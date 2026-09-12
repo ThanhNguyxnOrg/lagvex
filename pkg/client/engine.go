@@ -18,9 +18,9 @@ import (
 type TunnelState string
 
 const (
-	StateDisconnected TunnelState = "disconnected"
-	StateConnecting   TunnelState = "connecting"
-	StateConnected    TunnelState = "connected"
+	StateDisconnected  TunnelState = "disconnected"
+	StateConnecting    TunnelState = "connecting"
+	StateConnected     TunnelState = "connected"
 	StateDisconnecting TunnelState = "disconnecting"
 )
 
@@ -43,13 +43,13 @@ type TunnelStats struct {
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
 type Engine struct {
-	mu           sync.Mutex
-	state        TunnelState
-	clientID     uint64
-	sessionID    uint64
-	clientIP     netip.Addr
-	gatewayIP    netip.Addr
-	mtu          int
+	mu        sync.Mutex
+	state     TunnelState
+	clientID  uint64
+	sessionID uint64
+	clientIP  netip.Addr
+	gatewayIP netip.Addr
+	mtu       int
 
 	relayAddr    netip.AddrPort
 	relayIP      netip.Addr
@@ -65,14 +65,14 @@ type Engine struct {
 	gameCIDRs    []string
 	isGameActive bool
 
-	cancelFunc   context.CancelFunc
-	wg           sync.WaitGroup
+	cancelFunc context.CancelFunc
+	wg         sync.WaitGroup
 
-	bytesUp      atomic.Uint64
-	bytesDown    atomic.Uint64
-	pingMs       atomic.Int64
-	upRate       atomic.Int64
-	downRate     atomic.Int64
+	bytesUp   atomic.Uint64
+	bytesDown atomic.Uint64
+	pingMs    atomic.Int64
+	upRate    atomic.Int64
+	downRate  atomic.Int64
 }
 
 // NewEngine initializes the Lagvex Client Engine.

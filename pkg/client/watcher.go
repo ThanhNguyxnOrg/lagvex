@@ -10,11 +10,11 @@ import (
 
 // ProcessWatcher monitors running system processes to detect game start and exit events.
 type ProcessWatcher struct {
-	mu           sync.Mutex
-	targets      []string // Executable names to watch (lowercase)
-	isRunning    bool
-	activePID    int
-	matchedProc  string
+	mu          sync.Mutex
+	targets     []string // Executable names to watch (lowercase)
+	isRunning   bool
+	activePID   int
+	matchedProc string
 
 	OnGameStarted func(procName string)
 	OnGameStopped func(procName string)

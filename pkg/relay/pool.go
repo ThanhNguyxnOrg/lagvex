@@ -18,7 +18,7 @@ type IPPool struct {
 	gatewayIP    netip.Addr
 	startIP      netip.Addr
 	endIP        netip.Addr
-	usedIPs      map[netip.Addr]uint64    // IP -> SessionID
+	usedIPs      map[netip.Addr]uint64   // IP -> SessionID
 	reservations map[uint64]reservedAddr // ClientID -> reserved IP info
 }
 

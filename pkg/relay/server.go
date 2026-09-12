@@ -16,10 +16,10 @@ import (
 
 // Server implements the Lagvex Relay data plane on Linux.
 type Server struct {
-	cfg   Config
-	pool  *IPPool
+	cfg    Config
+	pool   *IPPool
 	tunDev *tun.Device
-	conn  *net.UDPConn
+	conn   *net.UDPConn
 
 	mu           sync.RWMutex
 	sessionsByID map[uint64]*Session

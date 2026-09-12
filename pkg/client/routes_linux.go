@@ -15,11 +15,11 @@ import (
 
 // RouteManager on Linux manages routes using `ip route`.
 type RouteManager struct {
-	mu           sync.Mutex
-	tunName      string
+	mu             sync.Mutex
+	tunName        string
 	installedCIDRs []string
-	pinnedRelay  string
-	pinnedDev    string
+	pinnedRelay    string
+	pinnedDev      string
 }
 
 func NewRouteManager() *RouteManager {

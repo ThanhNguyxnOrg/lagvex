@@ -14,10 +14,10 @@ import (
 
 // RouteManager on macOS manages kernel routes via `route` and `ifconfig`.
 type RouteManager struct {
-	mu           sync.Mutex
-	tunName      string
+	mu             sync.Mutex
+	tunName        string
 	installedCIDRs []string
-	pinnedRelay  string
+	pinnedRelay    string
 }
 
 func NewRouteManager() *RouteManager {

@@ -17,17 +17,17 @@ var (
 	modIphlpapi = syscall.NewLazyDLL("iphlpapi.dll")
 	modKernel32 = syscall.NewLazyDLL("kernel32.dll")
 
-	procWintunCreateAdapter         *syscall.LazyProc
-	procWintunOpenAdapter           *syscall.LazyProc
-	procWintunCloseAdapter          *syscall.LazyProc
-	procWintunStartSession          *syscall.LazyProc
-	procWintunEndSession            *syscall.LazyProc
-	procWintunGetReadWaitEvent      *syscall.LazyProc
-	procWintunReceivePacket         *syscall.LazyProc
-	procWintunReleaseReceivePacket  *syscall.LazyProc
-	procWintunAllocateSendPacket    *syscall.LazyProc
-	procWintunSendPacket            *syscall.LazyProc
-	procWintunGetAdapterLUID        *syscall.LazyProc
+	procWintunCreateAdapter        *syscall.LazyProc
+	procWintunOpenAdapter          *syscall.LazyProc
+	procWintunCloseAdapter         *syscall.LazyProc
+	procWintunStartSession         *syscall.LazyProc
+	procWintunEndSession           *syscall.LazyProc
+	procWintunGetReadWaitEvent     *syscall.LazyProc
+	procWintunReceivePacket        *syscall.LazyProc
+	procWintunReleaseReceivePacket *syscall.LazyProc
+	procWintunAllocateSendPacket   *syscall.LazyProc
+	procWintunSendPacket           *syscall.LazyProc
+	procWintunGetAdapterLUID       *syscall.LazyProc
 
 	procConvertInterfaceLuidToIndex = modIphlpapi.NewProc("ConvertInterfaceLuidToIndex")
 	procWaitForSingleObject         = modKernel32.NewProc("WaitForSingleObject")
@@ -75,14 +75,14 @@ func initWintunProcs(dllPath string) error {
 
 // WintunAdapter encapsulates an open WinTun adapter and session.
 type WintunAdapter struct {
-	mu           sync.Mutex
-	adapterH     uintptr
-	sessionH     uintptr
-	readEvent    uintptr
-	ifIndex      uint32
-	name         string
-	tunnelType   string
-	closed       bool
+	mu         sync.Mutex
+	adapterH   uintptr
+	sessionH   uintptr
+	readEvent  uintptr
+	ifIndex    uint32
+	name       string
+	tunnelType string
+	closed     bool
 }
 
 // OpenOrCreateWintunAdapter creates a WinTun adapter (or opens if exists).

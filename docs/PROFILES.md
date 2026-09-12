@@ -170,24 +170,23 @@ The `continent` field in each regional block enables the HUD to group game serve
 
 ---
 
-## 3. 🔬 Discovering CIDRs for New Games 🔍
+## 3. 🔬 Adding Custom Games & Discovering CIDRs 🔍
 
-To capture and add a new game title to Lagvex:
+Players and developers can add new games through two methods:
 
-1. 📊 **Monitor Sockets in Live Match**:
-   - Launch Windows **Resource Monitor** (`resmon.exe`) -> **Network** tab.
-   - Filter by your game's `.exe` while playing inside a server.
-   - Record the destination IP and UDP port transferring game data (typically 10-40 KB/s steady).
-2. 🔍 **Look up Autonomous System (ASN)**:
-   ```bash
-   whois <GAME_SERVER_IP> | grep -E "OriginAS|NetRange|CIDR"
-   ```
-3. 🎯 **Keep CIDRs Narrow**:
-   - Cross-check with official public cloud ranges (AWS `ip-ranges.json`, Azure IP ranges).
-   - Prefer `/20` through `/24` subnets to avoid dragging unrelated services through your VPS relay.
-4. 🌟 **Register via UI**:
-   - Open Dashboard at `http://127.0.0.1:18888`.
-   - Click **+ Add Custom Game**, enter process name and paste your CIDRs!
+### 🌟 Method A: Dynamic In-App Registration (Zero Coding)
+1. Open the Web Dashboard at `http://127.0.0.1:18888`.
+2. Click **+ Add Custom Game** in the cockpit.
+3. Enter your game's process name (e.g. `CustomGame.exe`) and paste the regional IP CIDRs.
+4. Custom games are saved immediately to local storage and become selectable for split-tunneling.
+
+### 🛠️ Method B: Permanent Repository Contribution
+To permanently contribute a game profile, complete regional CIDR map, and vector SVG insignia to the official Lagvex distribution:
+👉 **Follow our exhaustive developer walkthrough in [🤝 CONTRIBUTING.md](../CONTRIBUTING.md)**, which covers:
+- Live match packet capture with Resource Monitor, Wireshark, and PowerShell.
+- Cloud ASN lookups (Valve SDR, Riot Direct, AWS, Azure, GCP, Tencent Cloud).
+- Subnet isolation rules to prevent web traffic hijacking.
+- SVG emblem formatting and Go test validation.
 
 ---
 

@@ -18,10 +18,10 @@ import (
 type RouteManager struct {
 	mu sync.Mutex
 
-	tunIfIndex       uint32
+	tunIfIndex         uint32
 	installedGameCIDRs []string
-	pinnedRelayRoute string
-	pinnedPhysIndex  uint32
+	pinnedRelayRoute   string
+	pinnedPhysIndex    uint32
 }
 
 // NewRouteManager initializes a new RouteManager.
