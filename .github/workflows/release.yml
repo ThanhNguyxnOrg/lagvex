@@ -1,0 +1,189 @@
+name: 🚀 Build & Publish Release 📦
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+jobs:
+  detect:
+    name: 🔎 Detect Release Intent
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Parse Commit Message or Tag
+        id: check
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          REF="${{ github.ref }}"
+          SHOULD_RELEASE="false"
+          VERSION=""
+          TAG=""
+
+          if [[ "$REF" == refs/tags/v* ]]; then
+            TAG="${REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            SHOULD_RELEASE="true"
+            echo "Triggered by git tag: $TAG"
+          else
+            # Check if commit message starts with release pattern
+            FIRST_LINE=$(echo "$MSG" | head -n 1)
+            echo "Checking commit message: $FIRST_LINE"
+            if [[ "$FIRST_LINE" =~ [Rr]elease:?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]] || \
+               [[ "$FIRST_LINE" =~ chore\(release\):?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]]; then
+              VERSION="${BASH_REMATCH[1]}"
+              TAG="v${VERSION}"
+              SHOULD_RELEASE="true"
+              echo "Detected release commit message -> Tag: $TAG (Version: $VERSION)"
+            fi
+          fi
+
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+  build-and-release:
+    name: 📦 Build Multi-Platform & Publish
+    needs: detect
+    if: needs.detect.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐹 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: 🏷️ Ensure Git Tag Exists
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "Created and pushed tag $TAG"
+          else
+            echo "Tag $TAG already exists."
+          fi
+
+      - name: 📜 Extract Changelog
+        id: changelog
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          # Extract notes for [VERSION] from CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            awk -v ver="[${VERSION}]" '
+              $0 ~ ver {flag=1; next}
+              flag && /^## / {exit}
+              flag {print}
+            ' CHANGELOG.md > RELEASE_NOTES.md
+          fi
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "### 🚀 What's Changed in ${VERSION}" > RELEASE_NOTES.md
+            git log -n 10 --pretty=format:"* %s (%h)" >> RELEASE_NOTES.md
+          fi
+          echo "---" >> RELEASE_NOTES.md
+          echo "### 🔐 SHA-256 Checksums" >> RELEASE_NOTES.md
+          echo "Refer to \`checksums.txt\` attached below to verify your downloads." >> RELEASE_NOTES.md
+
+      - name: 🔨 Compile Release Binaries
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+        run: |
+          mkdir -p dist
+
+          # 1. Windows amd64 Client
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client.exe ./cmd/lagvex-client
+          
+          # 2. Linux amd64 Client & Relay
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client-linux-amd64 ./cmd/lagvex-client
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-relay ./cmd/lagvex-relay
+
+          # 3. macOS arm64 (Apple Silicon) Client
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client-darwin-arm64 ./cmd/lagvex-client
+
+          # 4. macOS amd64 (Intel) Client
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client-darwin-amd64 ./cmd/lagvex-client
+
+      - name: 📦 Package Archives
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          mkdir -p release-artifacts
+
+          # 🪟 Windows Client ZIP
+          mkdir -p pack-win
+          cp dist/lagvex-client.exe pack-win/
+          if [ -f "bin/amd64/wintun.dll" ]; then
+            cp bin/amd64/wintun.dll pack-win/
+          fi
+          cp -r configs pack-win/
+          cp README.md LICENSE pack-win/
+          cd pack-win && zip -r ../release-artifacts/lagvex-${TAG}-windows-amd64.zip . && cd ..
+
+          # 🐧 Linux Client TAR.GZ
+          mkdir -p pack-linux
+          cp dist/lagvex-client-linux-amd64 pack-linux/
+          cp -r configs pack-linux/
+          cp README.md LICENSE pack-linux/
+          tar -czvf release-artifacts/lagvex-${TAG}-linux-amd64.tar.gz -C pack-linux .
+
+          # 🍎 macOS Client TAR.GZ (Apple Silicon)
+          mkdir -p pack-darwin-arm64
+          cp dist/lagvex-client-darwin-arm64 pack-darwin-arm64/
+          cp -r configs pack-darwin-arm64/
+          cp README.md LICENSE pack-darwin-arm64/
+          tar -czvf release-artifacts/lagvex-${TAG}-darwin-arm64.tar.gz -C pack-darwin-arm64 .
+
+          # 🍎 macOS Client TAR.GZ (Intel)
+          mkdir -p pack-darwin-amd64
+          cp dist/lagvex-client-darwin-amd64 pack-darwin-amd64/
+          cp -r configs pack-darwin-amd64/
+          cp README.md LICENSE pack-darwin-amd64/
+          tar -czvf release-artifacts/lagvex-${TAG}-darwin-amd64.tar.gz -C pack-darwin-amd64 .
+
+          # ☁️ Linux Relay Server TAR.GZ
+          mkdir -p pack-relay
+          cp dist/lagvex-relay pack-relay/
+          cp scripts/install-relay.sh pack-relay/
+          cp docker-compose.yml Dockerfile pack-relay/
+          cp README.md LICENSE pack-relay/
+          tar -czvf release-artifacts/lagvex-relay-${TAG}-linux-amd64.tar.gz -C pack-relay .
+
+          # 🔐 Generate SHA-256 Checksums
+          cd release-artifacts
+          sha256sum * > checksums.txt
+          cd ..
+
+      - name: 🚀 Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.detect.outputs.tag }}
+          name: "Lagvex ${{ needs.detect.outputs.tag }} 🚀"
+          body_path: RELEASE_NOTES.md
+          files: |
+            release-artifacts/*.zip
+            release-artifacts/*.tar.gz
+            release-artifacts/checksums.txt
+          draft: false
+          prerelease: false

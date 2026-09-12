@@ -11,9 +11,10 @@
 
 <p align="center">
   <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go" alt="Go Version"></a>
+  <a href="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml"><img src="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform"></a>
   <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Anti--Cheat-Non--Invasive%20(No%20Hooks)-brightgreen" alt="Anti-Cheat: Non-Invasive"></a>
-  <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Disclaimer-Educational%20Use%20Only-orange" alt="Disclaimer"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.0.0-blueviolet" alt="Changelog"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 

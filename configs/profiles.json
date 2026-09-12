@@ -385,12 +385,14 @@
     },
     {
       "id": "lol",
-      "name": "League of Legends",
-      "category": "MOBA",
+      "name": "League of Legends & TFT",
+      "category": "MOBA & Auto-Battler",
       "icon": "⚔️",
       "processNames": [
         "League of Legends.exe",
-        "LeagueClient.exe"
+        "LeagueClient.exe",
+        "LeagueClientUx.exe",
+        "RiotClientServices.exe"
       ],
       "regions": [
         {
