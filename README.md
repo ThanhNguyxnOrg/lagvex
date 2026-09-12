@@ -96,6 +96,7 @@ Lagvex includes pre-verified, narrow CIDR IP pools for major competitive titles:
 | 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
 | 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md) | Profile JSON schema, cloud provider network maps (Valve SDR, Riot Direct, AWS, Azure), and capturing new games. |
 | 🔬 [**Networking Research & Whitepaper**](docs/RESEARCH.md) | Empirical network latency studies, bufferbloat mitigation, and kernel-level packet scheduling research. |
+| 🌐 [**Why a Relay (VPS) is Required**](docs/WHY_VPS.md) | **Technical FAQ**: Why an intermediate relay server is physically needed, ISP undersea routing limits, squad sharing, and vendor-neutral specs. |
 | ⚖️ [**Legal Disclaimer & Ban Waiver**](docs/DISCLAIMER.md) | **Crucial reading**: Educational use terms, anti-cheat policy, and zero ban liability agreement. |
 
 ---

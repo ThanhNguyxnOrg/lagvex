@@ -1,7 +1,7 @@
 # 🚀 Lagvex Relay VPS Deployment & Operations ☁️
 
 > **Step-by-Step Operator Guide for Self-Hosting Lagvex**  
-> 🔗 [Back to Project README.md](../README.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [Why a Relay is Needed](WHY_VPS.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
