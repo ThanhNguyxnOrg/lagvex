@@ -103,10 +103,10 @@ func main() {
 	// Web Dashboard Mode
 	uiServer := client.NewUIServer(engine, pm, "")
 
-	if !*noBrowserFlag && runtime.GOOS == "windows" {
+	if !*noBrowserFlag {
 		go func() {
 			time.Sleep(800 * time.Millisecond)
-			openBrowser(fmt.Sprintf("http://%s", *httpFlag))
+			openDesktopWindow(fmt.Sprintf("http://%s", *httpFlag))
 		}()
 	}
 
@@ -121,6 +121,47 @@ func main() {
 	}
 }
 
-func openBrowser(url string) {
-	_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+func openDesktopWindow(url string) {
+	if runtime.GOOS == "windows" {
+		// 1. Try Microsoft Edge standalone App Mode (clean desktop window with Lagvex UI)
+		edgeCandidates := []string{
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Microsoft", "Edge", "Application", "msedge.exe"),
+			filepath.Join(os.Getenv("ProgramFiles"), "Microsoft", "Edge", "Application", "msedge.exe"),
+			filepath.Join(os.Getenv("LocalAppData"), "Microsoft", "Edge", "Application", "msedge.exe"),
+		}
+		for _, p := range edgeCandidates {
+			if _, err := os.Stat(p); err == nil {
+				cmd := exec.Command(p, fmt.Sprintf("--app=%s", url), "--window-size=1220,840")
+				if err := cmd.Start(); err == nil {
+					return
+				}
+			}
+		}
+
+		// 2. Try Google Chrome standalone App Mode
+		chromeCandidates := []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "Google", "Chrome", "Application", "chrome.exe"),
+			filepath.Join(os.Getenv("ProgramFiles(x86)"), "Google", "Chrome", "Application", "chrome.exe"),
+			filepath.Join(os.Getenv("LocalAppData"), "Google", "Chrome", "Application", "chrome.exe"),
+		}
+		for _, p := range chromeCandidates {
+			if _, err := os.Stat(p); err == nil {
+				cmd := exec.Command(p, fmt.Sprintf("--app=%s", url), "--window-size=1220,840")
+				if err := cmd.Start(); err == nil {
+					return
+				}
+			}
+		}
+
+		// 3. Fallback to default browser
+		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		return
+	}
+
+	if runtime.GOOS == "darwin" {
+		_ = exec.Command("open", url).Start()
+		return
+	}
+
+	_ = exec.Command("xdg-open", url).Start()
 }
