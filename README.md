@@ -1,34 +1,56 @@
 # ⚡ Lagvex
 
-> **Open-Source Gaming Latency Reducer & Ping Booster**  
-> *Chơi game ping thấp, ổn định đường truyền, chống nghẽn mạng ISP bằng kỹ thuật Route-based Split-Tunneling an toàn tuyệt đối.*
+<p align="center">
+  <img src="assets/banner.jpg" alt="Lagvex Banner" width="100%">
+</p>
 
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://golang.org)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-blue)](https://github.com/lagvex/lagvex)
-[![Anti-Cheat](https://img.shields.io/badge/Anti--Cheat-100%25%20Safe%20(No%20Injection)-brightgreen)](https://github.com/lagvex/lagvex)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <strong>Open-Source Gaming Latency Reducer & Split-Tunneling Ping Booster</strong><br>
+  <em>Achieve ultra-low latency, eliminate jitter, and bypass ISP routing bottlenecks with 100% anti-cheat-safe route-based split-tunneling.</em>
+</p>
 
----
-
-## 🎯 Tại sao Lagvex vượt trội?
-
-Khi chơi game online (như Valorant, CS2, PUBG, Apex Legends), đường truyền mặc định của nhà mạng (ISP) tại Việt Nam thường đi qua các tuyến cáp quang bị nghẽn hoặc định tuyến vòng vèo sang Hong Kong, Nhật Bản rồi mới tới Singapore, gây ra hiện tượng **ping cao, giật lag, mất gói (packet loss) và choke**.
-
-Các giải pháp truyền thống:
-- **VPN thông thường**: Đẩy toàn bộ mạng (Web, YouTube, Discord, Windows Update) qua VPN, làm nghẽn băng thông, Discord bị đổi vùng và tốn tài nguyên.
-- **Phần mềm hook game (DLL Injection / Memory read / WinDivert)**: Rất dễ bị các hệ thống Anti-Cheat khắt khe (Riot Vanguard, BattlEye, EasyAntiCheat, VAC) quét và cấm tài khoản vĩnh viễn (False-positive Ban).
-
-**Lagvex giải quyết triệt để vấn đề này**:
-1. **100% An toàn với Anti-Cheat**: Không đọc bộ nhớ game, không DLL injection, không can thiệp socket. Chỉ sử dụng card mạng ảo **WinTun** (từ dự án WireGuard) và sửa **bảng định tuyến Windows (Windows Routing Table)**.
-2. **Split-Tunneling theo dải IP Game Server**: Chỉ lưu lượng hướng tới dải IP máy chủ game mới đi qua tunnel. Discord, trình duyệt, download vẫn đi trực tiếp qua mạng nhà với tốc độ tối đa.
-3. **Relay Server tự host siêu nhẹ (Go)**: Nhận gói đã bọc 9-byte header siêu nhỏ gọn qua UDP, đẩy thẳng vào Linux Kernel TUN device để kernel tự làm NAT MASQUERADE và MSS clamping. Độ trễ bổ sung gần như bằng 0ms.
-4. **Hỗ trợ đa game hot hiện nay**: Valorant, CS2, PUBG, Apex Legends, The Finals, Call of Duty, Delta Force, Overwatch 2, Rainbow Six Siege, League of Legends, Dota 2.
+<p align="center">
+  <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go" alt="Go Version"></a>
+  <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-blue" alt="Platform"></a>
+  <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Anti--Cheat-100%25%20Safe%20(No%20Hooks)-brightgreen" alt="Anti-Cheat Safe"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
 ---
 
-## 🎮 Danh mục Game hỗ trợ sẵn (Out-of-the-Box)
+## 📖 Table of Contents
 
-| Tựa Game | Thể loại | Cụm Server (Region) | Anti-Cheat Tương thích |
+- [Why Lagvex?](#-why-lagvex)
+- [Supported Games](#-supported-games)
+- [Documentation & Deep Dives](#-documentation--deep-dives)
+- [How It Works](#-how-it-works)
+- [Quick Start](#-quick-start)
+  - [1. Deploy Relay on VPS (One-Liner)](#1-deploy-relay-on-vps-one-liner)
+  - [2. Run Client on Windows](#2-run-client-on-windows)
+- [Building from Source](#-building-from-source)
+- [License](#-license)
+
+---
+
+## 🎯 Why Lagvex?
+
+When playing online multiplayer games (such as Valorant, Counter-Strike 2, PUBG, or Apex Legends), domestic ISPs often route game traffic through suboptimal international transit corridors, causing **high ping, rubberbanding, packet loss, and jitter**.
+
+Traditional workarounds fail in critical ways:
+- **Commercial VPNs**: Force 100% of all system traffic through the tunnel. Discord voice regions break, web browsing slows down, and background downloads choke game packets.
+- **Hook-based Game Boosters**: Use DLL injection, LSP, or packet-divert drivers (e.g. WinDivert). Modern kernel anti-cheats (**Riot Vanguard, Valve VAC, BattlEye, Easy Anti-Cheat, RICOCHET**) continuously detect and ban third-party socket injection.
+
+**Lagvex solves this cleanly**:
+1. **100% Anti-Cheat Safe**: Operates strictly at the OS routing table level using WireGuard's official **WinTun** driver. No memory reading, no DLL injection, and no socket tampering.
+2. **Selective Route-Based Split Tunneling**: Only traffic destined for game server IP ranges passes through the tunnel. Discord, browsers, streaming, and Windows updates stay on your physical network at full gigabit speed.
+3. **High-Performance Go Relay**: Lightweight server running on any Linux VPS. Features a 9-byte minimal packet header over UDP and hands raw IPv4 packets to the Linux kernel for zero-copy NAT MASQUERADE and MSS clamping.
+4. **Out-of-the-Box Multi-Game Support**: Pre-configured with verified server CIDR pools for major competitive shooters and popular online titles.
+
+---
+
+## 🎮 Supported Games
+
+| Game Title | Genre | Server Regions | Anti-Cheat Compatibility |
 |---|---|---|---|
 | **Valorant** | Tactical FPS | Singapore (SEA), Tokyo (JP), Hong Kong (HK), Mumbai (IN), Frankfurt | ✅ Riot Vanguard |
 | **Counter-Strike 2 (CS2)** | Tactical FPS | Singapore, Hong Kong, Tokyo, Seoul, Frankfurt (Valve SDR) | ✅ Valve Anti-Cheat (VAC) |
@@ -39,118 +61,111 @@ Các giải pháp truyền thống:
 | **Delta Force: Hawk Ops** | Tactical Shooter | Singapore, Hong Kong (Tencent Cloud / AWS) | ✅ ACE Anti-Cheat |
 | **Overwatch 2** | Hero Shooter | Singapore, Taiwan, Korea, Japan | ✅ Blizzard Defense Matrix |
 | **Rainbow Six Siege** | Tactical Shooter | Singapore (SEAU), Japan East (Ubisoft Azure) | ✅ BattlEye |
-| **League of Legends (LoL)** | MOBA | Việt Nam (VNG), Singapore (Riot Direct), Taiwan | ✅ Riot Vanguard |
+| **League of Legends (LoL)** | MOBA | Vietnam (VNG), Singapore (Riot Direct), Taiwan | ✅ Riot Vanguard |
 | **Dota 2** | MOBA | Singapore (SEA), Japan (Valve SDR) | ✅ Valve VAC |
 
-*Người dùng cũng có thể dễ dàng thêm Game hoặc dải CIDR tùy chỉnh ngay trên giao diện Web Dashboard.*
+*Users can also register custom games and private server CIDRs dynamically via the Web Dashboard.*
 
 ---
 
-## 🏗️ Kiến trúc Kỹ thuật (Technical Architecture)
+## 📚 Documentation & Deep Dives
+
+| Document | Description |
+|---|---|
+| 📐 [**Architecture Overview**](docs/ARCHITECTURE.md) | In-depth packet journey, WinTun driver mechanics, Windows routing safety rules, and anti-cheat analysis. |
+| 📡 [**Wire Protocol v1 Specification**](docs/PROTOCOL.md) | Binary packet format, HMAC-SHA256 handshake, 9-byte data header, keepalive ping/pong, and MTU arithmetic. |
+| 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
+| 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md) | Profile JSON schema, cloud provider network maps (Valve SDR, Riot Direct, AWS, Azure), and capturing new games. |
+
+---
+
+## 🏗️ How It Works
 
 ```
 [ Game: Valorant / CS2 / PUBG ]
-       │ Gửi UDP/TCP tới IP Game Server (ví dụ: 13.250.0.0/15)
+       │  Sends UDP/TCP packets to game server (e.g. 13.250.0.0/15)
        ▼
 [ Windows Routing Table ]
-       │ Chỉ dải IP đích Game Server ──> [ WinTun Adapter: Lagvex ] (10.88.0.2)
-       │ Mọi IP khác (Discord, Web) ──> [ Default Physical Gateway ] (Mạng thường)
+       │  Game Server CIDR matches on-link ──> [ WinTun Adapter: Lagvex ] (10.88.0.2)
+       │  All other traffic (Discord, Web) ──> [ Default Physical Gateway ] (Direct ISP)
        ▼
 [ Lagvex Client Engine (Windows) ]
-       │ Đọc raw IPv4 packets từ WinTun Ring Buffer
-       │ Bọc 9-byte header siêu nhẹ (SessionID + MsgType)
-       │ Gửi qua UDP socket tới Relay VPS (Route /32 ghim qua gateway vật lý)
+       │  Reads raw IPv4 packet from WinTun ring buffer
+       │  Encloses with 9-byte header (Version, Type, SessionID)
+       │  Sends over UDP to Relay VPS (Pinned /32 route guarantees physical path)
        ▼
-══════════════ [ Đường truyền cáp quang quốc tế / VPS ] ══════════════
+═════════════════════ International Fiber / VPS ═════════════════════
        ▼
-[ Lagvex Relay Server (Go trên Linux VPS) ]
-       │ Bóc 9-byte header, xác thực HMAC-SHA256, Anti-spoofing
-       │ Đẩy raw IPv4 packet vào Linux TUN (/dev/net/tun: lagvex0)
+[ Lagvex Relay Server (Go on Linux VPS) ]
+       │  Strips 9-byte header, verifies HMAC session, checks anti-spoofing
+       │  Writes raw IPv4 packet into Linux TUN device (/dev/net/tun: lagvex0)
        ▼
 [ Linux Kernel (VPS) ]
-       │ iptables NAT MASQUERADE + TCP MSS Clamping
+       │  iptables NAT MASQUERADE + TCP MSS Clamping
        ▼
-[ Game Server Đích (Singapore / Tokyo / Hong Kong...) ]
+[ Destination Game Server (Singapore / Tokyo / Hong Kong...) ]
 ```
-
-### Các nguyên tắc an toàn mạng:
-- **Pin Relay Route `/32`**: Luôn ghim địa chỉ IP của VPS Relay qua card mạng vật lý trước khi kích hoạt tunnel. Điều này triệt tiêu hoàn toàn nguy cơ **Routing Loop** (gói tin gửi tới relay bị hút ngược vào tunnel làm rớt mạng).
-- **On-link Game Routes**: Các dải IP của game được định tuyến dưới dạng *on-link* (không nexthop), giúp Windows không mất thời gian chờ phân giải ARP/NDIS và không bị rớt gói.
-- **`store=active` (RAM-only)**: Mọi thay đổi bảng định tuyến chỉ lưu trên RAM. Nếu máy tính tắt đột ngột, crash hoặc ngắt điện, toàn bộ route tự động biến mất 100%, không bao giờ gây lỗi mất mạng cho người dùng.
 
 ---
 
-## 🚀 Hướng dẫn Cài đặt & Sử dụng
+## 🚀 Quick Start
 
-### 1. Dựng Relay Server trên VPS Linux (1 lệnh duy nhất)
+### 1. Deploy Relay on VPS (One-Liner)
 
-Thuê một VPS Linux (Ubuntu / Debian / CentOS / Rocky / AlmaLinux) ở vị trí tối ưu (khuyến nghị **Singapore** hoặc **Tokyo/Hong Kong** từ các nhà cung cấp có đường truyền thẳng về Việt Nam như Vultr, Linode, AWS, DigitalOcean, Oracle Cloud, v.v.).
-
-Chạy lệnh sau với quyền root:
+Deploy on any Linux VPS (Ubuntu, Debian, CentOS, AlmaLinux, Arch) near your target game servers (e.g., Singapore or Tokyo):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lagvex/lagvex/main/scripts/install-relay.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
 
-Script sẽ tự động:
-1. Cấu hình `sysctl` tối ưu bộ đệm UDP và bật IP Forwarding (`net.ipv4.ip_forward = 1`).
-2. Cấu hình tường lửa `iptables` / `ufw` NAT MASQUERADE và MSS clamping tự động lưu qua các lần reboot.
-3. Tạo Pre-Shared Key (PSK) ngẫu nhiên 32 ký tự bảo mật.
-4. Cài đặt và kích hoạt systemd daemon `lagvex-relay.service`.
-5. In ra thông số IP, Port, PSK sẵn sàng để copy vào Client!
+The script automatically:
+1. Enables IP forwarding and optimizes kernel UDP buffers in `sysctl`.
+2. Sets up `iptables` NAT MASQUERADE and TCP MSS clamping that persist across reboots.
+3. Generates a secure random 32-character Pre-Shared Key (PSK).
+4. Configures and starts the `lagvex-relay.service` systemd daemon.
+5. Prints a client-ready configuration snippet.
 
-*(Bạn cũng có thể chạy qua Docker bằng `docker-compose up -d`)*
+*(Or run via container using `docker compose up -d`)*
 
 ---
 
-### 2. Chạy Client trên Windows
+### 2. Run Client on Windows
 
-1. Tải bản build `lagvex-client.exe` và thư mục `web/`, `configs/` từ Releases.
-2. Đảm bảo file `wintun.dll` (bản 64-bit) nằm cùng thư mục hoặc trong `bin/amd64/`.
-3. Chạy `lagvex-client.exe` với quyền **Administrator** (bắt buộc để Windows cho phép tạo adapter mạng ảo WinTun và thêm route `store=active`):
+1. Download the latest release containing `lagvex-client.exe`, `web/`, and `configs/`.
+2. Ensure `wintun.dll` (64-bit) is present alongside the executable or in `bin/amd64/`.
+3. Launch `lagvex-client.exe` as **Administrator** (required by Windows to create virtual network adapters and insert `store=active` routes):
 
 ```cmd
-# Chạy với giao diện Web Dashboard (mặc định mở trình duyệt http://127.0.0.1:18888):
+# Launch with Web Dashboard UI (opens http://127.0.0.1:18888 automatically):
 lagvex-client.exe
 
-# Hoặc kết nối trực tiếp qua giao diện dòng lệnh (CLI):
+# Or connect directly via CLI:
 lagvex-client.exe -connect -relay 123.45.67.89:51820 -psk your_secret_psk -game valorant -region asia-sg
 ```
 
 ---
 
-## 🖥️ Giao diện Web Dashboard
+## 🛠️ Building from Source
 
-Giao diện Dashboard hiện đại phong cách Cyberpunk Dark Neon:
-- **Đo Ping thời gian thực (RTT Latency)** liên tục tới Relay Server.
-- **Biểu đồ băng thông Up/Down** tính bằng KB/s hoặc MB/s.
-- **Smart Process Watcher**: Tự động nhận diện khi tiến trình game chạy (ví dụ `VALORANT-Win64-Shipping.exe` bật lên) để nạp route, và tự gỡ route khi bạn tắt game.
-- **Thư viện Game đa dạng**: Tìm kiếm và chọn cụm server của game chỉ bằng 1 cú click.
-- **Ping Tester**: Kiểm tra tốc độ mạng tới VPS trước khi kết nối.
-
----
-
-## 🛠️ Biên dịch từ mã nguồn (Build from Source)
-
-Yêu cầu máy cài đặt **Go 1.22+**:
+Requires **Go 1.22+**:
 
 ```bash
-# Clone repository
-git clone https://github.com/lagvex/lagvex.git
+# Clone the repository
+git clone https://github.com/ThanhNguyxnOrg/lagvex.git
 cd lagvex
 
-# Chạy Unit Tests kiểm tra giao thức và HMAC
-go test -v ./pkg/protocol
+# Run unit tests
+make test
 
-# Biên dịch Relay Server (cho Linux VPS)
-make relay          # Tạo file bin/lagvex-relay
+# Build Linux Relay binary
+make relay
 
-# Biên dịch Client (cho Windows)
-make client         # Tạo file bin/lagvex-client.exe
+# Build Windows Client executable
+make client
 ```
 
 ---
 
-## 📜 Giấy phép bản quyền (License)
+## 📜 License
 
-Dự án được phát hành theo giấy phép mã nguồn mở **MIT License**. Bạn hoàn toàn tự do sử dụng, chỉnh sửa, tự host hoặc đóng góp phát triển.
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.

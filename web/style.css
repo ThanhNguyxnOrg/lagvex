@@ -80,15 +80,19 @@ body {
   gap: 14px;
 }
 
-.brand-logo {
-  font-size: 28px;
-  filter: drop-shadow(0 0 12px var(--accent-cyan));
-  animation: pulseLogo 3s infinite ease-in-out;
+.brand-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  box-shadow: 0 0 16px var(--accent-cyan-glow);
+  transition: all 0.3s ease;
 }
 
-@keyframes pulseLogo {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
+.brand-logo-img:hover {
+  transform: scale(1.08) rotate(-2deg);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.5);
 }
 
 .brand-title {
