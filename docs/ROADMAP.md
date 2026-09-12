@@ -90,14 +90,22 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 *Target: Observability & User Trust. Focus: Measuring what actually matters for competitive gameplay.*
 
-### 1. 🎯 Direct vs. Relay Real-Time Comparison (Smart Route Advisor)
+### 1. 🎨 Esports Cockpit HUD & Visual Telemetry (✅ Completed in v1.1.0)
+- **Delivered**:
+  - High-performance dark neon cockpit with high-contrast cyber styling (`#0a0e17`, `#00f0ff`, `#00ff88`).
+  - Resolution-independent vector SVG insignias for all 11 games.
+  - Tactical dual-ring radar scanner and real-time laser packet stream animation.
+  - Non-blocking glassmorphic toast notification bus.
+  - Multi-continent `<optgroup>` server cluster grouping covering 105 global destinations.
+
+### 2. 🎯 Direct vs. Relay Real-Time Comparison (Smart Route Advisor)
 - **Feature**: Simultaneously probe:
   1. $RTT_{\text{direct}}$: Ping from PC directly to the target game cloud gateway.
   2. $RTT_{\text{relay}}$: Ping from PC to Relay + Relay to Game Server.
 - **User Experience**: If the direct path is already optimal ($RTT_{\text{direct}} < RTT_{\text{relay}}$ and 0% loss), the dashboard explicitly advises:
   > *"⚡ Your direct ISP path is currently optimal (26ms vs 34ms). Booster recommended: OFF."*
 
-### 2. 📉 Tail Latency (P50, P95, P99) & Jitter Mathematics
+### 3. 📉 Tail Latency (P50, P95, P99) & Jitter Mathematics
 - **Problem**: Mean/average ping hides the micro-freezes and packet spikes that ruin competitive gunfights.
 - **Action**: Maintain rolling 120-packet histogram windows in memory to compute:
   - **P50 (Median)**: Typical round-trip time.

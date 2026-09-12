@@ -78,7 +78,7 @@ Lagvex solves this physical routing limitation by inserting a dedicated high-per
 Lagvex is engineered with three clear tiers of access:
 
 1. 🎁 **Tier 1: Built-In Community Public Nodes (Zero Setup)**:  
-   The client ships with pre-configured public community relay endpoints in Singapore, Hong Kong, and Tokyo. Casual players simply open the app, pick their game, and click **BOOST NOW**.
+   The client ships with **14 pre-configured public community relay endpoints** across 5 continents (Singapore, Tokyo, Hong Kong, Seoul, Sydney, Frankfurt, London, Paris, Helsinki, US-East, US-West, São Paulo, and Bahrain). Casual players simply open the app, pick their game, and click **BOOST NOW**.
 2. 🤝 **Tier 2: The "1 Hosts for the Whole Squad" Model**:  
    Only **one person** in a gaming team, Discord server, or net cafe needs to deploy a relay. The installer prints a shareable 1-click link:  
    `lagvex://connect?endpoint=IP:PORT&psk=KEY&name=Squad`  
@@ -125,11 +125,16 @@ Traditional commercial VPN services also use remote servers, but they route **10
 
 ## 🚀 How to Set Up a Relay 📦
 
-Ready to deploy your own relay? It takes under 60 seconds using our automated installer:
+Ready to deploy your own relay? It takes under 60 seconds:
 
-```bash
-curl -sSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
-```
+- 🐧 **On Linux VPS**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
+  ```
+- 🪟 **On Windows 10/11 / Windows Server (PowerShell Admin)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
+  ```
 
 For complete instructions on ports, firewall configuration, systemd services, and Docker Compose deployment, consult the [🚀 VPS Deployment Guide](DEPLOYMENT.md).
 

@@ -15,37 +15,65 @@
 
 ---
 
-## 2. 🌍 Choosing Optimal VPS Locations
+## 2. 🌍 Choosing Optimal Worldwide Relay Locations
 
-For players based in Southeast Asia / Vietnam:
-- 🇸🇬 **Singapore (SGP)**: The primary routing hub for Southeast Asian gaming servers (**Valorant, CS2, PUBG, Apex, LoL**). Providers with direct fiber peering: Vultr, Linode, AWS EC2 (`ap-southeast-1`), Oracle Cloud SG, OVH Singapore.
-- 🇯🇵 **Tokyo, Japan (TYO)**: Ideal for connecting to Japanese and East Asian game servers.
-- 🇭🇰 **Hong Kong (HKG)**: Low-latency hop for southern China, Taiwan, and Korean gaming clusters.
+Lagvex supports a global network across 5 continents. Choose a relay location closest to your target game datacenter:
+
+| Continent | 📍 Prime Relay Hubs | 🎯 Target Esports & Game Clusters |
+|---|---|---|
+| **Asia-Pacific (APAC)** 🌏 | 🇸🇬 **Singapore (SGP)**<br>🇯🇵 **Tokyo (TYO)**<br>🇭🇰 **Hong Kong (HKG)**<br>🇰🇷 **Seoul (SEL)**<br>🇦🇺 **Sydney (SYD)** | Valorant SEA/JP/KR, CS2 SDR Singapore/Tokyo, PUBG Asia, Apex SG/Tokyo, LoL VNG/Riot Direct, Delta Force |
+| **Europe (EU)** 🌍 | 🇩🇪 **Frankfurt (FRA)**<br>🇬🇧 **London (LON)**<br>🇫🇷 **Paris (CDG)**<br>🇫🇮 **Helsinki (HEL)**<br>🇪🇸 **Madrid (MAD)** | CS2 EU North/West, Valorant EU Central/West, The Finals Frankfurt, Rainbow Six Siege EU, Dota 2 EU |
+| **North America (NA)** 🌎 | 🇺🇸 **US-East (N. Virginia - IAD)**<br>🇺🇸 **US-West (Oregon - PDX / San Jose)**<br>🇺🇸 **US-Central (Dallas - DFW)** | Apex NA East/West, Warzone Demonware US, CS2 NA, Valorant NA, Overwatch 2 NA, Rainbow Six NA |
+| **South America (SA)** 🌎 | 🇧🇷 **São Paulo (GRU)**<br>🇨🇱 **Santiago (SCL)** | CS2 South America, Valorant Brazil, League of Legends BR, PUBG South America |
+| **Middle East & Africa (MENA)** 🌍 | 🇧🇭 **Bahrain (BAH)**<br>🇦🇪 **Dubai (DXB)**<br>🇿🇦 **Johannesburg (JNB)** | Valorant Middle East, Apex Bahrain, CS2 Dubai, Fortnite Middle East |
 
 ---
 
-## 3. ⚡ Quick Deployment (One-Liner) 🏁
+## 3. ⚡ 1-Click Automated Relay Deployment 🏁
 
-Run this single command as root on your VPS:
+### 🐧 Option A: Deploy on Linux VPS (Ubuntu, Debian, CentOS, Rocky, Arch)
+
+Run this single command as `root` (or with `sudo`) in your VPS terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
 
-**What the installer does automatically:**
-1. 🔌 Verifies kernel TUN support (`/dev/net/tun`).
-2. 🔧 Configures `sysctl` for high-speed packet forwarding:
+**Step-by-step what the Linux installer does automatically:**
+1. 🔌 **Checks TUN Support**: Ensures `/dev/net/tun` exists in your kernel.
+2. 🔧 **Tunes Kernel Network Parameters**:
    ```ini
    net.ipv4.ip_forward = 1
    net.ipv4.conf.all.rp_filter = 2
    net.core.rmem_max = 8388608
    net.core.wmem_max = 8388608
    ```
-3. 🛡️ Sets up `iptables` / `ufw` NAT MASQUERADE and TCP MSS clamping, saving rules to persist across reboots.
-4. 🔑 Generates a cryptographically random 32-character Pre-Shared Key (PSK) stored securely in `/etc/lagvex/psk.key`.
-5. 📦 Installs the `lagvex-relay` binary to `/usr/local/bin/lagvex-relay`.
-6. ⚙️ Registers and starts the systemd service `lagvex-relay.service`.
-7. 📋 Displays your server IP, Port, PSK, and prints a **1-Click Squad Share Link** (`lagvex://connect?...`) that teammates can paste directly into their Lagvex HUD to join without manual configuration!
+3. 🛡️ **Sets Up Firewall & Masquerade**: Adds `iptables` NAT MASQUERADE for the `10.88.0.0/24` tunnel subnet and enables TCP MSS clamping so game packets never fragment.
+4. 🔑 **Generates Pre-Shared Key (PSK)**: Generates a cryptographically strong 32-character random key stored at `/etc/lagvex/psk.key`.
+5. 📦 **Installs Binary**: Downloads and installs `lagvex-relay` to `/usr/local/bin/lagvex-relay`.
+6. ⚙️ **Registers Systemd Service**: Creates `/etc/systemd/system/lagvex-relay.service` and activates it immediately.
+7. 📋 **Prints Squad Invite Link**: Outputs a ready-to-share link (`lagvex://connect?endpoint=IP:51820&psk=KEY&name=MySquad`) that friends can paste directly into their Lagvex HUD!
+
+---
+
+### 🪟 Option B: Host on Windows 10/11 or Windows Server (PowerShell)
+
+If you have a Windows PC or Windows Server with a public IP or port-forwarded router:
+
+1. Right-click the **Start Menu** and choose **PowerShell (Admin)** or **Terminal (Admin)**.
+2. Run this command:
+
+```powershell
+irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
+```
+
+**Step-by-step what the Windows installer does automatically:**
+1. 🛡️ **Checks Elevation**: Verifies script runs with local Administrator privileges.
+2. 🔌 **Configures WinTun**: Checks for `wintun.dll` and configures the Layer-3 adapter interface.
+3. ⚡ **Enables Routing**: Executes `Set-NetIPInterface -Forwarding Enabled` across network interfaces.
+4. 🌐 **Configures NetNat**: Provisions Windows NetNat masquerading for `10.88.0.0/24` to route client packets to the Internet.
+5. 🔑 **Generates Security Key**: Creates a 32-character PSK stored securely at `C:\ProgramData\Lagvex\relay.json`.
+6. 📋 **Prints 1-Click Link**: Shows your public IP, Port 51820, and generates your squad share link ready to paste!
 
 ---
 

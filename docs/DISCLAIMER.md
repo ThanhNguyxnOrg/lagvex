@@ -56,8 +56,17 @@ As stipulated in the **[MIT License](../LICENSE)**:
 
 ---
 
+## 5. 🏷️ Nominative Fair Use & Intellectual Property Notice ⚖️
+
+All game titles, publisher/developer names, trade dress, and associated insignias (including *Valorant*, *Counter-Strike 2*, *PUBG*, *Apex Legends*, *League of Legends*, *The Finals*, *Call of Duty*, *Delta Force*, *Overwatch 2*, *Rainbow Six Siege*, *Dota 2*, and their respective marks belonging to Valve, Riot Games, Electronic Arts, Krafton, Activision, Ubisoft, and TiMi Studio Group) are trademarks or registered trademarks of their respective legal copyright holders.
+
+Lagvex is an independent open-source network protocol research tool and kernel latency accelerator. It is **not** endorsed by, affiliated with, sponsored by, or associated with any game developer or publisher. All vector marks in this repository and web UI are reproduced strictly under **Nominative Fair Use** solely to identify game executables and destination routing clusters for end-user network optimization.
+
+---
+
 🔗 **Return to Main Documentation**:
 - 🏠 [**Project README**](../README.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
+- 🌐 [**Game Profiles & CIDRs**](PROFILES.md)

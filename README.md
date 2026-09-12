@@ -14,7 +14,7 @@
   <a href="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml"><img src="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform"></a>
   <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Anti--Cheat-Non--Invasive%20(No%20Hooks)-brightgreen" alt="Anti-Cheat: Non-Invasive"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.0.0-blueviolet" alt="Changelog"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.1.0-blueviolet" alt="Changelog"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -66,23 +66,23 @@ When playing competitive online games (like **Valorant, CS2, PUBG, or Apex Legen
 
 ---
 
-## 🎮 Supported Games 🏆
+## 🎮 Supported Games & 105 Global Server Clusters 🏆
 
-Lagvex includes pre-verified, narrow CIDR IP pools for major competitive titles:
+Lagvex includes pre-verified, narrow CIDR IP pools covering **105 regional server clusters across 5 continents** (Asia-Pacific, Europe, North America, South America, and Middle East / Africa):
 
-| Game Title | 🏷️ Genre | 🌐 Server Regions | 🛡️ Anti-Cheat Compatibility |
+| Game Title | 🏷️ Genre | 🌐 Server Regions (5 Continents) | 🛡️ Anti-Cheat Compatibility |
 |---|---|---|---|
-| **Valorant** 🎯 | Tactical FPS | Singapore (SEA), Tokyo (JP), Hong Kong (HK), Mumbai (IN), Frankfurt | ✅ Riot Vanguard |
-| **Counter-Strike 2 (CS2)** 💣 | Tactical FPS | Singapore, Hong Kong, Tokyo, Seoul, Frankfurt (Valve SDR) | ✅ Valve Anti-Cheat (VAC) |
-| **PUBG: BATTLEGROUNDS** 🪂 | Battle Royale | Singapore, Tokyo, Seoul, Frankfurt (Azure & AWS) | ✅ BattlEye + Zakynthos |
-| **Apex Legends** ⚡ | Battle Royale | Singapore, Tokyo, Taiwan, Oregon (EA Multiplay) | ✅ Easy Anti-Cheat |
-| **The Finals** 🏆 | Arena FPS | Singapore, Tokyo, Frankfurt | ✅ Easy Anti-Cheat |
-| **Call of Duty: Warzone / MW3** 🎖️ | FPS / BR | Singapore, Tokyo, US-West (Demonware) | ✅ RICOCHET Anti-Cheat |
-| **Delta Force: Hawk Ops** 🦅 | Tactical Shooter | Singapore, Hong Kong (Tencent Cloud / AWS) | ✅ ACE Anti-Cheat |
-| **Overwatch 2** 🛡️ | Hero Shooter | Singapore, Taiwan, Korea, Japan | ✅ Blizzard Defense Matrix |
-| **Rainbow Six Siege** 🧱 | Tactical Shooter | Singapore (SEAU), Japan East (Ubisoft Azure) | ✅ BattlEye |
-| **League of Legends (LoL)** ⚔️ | MOBA | Vietnam (VNG), Singapore (Riot Direct), Taiwan | ✅ Riot Vanguard |
-| **Dota 2** 🛡️ | MOBA | Singapore (SEA), Japan (Valve SDR) | ✅ Valve VAC |
+| **Valorant** 🎯 | Tactical FPS | 🌏 APAC (SG, JP, HK, IN, KR, AU) • 🌍 EU (Frankfurt, London, Paris, Madrid) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) • 🌍 MENA (Bahrain) | ✅ Riot Vanguard |
+| **Counter-Strike 2 (CS2)** 💣 | Tactical FPS | 🌏 APAC (Singapore, Tokyo, Hong Kong, Seoul, Sydney) • 🌍 EU (Frankfurt, London, Helsinki, Madrid) • 🌎 NA (Virginia, Oregon) • 🌎 SA (São Paulo) (Valve SDR) | ✅ Valve Anti-Cheat (VAC) |
+| **PUBG: BATTLEGROUNDS** 🪂 | Battle Royale | 🌏 APAC (Singapore, Tokyo, Seoul) • 🌍 EU (Frankfurt, Ireland) • 🌎 NA (Virginia, Oregon) • 🌎 SA (São Paulo) (Azure & AWS) | ✅ BattlEye + Zakynthos |
+| **Apex Legends** ⚡ | Battle Royale | 🌏 APAC (Singapore, Tokyo, Taiwan, Sydney) • 🌍 EU (Frankfurt, London, Amsterdam) • 🌎 NA (Oregon, Virginia, Texas) • 🌎 SA (São Paulo) (EA Multiplay) | ✅ Easy Anti-Cheat |
+| **The Finals** 🏆 | Arena FPS | 🌏 APAC (Singapore, Tokyo) • 🌍 EU (Frankfurt, London) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) | ✅ Easy Anti-Cheat |
+| **Call of Duty: Warzone / MW3** 🎖️ | FPS / BR | 🌏 APAC (Singapore, Tokyo, Sydney) • 🌍 EU (Frankfurt, London) • 🌎 NA (US-East, US-West, Texas) • 🌎 SA (São Paulo) (Demonware) | ✅ RICOCHET Anti-Cheat |
+| **Delta Force: Hawk Ops** 🦅 | Tactical Shooter | 🌏 APAC (Singapore, Hong Kong, Tokyo) • 🌍 EU (Frankfurt) • 🌎 NA (US-East, US-West) (Tencent Cloud / AWS) | ✅ ACE Anti-Cheat |
+| **Overwatch 2** 🛡️ | Hero Shooter | 🌏 APAC (Singapore, Taiwan, Korea, Japan, Australia) • 🌍 EU (Frankfurt, Paris) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) | ✅ Blizzard Defense Matrix |
+| **Rainbow Six Siege** 🧱 | Tactical Shooter | 🌏 APAC (Singapore, Japan, Australia) • 🌍 EU (North EU, West EU) • 🌎 NA (US-East, US-Central, US-West) • 🌎 SA (Brazil South) (Ubisoft Azure) | ✅ BattlEye |
+| **League of Legends (LoL) & TFT** ⚔️ | MOBA / Strategy | 🌏 APAC (Vietnam VNG, Singapore Riot Direct, Taiwan, Korea, Japan) • 🌍 EU (EU-West, EU-Nordic) • 🌎 NA (NA-East) • 🌎 SA (Brazil) | ✅ Riot Vanguard |
+| **Dota 2** 🛡️ | MOBA | 🌏 APAC (Singapore, Japan, Australia) • 🌍 EU (Frankfurt, Stockholm) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) (Valve SDR) | ✅ Valve VAC |
 
 *💡 Need a different game? Click **+ Add Custom Game** in the Web Dashboard to register any game executable and custom server IP range in seconds!*
 
@@ -167,22 +167,35 @@ Playing with a team or at a cyber cafe? Only **one person** in your squad needs 
 
 ---
 
-### ☁️ Option C: For Power Users & Server Hosts — Deploy Private VPS (60 Seconds) 🛠️
+### ☁️ Option C: For Power Users & Server Hosts — Deploy Private Relay (60 Seconds) 🛠️
 
-Want your own 100% dedicated private relay? Run this one-liner on any fresh Linux VPS (**Ubuntu, Debian, CentOS, Rocky Linux, Arch**) located in Singapore or Tokyo:
+Want your own 100% dedicated private relay? You can deploy on a Linux VPS or host directly on Windows:
 
+#### 🐧 1. On Linux VPS (Ubuntu, Debian, CentOS, Rocky, Arch)
+Run this one-liner as root on your cloud VPS:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
-
-**What the installer does automatically:**
-1. 🔧 Tunes kernel `sysctl` (`ip_forward=1`, `rp_filter=2`, 8MB UDP buffers).
-2. 🛡️ Sets up persistent `iptables` NAT MASQUERADE and TCP MSS clamping.
-3. 🔑 Generates a cryptographically secure 32-character Pre-Shared Key (PSK).
-4. ⚙️ Registers and starts the `lagvex-relay.service` systemd daemon.
-5. 📋 Generates your **1-Click Squad Share Link** ready to paste to your friends!
+**What it does automatically:**
+- 🔧 Tunes kernel `sysctl` (`ip_forward=1`, `rp_filter=2`, 8MB UDP buffers).
+- 🛡️ Sets up persistent `iptables` NAT MASQUERADE and TCP MSS clamping.
+- 🔑 Generates a cryptographically secure 32-character Pre-Shared Key (PSK).
+- ⚙️ Registers and starts the `lagvex-relay.service` systemd daemon.
+- 📋 Generates your **1-Click Squad Share Link** ready to paste to your friends!
 
 *(Prefer Docker? Run `docker compose up -d`)*
+
+#### 🪟 2. On Windows 10/11 or Windows Server (Native PowerShell)
+Open PowerShell as **Administrator** and run:
+```powershell
+irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
+```
+**What it does automatically:**
+- 🛡️ Verifies Administrator elevation and installs WireGuard WinTun driver.
+- ⚡ Enables Windows IP forwarding (`Set-NetIPInterface -Forwarding Enabled`).
+- 🌐 Configures Windows NetNat masquerade and port forwarding.
+- 🔑 Generates a 32-character random PSK and saves to `C:\ProgramData\Lagvex\relay.json`.
+- 📋 Prints your **1-Click Squad Share Link** (`lagvex://connect?...`) to share with friends!
 
 ---
 

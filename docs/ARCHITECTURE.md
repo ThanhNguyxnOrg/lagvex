@@ -17,9 +17,9 @@ Lagvex was built from the ground up to solve the latency challenges of online ga
    - **macOS**: Uses native **`utun`** (built into the Darwin kernel; zero third-party drivers needed).
    - **Linux / Steam Deck**: Uses native **/dev/net/tun**.
 3. ⚡ **Pure Go Monorepo**:
-   - Both the VPS Relay daemon (`lagvex-relay`) and the Client engine (`lagvex-client`) are written in Go. Sub-millisecond garbage collection pauses guarantee zero jitter for real-time game packets.
-4. 🐧 **Kernel-Level NAT on the VPS**:
-   - The Go relay server does **not** perform slow user-space NAT. It writes raw IPv4 packets directly into the Linux TUN interface (`lagvex0`). The Linux kernel handles `iptables` MASQUERADE, conntrack, and TCP MSS clamping at hardware line speed.
+   - Both the VPS Relay daemon (`lagvex-relay`) and the Client engine (`lagvex-client`) are written in Go. Zero-allocation data pipelines and buffer recycling via `sync.Pool` minimize GC pause times to preserve microsecond-level packet throughput.
+4. 🐧 **High-Performance Kernel-Level NAT (Linux & Windows)**:
+   - The relay server avoids slow user-space packet translation. On Linux, it writes raw IPv4 frames into `/dev/net/tun` (`lagvex0`) where the Linux kernel executes hardware-speed `iptables` NAT MASQUERADE, conntrack, and TCP MSS clamping. On Windows, it leverages NetNat packet masquerading and WinTun.
 
 ---
 
@@ -117,8 +117,58 @@ Lagvex solves this using the **Smart Process Watcher** ([`pkg/client/watcher.go`
 
 ---
 
+## 6. 🎨 Esports Cockpit HUD & Telemetry Architecture
+
+The frontend (`web/`) is architected as a lightweight, zero-dependency tactical gaming interface:
+
+```text
+  [ Embedded Go HTTP Server (:18888) ]
+                  │
+                  ├─► GET /api/status       (Engine state, active game, active relay)
+                  ├─► POST /api/connect     (Triggers handshake & dynamic routing)
+                  ├─► POST /api/disconnect  (Tears down routes & releases IP)
+                  ├─► POST /api/probe       (ICMP/UDP multi-probe for latency scoring)
+                  └─► Static Assets         (HTML5, Vanilla CSS, JS with zero npm bloat)
+```
+
+### Key Front-End Subsystems:
+1. 🛡️ **Resolution-Independent Vector Emblems**: Custom inline SVG insignias for all 11 games provide instantaneous rasterization with zero blur on 4K / Ultrawide gaming monitors.
+2. 📡 **Tactical Dual-Ring Radar Scanner**: Animated Canvas/SVG radar sweep line with synchronized radial sonar rings provides visual feedback during connection negotiation and process discovery.
+3. ⚡ **Active Laser Packet Stream**: When active, a dynamic SVG neon beam with traveling light particles illuminates the connection bridge, demonstrating active packet forwarding at a glance.
+4. 🔔 **Glassmorphic Toast Bus**: A centralized event dispatcher queues non-blocking feedback pills (probe results, copy events, route alerts) with smooth spring transitions and automated lifecycle disposal.
+
+---
+
+## 7. 🌐 Global Multi-Continent Relay Topology
+
+To deliver competitive latency for players worldwide, Lagvex structures its server infrastructure into **5 continental tiers**:
+
+```text
+                                  ┌──────────────────────────┐
+                                  │      LAGVEX CLIENT       │
+                                  └────────────┬─────────────┘
+                                               │
+                        ┌──────────────────────┴──────────────────────┐
+                        │ Dynamic Continental Routing Selector       │
+                        ▼                                             ▼
+             [ 🌏 Asia-Pacific ]                             [ 🌍 Europe ]
+        Singapore / Tokyo / Hong Kong                   Frankfurt / London / Paris
+        Seoul / Mumbai / Sydney                         Helsinki / Madrid
+                        │                                             │
+                        ├──────────────────────┬──────────────────────┤
+                        ▼                      ▼                      ▼
+             [ 🌎 North America ]     [ 🌎 South America ]    [ 🌍 Middle East ]
+             US-East / US-West        São Paulo / Santiago    Bahrain / Dubai
+```
+
+- **Optgroup Hierarchical Selectors**: The client UI dynamically parses `continent` attributes in `configs/profiles.json` to organize 105 regional server clusters into continent-based optical groups.
+- **Relay Proximity Priority**: Built-in relay selection prioritizes geographically proximate nodes, minimizing intermediate undersea hops before entering dedicated game backbones (Riot Direct, Valve SDR, AWS Global Accelerator).
+
+---
+
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
+- 🌐 [**Game Profiles & CIDRs**](PROFILES.md)
 - ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)
