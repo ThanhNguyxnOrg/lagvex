@@ -75,6 +75,7 @@ function getGameLogoSvg(gameId) {
         </svg>`;
 
     case "warzone":
+    case "cod_warzone":
       // Call of Duty: Warzone Military Stencil
       return `
         <svg viewBox="0 0 100 100" class="game-svg-logo" aria-label="Call of Duty: Warzone">
@@ -137,147 +138,1186 @@ function getGameLogoSvg(gameId) {
 // Complete offline fallback profiles
 const DEFAULT_GAMES = [
   {
-    id: "valorant",
-    name: "Valorant",
-    publisher: "Riot Games",
-    category: "Tactical FPS",
-    accent: "#ff4655",
-    processNames: ["VALORANT-Win64-Shipping.exe", "RiotClientServices.exe"],
-    regions: [
-      { id: "asia-sg", name: "Southeast Asia (Singapore - Riot Direct)", cidrs: ["13.250.0.0/15", "18.140.0.0/15", "52.220.0.0/15"] },
-      { id: "asia-hk", name: "Hong Kong (Riot Direct & AWS ap-east-1)", cidrs: ["18.162.0.0/15", "18.166.0.0/15"] },
-      { id: "asia-jp", name: "Japan (Tokyo - Riot Direct)", cidrs: ["13.112.0.0/14", "18.176.0.0/14"] }
+    "id": "valorant",
+    "name": "Valorant",
+    "publisher": "Riot Games",
+    "category": "Tactical FPS",
+    "accent": "#ff4655",
+    "processNames": [
+      "VALORANT-Win64-Shipping.exe",
+      "RiotClientServices.exe",
+      "VALORANT.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "US East (N. Virginia - Riot Direct)",
+        "cidrs": [
+          "192.207.0.0/18",
+          "24.105.0.0/18",
+          "52.0.0.0/11"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "US Central (Chicago / Texas - Riot Direct)",
+        "cidrs": [
+          "104.160.131.0/24",
+          "18.216.0.0/14"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "US West (California / Oregon - Riot Direct)",
+        "cidrs": [
+          "104.160.128.0/24",
+          "54.183.0.0/16",
+          "35.160.0.0/13"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt - Riot Direct)",
+        "cidrs": [
+          "104.160.141.0/24",
+          "3.120.0.0/14",
+          "18.194.0.0/15"
+        ]
+      },
+      {
+        "id": "eu-london",
+        "continent": "Europe",
+        "name": "Europe West (London - Riot Direct)",
+        "cidrs": [
+          "104.160.143.0/24",
+          "3.8.0.0/14",
+          "35.176.0.0/14"
+        ]
+      },
+      {
+        "id": "eu-stockholm",
+        "continent": "Europe",
+        "name": "Europe North (Stockholm - Riot Direct)",
+        "cidrs": [
+          "13.48.0.0/15",
+          "16.16.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore - Riot Direct)",
+        "cidrs": [
+          "13.250.0.0/15",
+          "18.140.0.0/15",
+          "52.220.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-tokyo",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo - Riot Direct)",
+        "cidrs": [
+          "13.112.0.0/14",
+          "18.176.0.0/14",
+          "52.192.0.0/14"
+        ]
+      },
+      {
+        "id": "asia-seoul",
+        "continent": "Asia-Pacific",
+        "name": "Korea (Seoul - Riot Direct)",
+        "cidrs": [
+          "104.160.154.0/24",
+          "13.124.0.0/14"
+        ]
+      },
+      {
+        "id": "asia-hk",
+        "continent": "Asia-Pacific",
+        "name": "Hong Kong (Riot Direct & AWS)",
+        "cidrs": [
+          "18.162.0.0/15",
+          "18.166.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-mumbai",
+        "continent": "Asia-Pacific",
+        "name": "India (Mumbai - Riot Direct)",
+        "cidrs": [
+          "13.126.0.0/15",
+          "13.232.0.0/15"
+        ]
+      },
+      {
+        "id": "oc-sydney",
+        "continent": "Oceania",
+        "name": "Australia (Sydney - Riot Direct)",
+        "cidrs": [
+          "104.160.156.0/24",
+          "13.236.0.0/14"
+        ]
+      },
+      {
+        "id": "sa-saopaulo",
+        "continent": "South America",
+        "name": "Brazil (São Paulo - Riot Direct)",
+        "cidrs": [
+          "104.160.152.0/24",
+          "177.54.144.0/20",
+          "18.228.0.0/15"
+        ]
+      }
     ]
   },
   {
-    id: "cs2",
-    name: "Counter-Strike 2",
-    publisher: "Valve Corporation",
-    category: "Tactical FPS",
-    accent: "#de9b35",
-    processNames: ["cs2.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Valve SDR - AS32590)", cidrs: ["103.10.124.0/24", "45.121.184.0/24", "162.254.197.0/24"] },
-      { id: "asia-hk", name: "Hong Kong (Valve SDR)", cidrs: ["153.254.86.0/24", "162.254.195.0/24"] },
-      { id: "asia-jp", name: "Japan (Tokyo Valve SDR)", cidrs: ["45.121.186.0/24", "155.133.239.0/24"] }
+    "id": "cs2",
+    "name": "Counter-Strike 2",
+    "publisher": "Valve Corporation",
+    "category": "Tactical FPS",
+    "accent": "#de9b35",
+    "processNames": [
+      "cs2.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "US East (Sterling / Virginia Valve SDR)",
+        "cidrs": [
+          "162.254.192.0/24",
+          "155.133.253.0/24",
+          "155.133.250.0/24"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "US Central (Chicago Valve SDR)",
+        "cidrs": [
+          "162.254.193.0/24",
+          "155.133.251.0/24"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "US West (Seattle / Los Angeles Valve SDR)",
+        "cidrs": [
+          "162.254.195.0/24",
+          "162.254.194.0/24",
+          "155.133.248.0/24"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Valve SDR)",
+        "cidrs": [
+          "155.133.226.0/24",
+          "155.133.242.0/24",
+          "162.254.197.0/24"
+        ]
+      },
+      {
+        "id": "eu-london",
+        "continent": "Europe",
+        "name": "Europe West (London Valve SDR)",
+        "cidrs": [
+          "162.254.196.0/24",
+          "155.133.243.0/24"
+        ]
+      },
+      {
+        "id": "eu-stockholm",
+        "continent": "Europe",
+        "name": "Europe North (Stockholm Valve SDR)",
+        "cidrs": [
+          "155.133.240.0/24",
+          "155.133.241.0/24"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Singapore (Valve SDR - AS32590)",
+        "cidrs": [
+          "103.10.124.0/24",
+          "103.28.54.0/24",
+          "45.121.184.0/24",
+          "155.133.254.0/24"
+        ]
+      },
+      {
+        "id": "asia-tokyo",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Valve SDR)",
+        "cidrs": [
+          "45.121.186.0/24",
+          "155.133.239.0/24",
+          "155.133.245.0/24"
+        ]
+      },
+      {
+        "id": "asia-seoul",
+        "continent": "Asia-Pacific",
+        "name": "Korea (Seoul Valve SDR)",
+        "cidrs": [
+          "155.133.234.0/24"
+        ]
+      },
+      {
+        "id": "asia-hk",
+        "continent": "Asia-Pacific",
+        "name": "Hong Kong (Valve SDR)",
+        "cidrs": [
+          "153.254.86.0/24",
+          "155.133.244.0/24"
+        ]
+      },
+      {
+        "id": "asia-mumbai",
+        "continent": "Asia-Pacific",
+        "name": "India (Mumbai Valve SDR)",
+        "cidrs": [
+          "155.133.233.0/24"
+        ]
+      },
+      {
+        "id": "oc-sydney",
+        "continent": "Oceania",
+        "name": "Australia (Sydney Valve SDR)",
+        "cidrs": [
+          "103.10.125.0/24",
+          "45.121.185.0/24",
+          "155.133.246.0/24"
+        ]
+      },
+      {
+        "id": "sa-saopaulo",
+        "continent": "South America",
+        "name": "Brazil (São Paulo Valve SDR)",
+        "cidrs": [
+          "205.185.194.0/24",
+          "155.133.236.0/24"
+        ]
+      },
+      {
+        "id": "af-johannesburg",
+        "continent": "Middle East & Africa",
+        "name": "South Africa (Johannesburg Valve SDR)",
+        "cidrs": [
+          "155.133.238.0/24",
+          "152.111.192.0/24"
+        ]
+      }
     ]
   },
   {
-    id: "pubg",
-    name: "PUBG: BATTLEGROUNDS",
-    publisher: "Krafton Inc.",
-    category: "Battle Royale",
-    accent: "#f39c12",
-    processNames: ["TslGame.exe", "TslGame_BE.exe", "TslGame_UC.exe"],
-    regions: [
-      { id: "asia-sg", name: "Southeast Asia (Azure SG & AWS)", cidrs: ["20.198.192.0/19", "20.24.48.0/20", "13.250.0.0/15"] },
-      { id: "asia-jp", name: "Japan (Tokyo Azure)", cidrs: ["20.210.0.0/16", "40.79.160.0/19"] },
-      { id: "asia-kr", name: "Korea (Seoul AWS/Azure)", cidrs: ["13.124.0.0/14", "3.34.0.0/15"] }
+    "id": "dota2",
+    "name": "Dota 2",
+    "publisher": "Valve Corporation",
+    "category": "MOBA",
+    "accent": "#e03825",
+    "processNames": [
+      "dota2.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "US East (Sterling / Virginia Valve SDR)",
+        "cidrs": [
+          "162.254.192.0/24",
+          "155.133.253.0/24"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "US Central (Chicago Valve SDR)",
+        "cidrs": [
+          "162.254.193.0/24",
+          "155.133.251.0/24"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "US West (Seattle / Los Angeles Valve SDR)",
+        "cidrs": [
+          "162.254.195.0/24",
+          "155.133.248.0/24"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Valve SDR)",
+        "cidrs": [
+          "155.133.226.0/24",
+          "155.133.242.0/24"
+        ]
+      },
+      {
+        "id": "eu-stockholm",
+        "continent": "Europe",
+        "name": "Europe North (Stockholm Valve SDR)",
+        "cidrs": [
+          "155.133.240.0/24",
+          "155.133.241.0/24"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Valve SDR)",
+        "cidrs": [
+          "103.10.124.0/24",
+          "45.121.184.0/24",
+          "155.133.254.0/24"
+        ]
+      },
+      {
+        "id": "asia-tokyo",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Valve SDR)",
+        "cidrs": [
+          "45.121.186.0/24",
+          "155.133.239.0/24"
+        ]
+      },
+      {
+        "id": "asia-hk",
+        "continent": "Asia-Pacific",
+        "name": "Hong Kong (Valve SDR)",
+        "cidrs": [
+          "153.254.86.0/24",
+          "155.133.244.0/24"
+        ]
+      },
+      {
+        "id": "asia-mumbai",
+        "continent": "Asia-Pacific",
+        "name": "India (Mumbai Valve SDR)",
+        "cidrs": [
+          "155.133.233.0/24"
+        ]
+      },
+      {
+        "id": "oc-sydney",
+        "continent": "Oceania",
+        "name": "Australia (Sydney Valve SDR)",
+        "cidrs": [
+          "103.10.125.0/24",
+          "155.133.246.0/24"
+        ]
+      },
+      {
+        "id": "sa-saopaulo",
+        "continent": "South America",
+        "name": "Brazil (São Paulo Valve SDR)",
+        "cidrs": [
+          "205.185.194.0/24",
+          "155.133.236.0/24"
+        ]
+      }
     ]
   },
   {
-    id: "apex",
-    name: "Apex Legends",
-    publisher: "Electronic Arts / Respawn",
-    category: "Battle Royale",
-    accent: "#e74c3c",
-    processNames: ["r5apex.exe", "r5apex_dx12.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (EA Multiplay & GCE)", cidrs: ["152.199.0.0/16", "13.250.0.0/15"] },
-      { id: "asia-jp", name: "Japan (Tokyo Multiplay)", cidrs: ["52.192.0.0/14", "54.238.0.0/15"] },
-      { id: "asia-tw", name: "Taiwan (EA Multiplay)", cidrs: ["104.16.0.0/12"] }
+    "id": "pubg",
+    "name": "PUBG: BATTLEGROUNDS",
+    "publisher": "Krafton Inc.",
+    "category": "Battle Royale",
+    "accent": "#f39c12",
+    "processNames": [
+      "TslGame.exe",
+      "TslGame_BE.exe",
+      "TslGame_UC.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "North America East (Virginia AWS/Azure)",
+        "cidrs": [
+          "20.185.0.0/16",
+          "52.86.0.0/15"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "North America West (Oregon AWS)",
+        "cidrs": [
+          "54.186.0.0/15",
+          "40.83.128.0/17"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Azure/AWS)",
+        "cidrs": [
+          "20.52.0.0/16",
+          "52.28.0.0/15"
+        ]
+      },
+      {
+        "id": "eu-london",
+        "continent": "Europe",
+        "name": "Europe West (London / Ireland AWS)",
+        "cidrs": [
+          "52.16.0.0/15",
+          "35.176.0.0/14"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Azure/AWS)",
+        "cidrs": [
+          "20.198.192.0/19",
+          "20.24.48.0/20",
+          "13.250.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-kr",
+        "continent": "Asia-Pacific",
+        "name": "Korea (Seoul Kakao/Steam AWS)",
+        "cidrs": [
+          "13.124.0.0/14",
+          "3.34.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Azure)",
+        "cidrs": [
+          "20.210.0.0/16",
+          "40.79.160.0/19"
+        ]
+      },
+      {
+        "id": "oc-syd",
+        "continent": "Oceania",
+        "name": "Oceania (Sydney AWS)",
+        "cidrs": [
+          "13.236.0.0/14"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (São Paulo AWS)",
+        "cidrs": [
+          "18.228.0.0/15"
+        ]
+      }
     ]
   },
   {
-    id: "lol",
-    name: "League of Legends & TFT",
-    publisher: "Riot Games & VNG",
-    category: "MOBA",
-    accent: "#0ac8b9",
-    processNames: ["League of Legends.exe", "LeagueClient.exe", "RiotClientServices.exe"],
-    regions: [
-      { id: "vn", name: "Việt Nam (VNG Datacenter)", cidrs: ["103.1.0.0/20", "118.69.0.0/16"] },
-      { id: "sg", name: "Singapore (Riot Direct SG)", cidrs: ["13.250.0.0/15", "54.251.0.0/16"] }
+    "id": "apex",
+    "name": "Apex Legends",
+    "publisher": "Electronic Arts / Respawn",
+    "category": "Battle Royale",
+    "accent": "#e74c3c",
+    "processNames": [
+      "r5apex.exe",
+      "r5apex_dx12.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "North America East (Virginia Multiplay)",
+        "cidrs": [
+          "152.199.0.0/16",
+          "52.86.0.0/15"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "North America Central (Dallas Multiplay)",
+        "cidrs": [
+          "152.199.16.0/20"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "North America West (Oregon Multiplay)",
+        "cidrs": [
+          "54.186.0.0/15"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Multiplay)",
+        "cidrs": [
+          "52.28.0.0/15"
+        ]
+      },
+      {
+        "id": "eu-london",
+        "continent": "Europe",
+        "name": "Europe West (London Multiplay)",
+        "cidrs": [
+          "35.176.0.0/14"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Multiplay)",
+        "cidrs": [
+          "13.250.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Multiplay)",
+        "cidrs": [
+          "52.192.0.0/14"
+        ]
+      },
+      {
+        "id": "asia-tw",
+        "continent": "Asia-Pacific",
+        "name": "Taiwan (EA Multiplay)",
+        "cidrs": [
+          "104.16.0.0/12"
+        ]
+      },
+      {
+        "id": "oc-syd",
+        "continent": "Oceania",
+        "name": "Oceania (Sydney Multiplay)",
+        "cidrs": [
+          "13.236.0.0/14"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (São Paulo Multiplay)",
+        "cidrs": [
+          "18.228.0.0/15"
+        ]
+      }
     ]
   },
   {
-    id: "thefinals",
-    name: "The Finals",
-    publisher: "Embark Studios",
-    category: "Arena FPS",
-    accent: "#e91e63",
-    processNames: ["Discovery.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Embark SG)", cidrs: ["13.212.0.0/15", "18.140.0.0/15"] },
-      { id: "asia-jp", name: "Japan (Tokyo)", cidrs: ["18.176.0.0/14"] }
+    "id": "lol",
+    "name": "League of Legends & TFT",
+    "publisher": "Riot Games & VNG",
+    "category": "MOBA",
+    "accent": "#0ac8b9",
+    "processNames": [
+      "League of Legends.exe",
+      "LeagueClient.exe",
+      "RiotClientServices.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-chicago",
+        "continent": "North America",
+        "name": "North America (Chicago - Riot Direct)",
+        "cidrs": [
+          "104.160.131.0/24",
+          "192.207.0.0/18"
+        ]
+      },
+      {
+        "id": "euw-frankfurt",
+        "continent": "Europe",
+        "name": "Europe West (EUW - Frankfurt Riot Direct)",
+        "cidrs": [
+          "104.160.141.0/24",
+          "3.120.0.0/14"
+        ]
+      },
+      {
+        "id": "eune-stockholm",
+        "continent": "Europe",
+        "name": "Europe Nordic & East (EUNE - Stockholm)",
+        "cidrs": [
+          "104.160.142.0/24",
+          "13.48.0.0/15"
+        ]
+      },
+      {
+        "id": "vn",
+        "continent": "Asia-Pacific",
+        "name": "Việt Nam (VNG Datacenter)",
+        "cidrs": [
+          "103.1.0.0/20",
+          "118.69.0.0/16"
+        ]
+      },
+      {
+        "id": "sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Riot Direct)",
+        "cidrs": [
+          "13.250.0.0/15",
+          "54.251.0.0/16"
+        ]
+      },
+      {
+        "id": "kr",
+        "continent": "Asia-Pacific",
+        "name": "Korea (Seoul Riot Direct)",
+        "cidrs": [
+          "104.160.154.0/24",
+          "13.124.0.0/14"
+        ]
+      },
+      {
+        "id": "jp",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Riot Direct)",
+        "cidrs": [
+          "13.112.0.0/14",
+          "18.176.0.0/14"
+        ]
+      },
+      {
+        "id": "oce",
+        "continent": "Oceania",
+        "name": "Oceania (OCE - Sydney Riot Direct)",
+        "cidrs": [
+          "104.160.156.0/24",
+          "13.236.0.0/14"
+        ]
+      },
+      {
+        "id": "br",
+        "continent": "South America",
+        "name": "Brazil (BR - São Paulo Riot Direct)",
+        "cidrs": [
+          "104.160.152.0/24",
+          "177.54.144.0/20"
+        ]
+      }
     ]
   },
   {
-    id: "warzone",
-    name: "Call of Duty: Warzone",
-    publisher: "Activision",
-    category: "Battle Royale",
-    accent: "#27ae60",
-    processNames: ["cod.exe", "bootstrapper.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Demonware Activision)", cidrs: ["103.245.110.0/23", "13.212.0.0/15"] },
-      { id: "asia-jp", name: "Japan (Tokyo Demonware)", cidrs: ["103.245.112.0/23"] }
+    "id": "thefinals",
+    "name": "The Finals",
+    "publisher": "Embark Studios",
+    "category": "Arena FPS",
+    "accent": "#e91e63",
+    "processNames": [
+      "Discovery.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "North America (US Central GCP/AWS)",
+        "cidrs": [
+          "34.66.0.0/16",
+          "35.226.0.0/16"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt GCP)",
+        "cidrs": [
+          "34.89.0.0/16",
+          "35.242.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore GCP/AWS)",
+        "cidrs": [
+          "34.87.0.0/16",
+          "13.212.0.0/15"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "East Asia (Tokyo GCP/AWS)",
+        "cidrs": [
+          "34.84.0.0/16",
+          "18.176.0.0/14"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (São Paulo GCP)",
+        "cidrs": [
+          "34.95.0.0/16"
+        ]
+      }
     ]
   },
   {
-    id: "deltaforce",
-    name: "Delta Force: Hawk Ops",
-    publisher: "TiMi Studio Group",
-    category: "Tactical FPS",
-    accent: "#00f0ff",
-    processNames: ["DeltaForce.exe", "DeltaForceClient-Win64-Shipping.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Tencent Cloud / AWS)", cidrs: ["13.228.0.0/15", "43.134.0.0/16"] },
-      { id: "asia-hk", name: "Hong Kong (Tencent Cloud)", cidrs: ["43.154.0.0/16"] }
+    "id": "cod_warzone",
+    "name": "Call of Duty: Warzone",
+    "publisher": "Activision",
+    "category": "Battle Royale",
+    "accent": "#27ae60",
+    "processNames": [
+      "cod.exe",
+      "bootstrapper.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "North America East (New York / Atlanta)",
+        "cidrs": [
+          "103.245.110.0/23",
+          "198.148.80.0/20"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "North America Central (Dallas Demonware)",
+        "cidrs": [
+          "198.148.96.0/20"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "North America West (Los Angeles Demonware)",
+        "cidrs": [
+          "198.148.112.0/20"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Demonware)",
+        "cidrs": [
+          "185.34.104.0/22"
+        ]
+      },
+      {
+        "id": "eu-london",
+        "continent": "Europe",
+        "name": "Europe West (London Demonware)",
+        "cidrs": [
+          "185.34.106.0/23"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Demonware)",
+        "cidrs": [
+          "103.245.110.0/23"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "East Asia (Tokyo Demonware)",
+        "cidrs": [
+          "103.245.112.0/23"
+        ]
+      },
+      {
+        "id": "oc-syd",
+        "continent": "Oceania",
+        "name": "Australia (Sydney Demonware)",
+        "cidrs": [
+          "103.245.114.0/23"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (São Paulo Demonware)",
+        "cidrs": [
+          "103.245.116.0/23"
+        ]
+      },
+      {
+        "id": "me-riyadh",
+        "continent": "Middle East & Africa",
+        "name": "Middle East (Riyadh / Bahrain)",
+        "cidrs": [
+          "15.185.0.0/16"
+        ]
+      }
     ]
   },
   {
-    id: "overwatch2",
-    name: "Overwatch 2",
-    publisher: "Blizzard Entertainment",
-    category: "Hero Shooter",
-    accent: "#ff9c00",
-    processNames: ["Overwatch.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Blizzard GCE/AWS)", cidrs: ["34.87.0.0/16", "35.185.0.0/16"] },
-      { id: "asia-tw", name: "Taiwan (Blizzard Datacenter)", cidrs: ["210.242.0.0/16"] }
+    "id": "deltaforce",
+    "name": "Delta Force: Hawk Ops",
+    "publisher": "TiMi Studio Group",
+    "category": "Tactical FPS",
+    "accent": "#00f0ff",
+    "processNames": [
+      "DeltaForce.exe",
+      "DeltaForceClient-Win64-Shipping.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us",
+        "continent": "North America",
+        "name": "North America (Silicon Valley & Virginia)",
+        "cidrs": [
+          "43.153.0.0/16",
+          "43.155.0.0/16"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Tencent/AWS)",
+        "cidrs": [
+          "43.131.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Tencent/AWS)",
+        "cidrs": [
+          "13.228.0.0/15",
+          "43.134.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-hk",
+        "continent": "Asia-Pacific",
+        "name": "East Asia (Hong Kong Tencent Cloud)",
+        "cidrs": [
+          "43.154.0.0/16"
+        ]
+      }
     ]
   },
   {
-    id: "r6",
-    name: "Rainbow Six Siege",
-    publisher: "Ubisoft",
-    category: "Tactical FPS",
-    accent: "#3498db",
-    processNames: ["RainbowSix.exe", "RainbowSix_Vulkan.exe"],
-    regions: [
-      { id: "asia-sg", name: "Southeast Asia (Ubisoft / Azure SG)", cidrs: ["20.24.48.0/20", "20.198.192.0/19"] },
-      { id: "asia-jp", name: "Japan East (Ubisoft Azure)", cidrs: ["20.210.0.0/16"] }
+    "id": "overwatch2",
+    "name": "Overwatch 2",
+    "publisher": "Blizzard Entertainment",
+    "category": "Hero Shooter",
+    "accent": "#ff9c00",
+    "processNames": [
+      "Overwatch.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "North America Central (Chicago Battle.net)",
+        "cidrs": [
+          "24.105.32.0/20",
+          "24.105.62.0/24"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "North America West (Los Angeles Battle.net)",
+        "cidrs": [
+          "24.105.12.0/22"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Battle.net)",
+        "cidrs": [
+          "185.60.112.0/22",
+          "185.60.114.0/23"
+        ]
+      },
+      {
+        "id": "eu-paris",
+        "continent": "Europe",
+        "name": "Europe West (Paris Battle.net)",
+        "cidrs": [
+          "185.60.115.0/24"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Battle.net)",
+        "cidrs": [
+          "34.87.0.0/16",
+          "35.185.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-kr",
+        "continent": "Asia-Pacific",
+        "name": "Korea (Seoul Battle.net)",
+        "cidrs": [
+          "211.115.0.0/17",
+          "211.233.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "Japan (Tokyo Battle.net)",
+        "cidrs": [
+          "34.84.0.0/16"
+        ]
+      },
+      {
+        "id": "oc-syd",
+        "continent": "Oceania",
+        "name": "Australia (Sydney Battle.net)",
+        "cidrs": [
+          "103.4.114.0/23"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (São Paulo Battle.net)",
+        "cidrs": [
+          "54.232.0.0/16"
+        ]
+      }
     ]
   },
   {
-    id: "dota2",
-    name: "Dota 2",
-    publisher: "Valve Corporation",
-    category: "MOBA",
-    accent: "#e03825",
-    processNames: ["dota2.exe"],
-    regions: [
-      { id: "asia-sg", name: "Singapore (Valve SDR - AS32590)", cidrs: ["103.10.124.0/24", "45.121.184.0/24"] },
-      { id: "asia-jp", name: "Japan (Tokyo Valve SDR)", cidrs: ["45.121.186.0/24"] }
+    "id": "r6",
+    "name": "Rainbow Six Siege",
+    "publisher": "Ubisoft",
+    "category": "Tactical FPS",
+    "accent": "#3498db",
+    "processNames": [
+      "RainbowSix.exe",
+      "RainbowSix_Vulkan.exe"
+    ],
+    "regions": [
+      {
+        "id": "na-us-east",
+        "continent": "North America",
+        "name": "North America East (Virginia Azure)",
+        "cidrs": [
+          "20.185.0.0/16",
+          "40.76.0.0/14"
+        ]
+      },
+      {
+        "id": "na-us-central",
+        "continent": "North America",
+        "name": "North America Central (Iowa Azure)",
+        "cidrs": [
+          "40.77.0.0/16",
+          "20.37.0.0/16"
+        ]
+      },
+      {
+        "id": "na-us-west",
+        "continent": "North America",
+        "name": "North America West (California Azure)",
+        "cidrs": [
+          "40.83.128.0/17",
+          "13.64.0.0/14"
+        ]
+      },
+      {
+        "id": "eu-netherlands",
+        "continent": "Europe",
+        "name": "Europe West (Netherlands Azure)",
+        "cidrs": [
+          "20.50.0.0/16",
+          "40.68.0.0/15"
+        ]
+      },
+      {
+        "id": "eu-frankfurt",
+        "continent": "Europe",
+        "name": "Europe Central (Frankfurt Azure)",
+        "cidrs": [
+          "20.52.0.0/16"
+        ]
+      },
+      {
+        "id": "asia-sg",
+        "continent": "Asia-Pacific",
+        "name": "Southeast Asia (Singapore Azure)",
+        "cidrs": [
+          "20.24.48.0/20",
+          "20.198.192.0/19"
+        ]
+      },
+      {
+        "id": "asia-jp",
+        "continent": "Asia-Pacific",
+        "name": "Japan East (Tokyo Azure)",
+        "cidrs": [
+          "20.210.0.0/16"
+        ]
+      },
+      {
+        "id": "oc-syd",
+        "continent": "Oceania",
+        "name": "Australia East (Sydney Azure)",
+        "cidrs": [
+          "20.37.192.0/18"
+        ]
+      },
+      {
+        "id": "sa-br",
+        "continent": "South America",
+        "name": "South America (Brazil South - São Paulo)",
+        "cidrs": [
+          "20.201.0.0/16"
+        ]
+      },
+      {
+        "id": "me-dxb",
+        "continent": "Middle East & Africa",
+        "name": "Middle East (UAE North - Dubai Azure)",
+        "cidrs": [
+          "20.46.0.0/16"
+        ]
+      },
+      {
+        "id": "af-jnb",
+        "continent": "Middle East & Africa",
+        "name": "South Africa (South Africa North Azure)",
+        "cidrs": [
+          "20.164.0.0/16"
+        ]
+      }
     ]
   }
 ];
 
 const DEFAULT_RELAYS = [
-  { id: "community-sg-1", name: "🇸🇬 Singapore #1 [Community Public Free]", location: "Singapore", endpoint: "sg1.lagvex.org:4433", psk: "lagvex-community-sg-free-public-psk-2026" },
-  { id: "community-hk-1", name: "🇭🇰 Hong Kong #1 [Community Public Free]", location: "Hong Kong", endpoint: "hk1.lagvex.org:4433", psk: "lagvex-community-hk-free-public-psk-2026" },
-  { id: "community-jp-1", name: "🇯🇵 Tokyo #1 [Community Public Free]", location: "Tokyo", endpoint: "jp1.lagvex.org:4433", psk: "lagvex-community-jp-free-public-psk-2026" }
+  {
+    "id": "us-east-1",
+    "name": "🇺🇸 North America East (US East - Virginia #1)",
+    "continent": "North America",
+    "location": "Ashburn, VA",
+    "endpoint": "us-east.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026"
+  },
+  {
+    "id": "us-central-1",
+    "name": "🇺🇸 North America Central (Dallas / Texas)",
+    "continent": "North America",
+    "location": "Dallas, TX",
+    "endpoint": "us-central.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026"
+  },
+  {
+    "id": "us-west-1",
+    "name": "🇺🇸 North America West (Silicon Valley / California)",
+    "continent": "North America",
+    "location": "San Jose, CA",
+    "endpoint": "us-west.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026"
+  },
+  {
+    "id": "eu-central-1",
+    "name": "🇩🇪 Europe Central (Frankfurt / Germany #1)",
+    "continent": "Europe",
+    "location": "Frankfurt, Germany",
+    "endpoint": "eu-central.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026"
+  },
+  {
+    "id": "eu-west-1",
+    "name": "🇬🇧 Europe West (London / United Kingdom #1)",
+    "continent": "Europe",
+    "location": "London, UK",
+    "endpoint": "eu-west.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026"
+  },
+  {
+    "id": "eu-north-1",
+    "name": "🇸🇪 Europe North (Stockholm / Sweden #1)",
+    "continent": "Europe",
+    "location": "Stockholm, Sweden",
+    "endpoint": "eu-north.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026"
+  },
+  {
+    "id": "asia-sg-1",
+    "name": "🇸🇬 Southeast Asia #1 (Singapore - Equinix SG1)",
+    "continent": "Asia-Pacific",
+    "location": "Singapore",
+    "endpoint": "sg1.lagvex.org:4433",
+    "psk": "lagvex-community-sg-free-public-psk-2026"
+  },
+  {
+    "id": "asia-sg-2",
+    "name": "🇸🇬 Southeast Asia #2 (Singapore - Direct Fiber)",
+    "continent": "Asia-Pacific",
+    "location": "Singapore",
+    "endpoint": "sg2.lagvex.org:4433",
+    "psk": "lagvex-community-sg-free-public-psk-2026"
+  },
+  {
+    "id": "asia-jp-1",
+    "name": "🇯🇵 East Asia (Tokyo / Japan #1)",
+    "continent": "Asia-Pacific",
+    "location": "Tokyo, Japan",
+    "endpoint": "jp1.lagvex.org:4433",
+    "psk": "lagvex-community-jp-free-public-psk-2026"
+  },
+  {
+    "id": "asia-kr-1",
+    "name": "🇰🇷 East Asia (Seoul / South Korea #1)",
+    "continent": "Asia-Pacific",
+    "location": "Seoul, South Korea",
+    "endpoint": "kr1.lagvex.org:4433",
+    "psk": "lagvex-community-kr-free-public-psk-2026"
+  },
+  {
+    "id": "asia-hk-1",
+    "name": "🇭🇰 East Asia (Hong Kong #1)",
+    "continent": "Asia-Pacific",
+    "location": "Hong Kong",
+    "endpoint": "hk1.lagvex.org:4433",
+    "psk": "lagvex-community-hk-free-public-psk-2026"
+  },
+  {
+    "id": "oc-syd-1",
+    "name": "🇦🇺 Oceania (Sydney / Australia #1)",
+    "continent": "Oceania",
+    "location": "Sydney, Australia",
+    "endpoint": "syd1.lagvex.org:4433",
+    "psk": "lagvex-community-oc-free-public-psk-2026"
+  },
+  {
+    "id": "sa-br-1",
+    "name": "🇧🇷 South America (São Paulo / Brazil #1)",
+    "continent": "South America",
+    "location": "São Paulo, Brazil",
+    "endpoint": "br1.lagvex.org:4433",
+    "psk": "lagvex-community-sa-free-public-psk-2026"
+  },
+  {
+    "id": "me-dxb-1",
+    "name": "🇦🇪 Middle East (Dubai / UAE #1)",
+    "continent": "Middle East",
+    "location": "Dubai, UAE",
+    "endpoint": "dxb1.lagvex.org:4433",
+    "psk": "lagvex-community-me-free-public-psk-2026"
+  }
 ];
 
 let gamesList = [...DEFAULT_GAMES];
@@ -340,6 +1380,14 @@ function setupEventListeners() {
     });
   }
 
+  // Relay Selector Change
+  const relaySelect = document.getElementById("relay-select");
+  if (relaySelect) {
+    relaySelect.addEventListener("change", () => {
+      updateRouteHops();
+    });
+  }
+
   // Modals
   setupModals();
 }
@@ -376,13 +1424,27 @@ function populateRelays() {
   if (!select) return;
   select.innerHTML = "";
 
+  const groups = {};
   relaysList.forEach(r => {
-    const opt = document.createElement("option");
-    opt.value = r.endpoint;
-    opt.dataset.psk = r.psk || "";
-    opt.textContent = `${r.name} (${r.endpoint})`;
-    select.appendChild(opt);
+    const cont = r.continent || "Other Relays";
+    if (!groups[cont]) groups[cont] = [];
+    groups[cont].push(r);
   });
+
+  for (const [continent, items] of Object.entries(groups)) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = `🌐 ${continent} Relays`;
+    items.forEach(r => {
+      const opt = document.createElement("option");
+      opt.value = r.endpoint;
+      opt.dataset.psk = r.psk || "";
+      opt.dataset.name = r.name;
+      opt.dataset.location = r.location || "";
+      opt.textContent = `${r.name} (${r.endpoint})`;
+      optgroup.appendChild(opt);
+    });
+    select.appendChild(optgroup);
+  }
 }
 
 function renderGames() {
@@ -432,7 +1494,7 @@ function renderGames() {
       <div class="card-meta-row">
         <span class="meta-tag">
           <svg class="meta-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          ${regionCount} Clusters
+          ${regionCount} Global Regions
         </span>
         <span class="meta-tag">
           <svg class="meta-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -443,7 +1505,7 @@ function renderGames() {
       <div class="card-bottom-row">
         <span class="card-ping-badge">
           <svg class="meta-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-          ~28ms via SG
+          Global Low Latency
         </span>
         <button class="card-select-btn">${game.id === selectedGameId ? "Active" : "Select"}</button>
       </div>
@@ -470,17 +1532,31 @@ function selectGame(gameId) {
   if (descEl) descEl.textContent = `Processes: ${game.processNames.join(", ")}`;
   if (heroBadge) heroBadge.innerHTML = getGameLogoSvg(game.id);
 
-  // Populate Regions
+  // Populate Regions with Optgroups by Continent
   const regSelect = document.getElementById("region-select");
   if (regSelect) {
     regSelect.innerHTML = "";
     if (game.regions && game.regions.length > 0) {
+      const groups = {};
       game.regions.forEach(reg => {
-        const opt = document.createElement("option");
-        opt.value = reg.id;
-        opt.textContent = `${reg.name} (${reg.cidrs ? reg.cidrs.length : 0} CIDRs)`;
-        regSelect.appendChild(opt);
+        const cont = reg.continent || "Global Clusters";
+        if (!groups[cont]) groups[cont] = [];
+        groups[cont].push(reg);
       });
+
+      for (const [continent, regions] of Object.entries(groups)) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = `🌐 ${continent}`;
+        regions.forEach(reg => {
+          const opt = document.createElement("option");
+          opt.value = reg.id;
+          opt.dataset.continent = continent;
+          opt.dataset.name = reg.name;
+          opt.textContent = `${reg.name} (${reg.cidrs ? reg.cidrs.length : 0} CIDRs)`;
+          optgroup.appendChild(opt);
+        });
+        regSelect.appendChild(optgroup);
+      }
       selectedRegionId = game.regions[0].id;
     }
   }
@@ -497,10 +1573,27 @@ function selectGame(gameId) {
 }
 
 function updateRouteHops() {
-  const hopNode = document.getElementById("hop-server-target");
-  if (hopNode) {
-    const game = gamesList.find(g => g.id === selectedGameId);
-    hopNode.textContent = game ? `${game.name} Cloud Server` : "Game Server";
+  const game = gamesList.find(g => g.id === selectedGameId);
+  const regSelect = document.getElementById("region-select");
+  const relaySelect = document.getElementById("relay-select");
+
+  const hopTarget = document.getElementById("hop-server-target");
+  const hopRelay = document.getElementById("hop-relay-sub");
+
+  if (hopTarget) {
+    const regName = regSelect?.selectedOptions[0]?.dataset.name || (game?.regions[0]?.name || "Game Cloud");
+    hopTarget.textContent = game ? `${game.name} Cloud Server` : "Game Cloud Server";
+    const subTarget = document.querySelector(".target-node .hop-sub");
+    if (subTarget) {
+      subTarget.textContent = regName.split("(")[0].trim() || "Global Direct Transit";
+    }
+  }
+
+  if (hopRelay && relaySelect && relaySelect.selectedOptions[0]) {
+    const relayName = relaySelect.selectedOptions[0].dataset.name || "Singapore #1";
+    const cleanName = relayName.split("[")[0].trim();
+    const pingVal = isConnected ? "28 ms" : "-- ms";
+    hopRelay.innerHTML = `${cleanName} (<span id="metric-ping">${pingVal}</span>)`;
   }
 }
 

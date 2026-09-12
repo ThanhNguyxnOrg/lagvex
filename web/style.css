@@ -695,9 +695,19 @@ body {
   border-color: var(--accent-cyan);
 }
 
+.clean-select optgroup {
+  background: #090c14;
+  color: var(--accent-cyan);
+  font-weight: 800;
+  font-size: 11px;
+  padding: 6px 0;
+}
+
 .clean-select option {
   background: #111520;
   color: #fff;
+  font-weight: 500;
+  padding: 4px 8px;
 }
 
 .btn-sub-action {
