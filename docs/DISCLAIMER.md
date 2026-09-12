@@ -2,7 +2,7 @@
 
 > [!CAUTION]
 > **CRITICAL LEGAL NOTICE: PLEASE READ THIS DOCUMENT IN ITS ENTIRETY PRIOR TO INSTALLING, COMPILING, OR EXECUTING LAGVEX.**  
-> 🔗 [Back to Project README.md](../README.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md)
 
 ---
 
@@ -66,6 +66,7 @@ Lagvex is an independent open-source network protocol research tool and kernel l
 
 🔗 **Return to Main Documentation**:
 - 🏠 [**Project README**](../README.md)
+- 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)

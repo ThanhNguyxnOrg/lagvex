@@ -1,7 +1,7 @@
 # 📡 Lagvex Wire Protocol v1 Specification ⚡
 
 > **Lightweight Binary Wire Protocol for Competitive Gaming**  
-> 🔗 [Back to Project README.md](../README.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -146,6 +146,8 @@ iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp
 
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
+- 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
+- 🌐 [**Game Profiles & CIDRs**](PROFILES.md)
 - ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)

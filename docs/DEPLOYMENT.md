@@ -1,7 +1,7 @@
 # 🚀 Lagvex Relay VPS Deployment & Operations ☁️
 
 > **Step-by-Step Operator Guide for Self-Hosting Lagvex**  
-> 🔗 [Back to Project README.md](../README.md) | [Why a Relay is Needed](WHY_VPS.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Why a Relay is Needed](WHY_VPS.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -190,6 +190,8 @@ ip addr show dev lagvex0
 
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
+- 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
+- 🌐 [**Game Profiles & CIDRs**](PROFILES.md)
 - ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)

@@ -1,7 +1,7 @@
 # 🌐 Lagvex Game Profiles & CIDR Routing Guide 🎮
 
 > **Comprehensive Network Maps for Competitive Esports & Online Titles**  
-> 🔗 [Back to Project README.md](../README.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -193,6 +193,7 @@ To capture and add a new game title to Lagvex:
 
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
+- 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)

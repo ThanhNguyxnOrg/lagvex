@@ -34,13 +34,14 @@
 ## 📖 Table of Contents 📑
 
 - [🎯 Why Lagvex?](#-why-lagvex)
-- [🎮 Supported Games](#-supported-games)
+- [🎮 Supported Games](#-supported-games--105-global-server-clusters-)
 - [📚 Documentation & Deep Dives](#-documentation--deep-dives)
 - [🏗️ How It Works (Architecture)](#️-how-it-works-architecture)
 - [🚀 Quick Start](#-quick-start)
   - [☁️ 1. Deploy Relay on VPS (One-Liner)](#️-1-deploy-relay-on-vps-one-liner)
   - [💻 2. Run Client (Windows, macOS, Linux)](#-2-run-client-windows-macos-linux)
 - [🛠️ Building from Source](#️-building-from-source)
+- [🤝 Contributing & Adding Games](#-contributing--adding-games)
 - [⚖️ Full Disclaimer & Ban Liability Waiver](#️-full-disclaimer--ban-liability-waiver)
 - [📜 License](#-license)
 
@@ -92,6 +93,7 @@ Lagvex includes pre-verified, narrow CIDR IP pools covering **105 regional serve
 
 | 📖 Document | 📝 Description |
 |---|---|
+| 🤝 [**Contributor & Maintainer Guide**](CONTRIBUTING.md) | **Developer handbook**: How to capture game packets, find ASNs, narrow CIDRs, register profiles in `profiles.json`, craft SVG logos, and submit PRs. |
 | 📐 [**Architecture Overview**](docs/ARCHITECTURE.md) | In-depth packet journey, WinTun driver mechanics, Windows routing safety rules, and anti-cheat safety analysis. |
 | 📡 [**Wire Protocol v1 Specification**](docs/PROTOCOL.md) | Binary packet format, HMAC-SHA256 handshake, 9-byte data header, keepalive ping/pong, and MTU arithmetic. |
 | 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
@@ -239,6 +241,18 @@ make client-mac
 # 🐧 6. Build Linux / Steam Deck Client
 make client-linux
 ```
+
+---
+
+## 🤝 Contributing & Adding Games 🚀
+
+Want to add your favorite game, update server IP clusters, or contribute new features? We welcome community pull requests!
+
+- 🎮 **Add a New Game in 15 Minutes**: Discover destination UDP server CIDRs via Resource Monitor or Wireshark, add the profile to `configs/profiles.json`, and insert an SVG logo into `web/app.js`.
+- 🛰️ **Add Community Relays**: Expand global coverage across APAC, EU, NA, SA, or MENA.
+- 🧪 **Zero-Fuss Testing**: Automated Go tests verify JSON integrity and CIDR arithmetic instantly.
+
+👉 **Read the complete step-by-step developer guide:** [**🤝 CONTRIBUTING.md**](CONTRIBUTING.md)
 
 ---
 

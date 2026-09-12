@@ -1,5 +1,7 @@
 # LAGVEX — Networking Research & Architecture Handoff
 
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Roadmap](ROADMAP.md) | [Architecture](ARCHITECTURE.md)
+>
 > **Purpose:** research-backed technical brief for an implementation agent building LAGVEX, an open-source Windows game network accelerator.
 >
 > **Verified research date:** 2026-09-12
@@ -1963,3 +1965,7 @@ A rigorous technical review of the current implementation against the research b
 2. **Adaptive FEC**: Inject parity packets exclusively when undersea link loss exceeds acceptable thresholds.
 
 For the comprehensive operational specification, refer to [docs/ROADMAP.md](ROADMAP.md).
+
+---
+
+[⬅️ Back to README](../README.md) • [🤝 Contributor Guide](../CONTRIBUTING.md) • [🗺️ Roadmap](ROADMAP.md) • [📐 Architecture](ARCHITECTURE.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)

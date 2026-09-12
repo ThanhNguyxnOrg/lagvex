@@ -1,5 +1,7 @@
 # 📝 Changelog 📜
 
+> 🔗 [Back to Project README.md](README.md) | [Contributor Guide](CONTRIBUTING.md)
+
 All notable changes to the **Lagvex** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -10,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-09-12 🚀
 
 ### 🔥 Added
+- 🤝 **Comprehensive Contributor & Maintainer Guide (`CONTRIBUTING.md`)**:
+  - Detailed handbook for open-source contributors and maintainers covering how to capture live game traffic (Resmon, Wireshark, PowerShell), identify ASNs, narrow CIDR subnets, register profiles in `configs/profiles.json`, craft vector SVG insignia in `web/app.js`, and validate with Go tests.
 - 🎨 **Esports Cockpit HUD Redesign (`web/`)**:
   - Complete front-end overhaul inspired by professional esports command centers and tactical gaming HUDs.
   - High-contrast cyber dark aesthetics (`#0a0e17`) with electric cyan accents (`#00f0ff`), neon emerald indicators (`#00ff88`), warning amber (`#ffaa00`), and hot magenta alerts (`#ff0055`).

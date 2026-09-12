@@ -1,7 +1,7 @@
 # 📐 Lagvex Architecture & Network Design ⚡
 
 > **High-Performance Route-Based Split-Tunneling Engine**  
-> 🔗 [Back to Project README.md](../README.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -168,6 +168,7 @@ To deliver competitive latency for players worldwide, Lagvex structures its serv
 
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
+- 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
 - 🌐 [**Game Profiles & CIDRs**](PROFILES.md)

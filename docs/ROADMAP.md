@@ -1,6 +1,6 @@
 # 🗺️ Lagvex Engineering Roadmap & Production Plan 🚀
 
-> 💡 **Related Documents**: [📖 Back to README](../README.md) • [🔬 Networking Research](RESEARCH.md) • [📐 Architecture](ARCHITECTURE.md) • [📡 Wire Protocol](PROTOCOL.md) • [⚖️ Disclaimer](DISCLAIMER.md)
+> 💡 **Related Documents**: [📖 Back to README](../README.md) • [🤝 Contributor Guide](../CONTRIBUTING.md) • [🔬 Networking Research](RESEARCH.md) • [📐 Architecture](ARCHITECTURE.md) • [📡 Wire Protocol](PROTOCOL.md) • [⚖️ Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -154,4 +154,4 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ---
 
-[⬅️ Back to README](../README.md) • [🔬 Read Research Whitepaper](RESEARCH.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)
+[⬅️ Back to README](../README.md) • [🤝 Contributor Guide](../CONTRIBUTING.md) • [🔬 Read Research Whitepaper](RESEARCH.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)

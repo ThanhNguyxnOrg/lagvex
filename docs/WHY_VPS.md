@@ -1,6 +1,6 @@
 # 🌐 Why a Relay Server (VPS) is Required ⚡
 
-> 💡 **Related Documents**: [📖 Back to README](../README.md) • [📐 Architecture Overview](ARCHITECTURE.md) • [🚀 Deployment Guide](DEPLOYMENT.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)
+> 💡 **Related Documents**: [📖 Back to README](../README.md) • [🤝 Contributor Guide](../CONTRIBUTING.md) • [📐 Architecture Overview](ARCHITECTURE.md) • [🚀 Deployment Guide](DEPLOYMENT.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
@@ -140,4 +140,4 @@ For complete instructions on ports, firewall configuration, systemd services, an
 
 ---
 
-[⬅️ Back to README](../README.md) • [📖 Architecture Overview](ARCHITECTURE.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)
+[⬅️ Back to README](../README.md) • [🤝 Contributor Guide](../CONTRIBUTING.md) • [📖 Architecture Overview](ARCHITECTURE.md) • [⚖️ Legal Disclaimer](DISCLAIMER.md)
