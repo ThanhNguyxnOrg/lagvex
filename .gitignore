@@ -1,7 +1,6 @@
 # Binaries and executables
-bin/lagvex-relay
-bin/lagvex-relay-arm64
-bin/lagvex-client.exe
+bin/lagvex-relay*
+bin/lagvex-client*
 *.exe
 *.dll
 *.so

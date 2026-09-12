@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lagvex/lagvex/pkg/relay"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/relay"
 )
 
 var (

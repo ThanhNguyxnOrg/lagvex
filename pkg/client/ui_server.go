@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lagvex/lagvex/pkg/profiles"
-	"github.com/lagvex/lagvex/pkg/protocol"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 )
 
 // UIServer serves the modern Gaming Booster Dashboard and REST API.

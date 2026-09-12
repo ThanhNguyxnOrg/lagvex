@@ -18,7 +18,7 @@ cat << 'EOF'
  | |    __ _  __ ___   _____  __     
  | |   / _` |/ _` \ \ / / _ \ \/ /     Lagvex Relay Installer
  | |__| (_| | (_| |\ V /  __/>  <      High-Performance Game Booster Relay
- |_____\__,_|\__, | \_/ \___/_/\_\     https://github.com/lagvex/lagvex
+ |_____\__,_|\__, | \_/ \___/_/\_\     https://github.com/ThanhNguyxnOrg/lagvex
              |___/                   
 EOF
 echo -e "${NC}"
@@ -146,7 +146,7 @@ else
     if command -v go >/dev/null 2>&1; then
         echo "    Building lagvex-relay via Go..."
         TMP_BUILD="$(mktemp -d)"
-        git clone --depth 1 https://github.com/lagvex/lagvex.git "$TMP_BUILD" 2>/dev/null || true
+        git clone --depth 1 https://github.com/ThanhNguyxnOrg/lagvex.git "$TMP_BUILD" 2>/dev/null || true
         if [[ -d "$TMP_BUILD/cmd/lagvex-relay" ]]; then
             (cd "$TMP_BUILD" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$INSTALL_DIR/lagvex-relay" ./cmd/lagvex-relay)
             rm -rf "$TMP_BUILD"

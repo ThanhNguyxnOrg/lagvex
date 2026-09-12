@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lagvex/lagvex/pkg/protocol"
-	"github.com/lagvex/lagvex/pkg/tun"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/tun"
 )
 
 // Server implements the Lagvex Relay data plane on Linux.

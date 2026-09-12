@@ -1,3 +1,3 @@
-module github.com/lagvex/lagvex
+module github.com/ThanhNguyxnOrg/lagvex
 
 go 1.22

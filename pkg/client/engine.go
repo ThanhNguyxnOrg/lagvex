@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lagvex/lagvex/pkg/profiles"
-	"github.com/lagvex/lagvex/pkg/protocol"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 )
 
 // TunnelState represents the operational status of the tunnel.
