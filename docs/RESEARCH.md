@@ -1937,3 +1937,29 @@ The core product principle should be:
 > **LAGVEX does not promise to magically reduce ping. It measures whether an alternate path is better, uses it when evidence says it is better, and gets out of the way when it is not.**
 
 That wording is an engineering/product philosophy, not a quoted research result.
+
+---
+
+# 24. Production Engineering Audit & Concrete Priority Roadmap (P0 — P4)
+
+A rigorous technical review of the current implementation against the research baseline has identified critical priorities required to transition from an MVP to a secure, production-grade system:
+
+## 24.1 Priority P0: Cryptographic Hardening & Anti-Replay
+1. **Data-Plane AEAD**: Eliminate plaintext payload vulnerability by wrapping each game packet inside **ChaCha20-Poly1305** using session keys derived during the HMAC-SHA256 handshake.
+2. **Server-Side Nonce Cache**: Replace naive $\pm 120$s timestamp validation with an active sliding-window nonce cache to strictly reject replayed handshake attempts.
+3. **Authenticated Dynamic Roaming**: Require successful AEAD tag verification before calling `sess.UpdateRemote(remote)` to block IP-spoofing session takeovers.
+4. **Honest Claims**: Refrain from using absolute claims ("100% Anti-Cheat Safe" or "zero jitter") in user-facing documentation.
+
+## 24.2 Priority P1: Native OS Routing & State Invariants
+1. **Windows IP Helper APIs**: Migrate from CLI string scraping (`route print`, `netsh`) to native Win32 `iphlpapi.dll` APIs (`GetBestRoute2`, `GetAdaptersAddresses`, `CreateIpForwardEntry2`) to avoid localization failures.
+2. **Atomic Session Cleanup**: When a client reconnects, terminate any pre-existing session for that `ClientID` prior to allocating a new IP address from the pool.
+
+## 24.3 Priority P2: True Telemetry & Tail-Latency HUD
+1. **Direct vs. Relay Telemetry**: Provide comparative RTT measurements to dynamically recommend whether boosting is advantageous.
+2. **Tail Latency (P95/P99) & Jitter**: Render rolling histograms of latency variation on the client HUD.
+
+## 24.4 Priority P3 & P4: Multi-Relay Schedulers, Hysteresis & Adaptive FEC
+1. **Hysteresis Anti-Flapping**: Prevent route thrashing across multiple relay nodes.
+2. **Adaptive FEC**: Inject parity packets exclusively when undersea link loss exceeds acceptable thresholds.
+
+For the comprehensive operational specification, refer to [docs/ROADMAP.md](ROADMAP.md).
