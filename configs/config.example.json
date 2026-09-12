@@ -1,0 +1,8 @@
+{
+  "relay": "123.45.67.89:51820",
+  "psk": "your_secure_pre_shared_key_here",
+  "game": "valorant",
+  "region": "asia-sg",
+  "forceRoutes": false,
+  "httpListen": "127.0.0.1:18888"
+}

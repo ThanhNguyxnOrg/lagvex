@@ -1,0 +1,458 @@
+{
+  "schemaVersion": 1,
+  "updatedUtc": "2026-09-12T00:00:00Z",
+  "games": [
+    {
+      "id": "valorant",
+      "name": "Valorant",
+      "category": "Tactical FPS",
+      "icon": "🎯",
+      "processNames": [
+        "VALORANT-Win64-Shipping.exe",
+        "RiotClientServices.exe",
+        "VALORANT.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Southeast Asia (Singapore)",
+          "source": "Riot Direct AS6507 & AWS ap-southeast-1",
+          "cidrs": [
+            "13.250.0.0/15",
+            "13.228.0.0/15",
+            "18.140.0.0/15",
+            "52.220.0.0/15",
+            "54.251.0.0/16",
+            "54.255.0.0/16"
+          ]
+        },
+        {
+          "id": "asia-hk",
+          "name": "Hong Kong",
+          "source": "Riot Direct AS6507 & AWS ap-east-1",
+          "cidrs": [
+            "18.162.0.0/15",
+            "18.166.0.0/15",
+            "16.162.0.0/15"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo)",
+          "source": "Riot Direct AS6507 & AWS ap-northeast-1",
+          "cidrs": [
+            "13.112.0.0/14",
+            "18.176.0.0/14",
+            "52.192.0.0/14",
+            "54.238.0.0/15"
+          ]
+        },
+        {
+          "id": "asia-in",
+          "name": "India (Mumbai)",
+          "source": "Riot Direct AS6507 & AWS ap-south-1",
+          "cidrs": [
+            "13.126.0.0/15",
+            "13.232.0.0/15"
+          ]
+        },
+        {
+          "id": "eu-frankfurt",
+          "name": "Europe (Frankfurt)",
+          "source": "Riot Direct AS6507 & AWS eu-central-1",
+          "cidrs": [
+            "3.120.0.0/14",
+            "18.194.0.0/15"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cs2",
+      "name": "Counter-Strike 2 (CS2)",
+      "category": "Tactical FPS",
+      "icon": "💣",
+      "processNames": [
+        "cs2.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore (Valve SDR)",
+          "source": "Valve AS32590 (SGP)",
+          "cidrs": [
+            "103.10.124.0/24",
+            "103.28.54.0/24",
+            "45.121.184.0/24",
+            "162.254.197.0/24",
+            "155.133.254.0/24"
+          ]
+        },
+        {
+          "id": "asia-hk",
+          "name": "Hong Kong (Valve SDR)",
+          "source": "Valve AS32590 (HKG)",
+          "cidrs": [
+            "153.254.86.0/24",
+            "162.254.193.0/24",
+            "155.133.244.0/24"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo Valve SDR)",
+          "source": "Valve AS32590 (TYO)",
+          "cidrs": [
+            "155.133.239.0/24",
+            "155.133.245.0/24",
+            "45.121.186.0/24"
+          ]
+        },
+        {
+          "id": "asia-kr",
+          "name": "Korea (Seoul Valve SDR)",
+          "source": "Valve AS32590 (SEL)",
+          "cidrs": [
+            "155.133.234.0/24",
+            "162.254.196.0/24"
+          ]
+        },
+        {
+          "id": "eu-frankfurt",
+          "name": "Europe (Frankfurt Valve SDR)",
+          "source": "Valve AS32590 (FRA)",
+          "cidrs": [
+            "155.133.226.0/24",
+            "155.133.248.0/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubg",
+      "name": "PUBG: BATTLEGROUNDS",
+      "category": "Battle Royale",
+      "icon": "🪂",
+      "processNames": [
+        "TslGame.exe",
+        "TslGame_BE.exe",
+        "TslGame_UC.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Southeast Asia (Singapore)",
+          "source": "Azure & AWS SEA",
+          "cidrs": [
+            "20.24.48.0/20",
+            "52.139.208.0/20",
+            "20.198.192.0/19",
+            "20.197.0.0/18",
+            "13.212.0.0/15",
+            "18.140.0.0/15"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo)",
+          "source": "AWS & Azure Tokyo",
+          "cidrs": [
+            "13.112.0.0/14",
+            "18.176.0.0/14",
+            "20.210.0.0/16"
+          ]
+        },
+        {
+          "id": "asia-kr",
+          "name": "Korea (Seoul)",
+          "source": "AWS & Azure Seoul",
+          "cidrs": [
+            "13.124.0.0/14",
+            "3.34.0.0/15",
+            "20.196.0.0/16"
+          ]
+        },
+        {
+          "id": "eu-central",
+          "name": "Europe (Frankfurt)",
+          "source": "AWS Frankfurt",
+          "cidrs": [
+            "3.120.0.0/14",
+            "18.194.0.0/15"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apex",
+      "name": "Apex Legends",
+      "category": "Battle Royale",
+      "icon": "⚡",
+      "processNames": [
+        "r5apex.exe",
+        "r5apex_dx12.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore (GCE & AWS Multiplay)",
+          "source": "EA Multiplay SG",
+          "cidrs": [
+            "152.199.0.0/16",
+            "13.250.0.0/15",
+            "52.220.0.0/15"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo Multiplay)",
+          "source": "EA Multiplay Tokyo",
+          "cidrs": [
+            "52.192.0.0/14",
+            "54.238.0.0/15",
+            "13.112.0.0/14"
+          ]
+        },
+        {
+          "id": "asia-tw",
+          "name": "Taiwan",
+          "source": "EA Multiplay Taiwan",
+          "cidrs": [
+            "104.16.0.0/12"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thefinals",
+      "name": "The Finals",
+      "category": "Arena FPS",
+      "icon": "🏆",
+      "processNames": [
+        "Discovery.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore",
+          "source": "Embark SG",
+          "cidrs": [
+            "13.212.0.0/15",
+            "18.140.0.0/15",
+            "54.251.0.0/16"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo)",
+          "source": "Embark Tokyo",
+          "cidrs": [
+            "18.176.0.0/14",
+            "54.238.0.0/15"
+          ]
+        },
+        {
+          "id": "eu-frankfurt",
+          "name": "Europe (Frankfurt)",
+          "source": "Embark EU",
+          "cidrs": [
+            "3.120.0.0/14",
+            "18.194.0.0/15"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cod_warzone",
+      "name": "Call of Duty: Warzone / MW3",
+      "category": "Battle Royale / FPS",
+      "icon": "🎖️",
+      "processNames": [
+        "cod.exe",
+        "bootstrapper.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore (Demonware)",
+          "source": "Activision Demonware SG",
+          "cidrs": [
+            "13.228.0.0/15",
+            "108.61.128.0/17"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo Demonware)",
+          "source": "Activision Demonware Tokyo",
+          "cidrs": [
+            "13.230.0.0/15",
+            "108.61.200.0/21"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deltaforce",
+      "name": "Delta Force: Hawk Ops",
+      "category": "Tactical Shooter",
+      "icon": "🦅",
+      "processNames": [
+        "DeltaForceClient-Win64-Shipping.exe",
+        "DeltaForceClient.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore",
+          "source": "Tencent Cloud & AWS SG",
+          "cidrs": [
+            "119.28.0.0/16",
+            "129.226.0.0/16",
+            "150.109.0.0/16"
+          ]
+        },
+        {
+          "id": "asia-hk",
+          "name": "Hong Kong",
+          "source": "Tencent Cloud HK",
+          "cidrs": [
+            "119.28.32.0/19",
+            "150.109.64.0/19"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overwatch2",
+      "name": "Overwatch 2",
+      "category": "Hero Shooter",
+      "icon": "🛡️",
+      "processNames": [
+        "Overwatch.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore / Taiwan",
+          "source": "Blizzard Entertainment",
+          "cidrs": [
+            "24.105.30.0/24",
+            "24.105.62.0/24",
+            "5.42.160.0/19"
+          ]
+        },
+        {
+          "id": "asia-kr",
+          "name": "Korea (Seoul)",
+          "source": "Blizzard Korea",
+          "cidrs": [
+            "211.115.0.0/17",
+            "211.233.0.0/17"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "r6",
+      "name": "Rainbow Six Siege",
+      "category": "Tactical Shooter",
+      "icon": "🧱",
+      "processNames": [
+        "RainbowSix.exe",
+        "RainbowSix_Vulkan.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Southeast Asia (Singapore SEAU)",
+          "source": "Ubisoft / Azure",
+          "cidrs": [
+            "20.24.48.0/20",
+            "20.198.192.0/19"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan East",
+          "source": "Ubisoft / Azure Tokyo",
+          "cidrs": [
+            "20.210.0.0/16",
+            "40.79.160.0/19"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lol",
+      "name": "League of Legends",
+      "category": "MOBA",
+      "icon": "⚔️",
+      "processNames": [
+        "League of Legends.exe",
+        "LeagueClient.exe"
+      ],
+      "regions": [
+        {
+          "id": "vn",
+          "name": "Việt Nam (VNG)",
+          "source": "Riot Games & VNG",
+          "cidrs": [
+            "103.1.0.0/20",
+            "118.69.0.0/16",
+            "123.30.0.0/16"
+          ]
+        },
+        {
+          "id": "sg",
+          "name": "Singapore",
+          "source": "Riot Direct SG",
+          "cidrs": [
+            "13.250.0.0/15",
+            "54.251.0.0/16",
+            "52.221.0.0/16"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dota2",
+      "name": "Dota 2",
+      "category": "MOBA",
+      "icon": "🛡️",
+      "processNames": [
+        "dota2.exe"
+      ],
+      "regions": [
+        {
+          "id": "asia-sg",
+          "name": "Singapore (Valve SDR)",
+          "source": "Valve AS32590 (SGP)",
+          "cidrs": [
+            "103.10.124.0/24",
+            "45.121.184.0/24",
+            "162.254.197.0/24"
+          ]
+        },
+        {
+          "id": "asia-jp",
+          "name": "Japan (Tokyo Valve SDR)",
+          "source": "Valve AS32590 (TYO)",
+          "cidrs": [
+            "45.121.186.0/24",
+            "155.133.239.0/24"
+          ]
+        }
+      ]
+    }
+  ],
+  "relays": [
+    {
+      "id": "relay-demo",
+      "name": "Lagvex Demo Relay (Singapore)",
+      "location": "Singapore",
+      "endpoint": "203.0.113.10:51820",
+      "psk": "demo-pre-shared-key-replace-with-your-vps"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+.PHONY: all relay client test clean
+
+all: relay client
+
+relay:
+	@echo "==> Building Lagvex Relay (Linux amd64)..."
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/lagvex-relay ./cmd/lagvex-relay
+
+relay-arm64:
+	@echo "==> Building Lagvex Relay (Linux arm64)..."
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/lagvex-relay-arm64 ./cmd/lagvex-relay
+
+client:
+	@echo "==> Building Lagvex Client (Windows amd64)..."
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/lagvex-client.exe ./cmd/lagvex-client
+
+test:
+	@echo "==> Running Unit Tests..."
+	go test -v ./pkg/protocol
+
+clean:
+	rm -rf bin/lagvex-relay bin/lagvex-relay-arm64 bin/lagvex-client.exe
