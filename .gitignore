@@ -24,8 +24,6 @@ go.work.sum
 *.psk
 data/
 
-# Old reference source (excluded to avoid copyright issues)
-source/
 
 # OS and Editor files
 .DS_Store

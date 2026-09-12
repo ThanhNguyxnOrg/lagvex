@@ -159,19 +159,23 @@ curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/
 
 ---
 
-### 💻 2. Run Client (Windows, macOS, Linux)
+### 💻 2. Run Client (Windows, Linux, macOS) 🎮
 
-1. 📦 Download the latest build from [Releases](https://github.com/ThanhNguyxnOrg/lagvex/releases).
-2. 🪟 **On Windows**: Ensure `wintun.dll` (64-bit) is in the executable directory or `bin/amd64/`. Run `lagvex-client.exe` as **Administrator**.
-3. 🍎 **On macOS**: Run `sudo ./lagvex-client-darwin-arm64` (uses native `utun`).
-4. 🐧 **On Linux / Steam Deck**: Run `sudo ./lagvex-client-linux-amd64` (uses `/dev/net/tun`).
+Lagvex provides first-class, native support across all three major gaming desktop operating systems:
 
-```cmd
-# 🌟 Start Web Dashboard UI (opens http://127.0.0.1:18888 automatically):
+| Platform | ⚙️ Driver Mechanism | 🎯 Ideal Use Case | 🚀 Command to Run |
+|---|---|---|---|
+| **Windows 10/11** 🪟 | Official `wintun.dll` Layer-3 ring buffer | Valorant, CS2, PUBG, Apex, The Finals, Warzone, Delta Force | `lagvex-client.exe` *(opens Standalone Desktop Window HUD)* |
+| **Linux & Steam Deck** 🐧 | Linux Kernel `/dev/net/tun` + `ip route` | Steam Deck (SteamOS), Proton gaming, CS2 native, Dota 2, Apex | `sudo ./lagvex-client-linux-amd64` |
+| **macOS (Apple Silicon)** 🍎 | Darwin native `utun` + BSD `route` | League of Legends (Mac native), Dota 2, Apple GPTK2 games | `sudo ./lagvex-client-darwin-arm64` |
+
+#### 🌟 Quick Launch Options:
+```bash
+# 🖥️ 1. Start Desktop HUD Window (auto-launches standalone app window at http://127.0.0.1:18888):
 lagvex-client.exe
 
-# ⚡ Or connect directly from command line (CLI):
-lagvex-client.exe -connect -relay 123.45.67.89:51820 -psk your_secret_psk -game valorant -region asia-sg
+# ⚡ 2. Or connect immediately via headless Command Line (CLI):
+lagvex-client.exe -connect -relay 123.45.67.89:4433 -psk your_secret_psk -game valorant -region asia-sg
 ```
 
 ---
