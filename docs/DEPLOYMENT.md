@@ -45,7 +45,7 @@ curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/
 4. 🔑 Generates a cryptographically random 32-character Pre-Shared Key (PSK) stored securely in `/etc/lagvex/psk.key`.
 5. 📦 Installs the `lagvex-relay` binary to `/usr/local/bin/lagvex-relay`.
 6. ⚙️ Registers and starts the systemd service `lagvex-relay.service`.
-7. 📋 Displays your server IP, Port, PSK, and ready-to-use client JSON snippet.
+7. 📋 Displays your server IP, Port, PSK, and prints a **1-Click Squad Share Link** (`lagvex://connect?...`) that teammates can paste directly into their Lagvex HUD to join without manual configuration!
 
 ---
 

@@ -450,11 +450,25 @@
   ],
   "relays": [
     {
-      "id": "relay-demo",
-      "name": "Lagvex Demo Relay (Singapore)",
+      "id": "community-sg-1",
+      "name": "🇸🇬 Singapore #1 [Community Public Free]",
       "location": "Singapore",
-      "endpoint": "203.0.113.10:51820",
-      "psk": "demo-pre-shared-key-replace-with-your-vps"
+      "endpoint": "sg1.lagvex.org:4433",
+      "psk": "lagvex-community-sg-free-public-psk-2026"
+    },
+    {
+      "id": "community-hk-1",
+      "name": "🇭🇰 Hong Kong #1 [Community Public Free]",
+      "location": "Hong Kong",
+      "endpoint": "hk1.lagvex.org:4433",
+      "psk": "lagvex-community-hk-free-public-psk-2026"
+    },
+    {
+      "id": "community-jp-1",
+      "name": "🇯🇵 Tokyo #1 [Community Public Free]",
+      "location": "Tokyo",
+      "endpoint": "jp1.lagvex.org:4433",
+      "psk": "lagvex-community-jp-free-public-psk-2026"
     }
   ]
 }

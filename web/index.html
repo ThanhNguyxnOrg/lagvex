@@ -128,6 +128,7 @@
           <p class="section-desc">Optimized CIDR IP pools for major competitive shooters and popular online titles</p>
         </div>
         <div class="section-actions">
+          <button id="btn-open-squad-modal" class="btn-squad">🤝 Join Squad / Paste Code</button>
           <button id="btn-open-custom-game" class="btn-primary">+ Add Custom Game</button>
           <button id="btn-open-custom-relay" class="btn-secondary">+ Add Custom VPS</button>
         </div>
@@ -173,6 +174,29 @@
       <div class="modal-footer">
         <button class="btn-secondary" id="cancel-relay-modal">Cancel</button>
         <button class="btn-primary" id="save-relay-modal">Save Relay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Join Squad / Paste Code -->
+  <div class="modal" id="modal-squad">
+    <div class="modal-content glass-panel">
+      <div class="modal-header">
+        <h3>🤝 Join Squad Server</h3>
+        <button class="modal-close" id="close-modal-squad">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+          Paste the <strong>Share Link</strong> or <strong>Invite Code</strong> sent by your squad leader or net cafe admin:
+        </p>
+        <div class="form-group">
+          <label>Squad Invite Link or Code</label>
+          <input type="text" id="squad-invite-input" placeholder="e.g. lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz or IP:Port|PSK">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancel-squad-modal">Cancel</button>
+        <button class="btn-primary" id="import-squad-modal" style="background: linear-gradient(135deg, #ffb800, #ff7300); color: #000; font-weight: 700;">Import & Join</button>
       </div>
     </div>
   </div>

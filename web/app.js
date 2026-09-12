@@ -320,6 +320,67 @@ function setupModals() {
     alert("Relay added successfully!");
   });
 
+  // Squad Modal
+  const modalSquad = document.getElementById("modal-squad");
+  const btnOpenSquad = document.getElementById("btn-open-squad-modal");
+  if (btnOpenSquad && modalSquad) {
+    btnOpenSquad.addEventListener("click", () => {
+      modalSquad.classList.add("active");
+    });
+    document.getElementById("close-modal-squad").addEventListener("click", () => {
+      modalSquad.classList.remove("active");
+    });
+    document.getElementById("cancel-squad-modal").addEventListener("click", () => {
+      modalSquad.classList.remove("active");
+    });
+
+    document.getElementById("import-squad-modal").addEventListener("click", () => {
+      const raw = document.getElementById("squad-invite-input").value.trim();
+      if (!raw) return;
+
+      let endpoint = "";
+      let psk = "";
+      let name = "Squad Relay";
+
+      if (raw.startsWith("lagvex://")) {
+        try {
+          const url = new URL(raw.replace("lagvex://", "http://dummy/"));
+          endpoint = url.searchParams.get("endpoint") || "";
+          psk = url.searchParams.get("psk") || "";
+          if (url.searchParams.get("name")) {
+            name = url.searchParams.get("name");
+          }
+        } catch (e) {
+          console.error("Failed parsing lagvex URL:", e);
+        }
+      } else if (raw.includes("|")) {
+        const parts = raw.split("|");
+        endpoint = parts[0].trim();
+        psk = parts[1].trim();
+      } else if (raw.includes(" ")) {
+        const parts = raw.split(/\s+/);
+        endpoint = parts[0].trim();
+        psk = parts[1].trim();
+      }
+
+      if (!endpoint || !psk) {
+        alert("Invalid invite format. Please paste lagvex:// link or IP:Port|PSK");
+        return;
+      }
+
+      const select = document.getElementById("relay-select");
+      const opt = document.createElement("option");
+      opt.value = endpoint;
+      opt.dataset.psk = psk;
+      opt.textContent = `🤝 ${name} (${endpoint})`;
+      select.appendChild(opt);
+      select.value = endpoint;
+
+      modalSquad.classList.remove("active");
+      alert(`🎉 Successfully joined squad relay: ${name} (${endpoint})!\nSelect your game and click BOOST NOW!`);
+    });
+  }
+
   // Game Modal
   const modalGame = document.getElementById("modal-game");
   document.getElementById("btn-open-custom-game").addEventListener("click", () => {

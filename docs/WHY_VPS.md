@@ -71,14 +71,24 @@ Lagvex solves this physical routing limitation by inserting a dedicated high-per
 
 ---
 
-## 👥 One Relay Serves Your Whole Squad / Community 🤝
+## 👥 Does Every Gamer Need to Rent a Server? NO! 🎮
 
-**You do NOT need a separate relay server for every individual player!** 🚫
+**Casual players do NOT need to touch a terminal or rent a server!** 🚫
 
-Because the Lagvex relay daemon is engineered in lightweight Go and offloads packet forwarding to the Linux kernel network stack:
+Lagvex is engineered with three clear tiers of access:
+
+1. 🎁 **Tier 1: Built-In Community Public Nodes (Zero Setup)**:  
+   The client ships with pre-configured public community relay endpoints in Singapore, Hong Kong, and Tokyo. Casual players simply open the app, pick their game, and click **BOOST NOW**.
+2. 🤝 **Tier 2: The "1 Hosts for the Whole Squad" Model**:  
+   Only **one person** in a gaming team, Discord server, or net cafe needs to deploy a relay. The installer prints a shareable 1-click link:  
+   `lagvex://connect?endpoint=IP:PORT&psk=KEY&name=Squad`  
+   Teammates simply paste this link into the HUD and are connected immediately.
+3. 🛠️ **Tier 3: Dedicated Self-Hosters & Cyber Cafes**:  
+   Only competitive players who demand 100% private bandwidth or cyber cafe owners optimizing 50+ LAN PCs need to run their own private relay node.
+
+### ⚡ Ultra-Efficient Server Capacity:
 - 📊 **Resource Footprint**: The relay daemon consumes less than **15 MB of RAM** and negligible CPU overhead (< 2% on a single core).
-- 🎮 **Capacity**: A single modest Linux server can comfortably handle **20 to 50 concurrent players** playing simultaneously without breaking a sweat.
-- 🤝 **Shared Community Node**: One player, esports team, or gaming guild can operate a single relay node and share the Pre-Shared Key (PSK) with their entire squad or local gaming club.
+- 🎮 **Capacity**: A single modest Linux server comfortably carries **20 to 50 concurrent players** playing simultaneously without packet drops.
 
 ---
 

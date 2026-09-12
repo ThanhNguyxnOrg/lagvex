@@ -188,7 +188,11 @@ echo -e "  Server IP  : ${BOLD}${PUBLIC_IP}${NC}"
 echo -e "  UDP Port   : ${BOLD}${PORT}${NC}"
 echo -e "  PSK Key    : ${BOLD}${YELLOW}${PSK}${NC}"
 echo ""
-echo -e "${CYAN}Copy this configuration into your Lagvex Client:${NC}"
+echo -e "${YELLOW}${BOLD}🤝 1-CLICK SQUAD SHARE LINK (Send this link to your teammates/friends):${NC}"
+echo -e "  ${BOLD}${CYAN}lagvex://connect?endpoint=${PUBLIC_IP}:${PORT}&psk=${PSK}&name=SquadRelay${NC}"
+echo -e "  ${WHITE}(Your friends just download Lagvex, click '🤝 Join Squad', and paste this link!)${NC}"
+echo ""
+echo -e "${CYAN}Or add manually to configs/profiles.json:${NC}"
 cat << EOF
 {
   "id": "my-vps-relay",

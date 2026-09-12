@@ -142,41 +142,61 @@ Lagvex includes pre-verified, narrow CIDR IP pools for major competitive titles:
 
 ## 🚀 Quick Start 🏁
 
-### ☁️ 1. Deploy Relay on VPS (One-Liner)
+Choose the experience that fits you:
 
-Deploy on any Linux VPS (**Ubuntu, Debian, CentOS, Rocky Linux, AlmaLinux, Arch**) located close to your target game servers (e.g. Singapore or Tokyo):
+### 🎮 Option A: For Gamers — 100% Plug-and-Play (Zero Setup, No VPS Needed!) ⚡
+
+You **do NOT need to rent or configure any server** to use Lagvex. Pre-configured **Free Public Community Nodes** are built right in:
+
+1. 📦 **Download**: Grab the latest `lagvex-client` for your OS from [Releases](https://github.com/ThanhNguyxnOrg/lagvex/releases).
+   - 🪟 **Windows 10/11**: Run `lagvex-client.exe` as Administrator *(launches dedicated Desktop App Window)*.
+   - 🐧 **Linux & Steam Deck**: Run `sudo ./lagvex-client-linux-amd64`.
+   - 🍎 **macOS (Apple Silicon)**: Run `sudo ./lagvex-client-darwin-arm64`.
+2. 🎯 **Select Game**: Click on your game (Valorant, CS2, LoL & TFT, Apex, PUBG, etc.).
+3. 🌐 **Choose Server**: Pick a built-in free community node (e.g. `🇸🇬 Singapore #1 [Community Free]`).
+4. ⚡ **Click BOOST NOW**: Launch your game and enjoy stable, low-jitter gameplay!
+
+---
+
+### 🤝 Option B: For Squads & LAN Parties — 1-Click Invite Link 🔗
+
+Playing with a team or at a cyber cafe? Only **one person** in your squad needs a relay:
+1. The squad leader hosts a relay node and shares their **1-Click Squad Link**:  
+   `lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz&name=MySquad`
+2. Teammates click **🤝 Join Squad / Paste Code** on their Lagvex HUD, paste the link, and immediately share the dedicated private tunnel!
+
+---
+
+### ☁️ Option C: For Power Users & Server Hosts — Deploy Private VPS (60 Seconds) 🛠️
+
+Want your own 100% dedicated private relay? Run this one-liner on any fresh Linux VPS (**Ubuntu, Debian, CentOS, Rocky Linux, Arch**) located in Singapore or Tokyo:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
 
 **What the installer does automatically:**
-1. 🔧 Configures kernel `sysctl` for maximum throughput (`ip_forward=1`, `rp_filter=2`, 8MB UDP buffers).
-2. 🛡️ Sets up `iptables` NAT MASQUERADE and TCP MSS clamping that persist across server reboots.
-3. 🔑 Generates a cryptographically random 32-character Pre-Shared Key (PSK).
-4. ⚙️ Registers and launches the `lagvex-relay.service` systemd daemon.
-5. 📋 Outputs your connection endpoint and PSK snippet ready to paste into your client!
+1. 🔧 Tunes kernel `sysctl` (`ip_forward=1`, `rp_filter=2`, 8MB UDP buffers).
+2. 🛡️ Sets up persistent `iptables` NAT MASQUERADE and TCP MSS clamping.
+3. 🔑 Generates a cryptographically secure 32-character Pre-Shared Key (PSK).
+4. ⚙️ Registers and starts the `lagvex-relay.service` systemd daemon.
+5. 📋 Generates your **1-Click Squad Share Link** ready to paste to your friends!
 
-*(Prefer Docker? Just run `docker compose up -d`)*
+*(Prefer Docker? Run `docker compose up -d`)*
 
 ---
 
-### 💻 2. Run Client (Windows, Linux, macOS) 🎮
+### 💻 Supported Client Operating Systems 🎮
 
-Lagvex provides first-class, native support across all three major gaming desktop operating systems:
-
-| Platform | ⚙️ Driver Mechanism | 🎯 Ideal Use Case | 🚀 Command to Run |
+| Platform | ⚙️ Driver Mechanism | 🎯 Ideal Use Case | 🚀 How to Run |
 |---|---|---|---|
 | **Windows 10/11** 🪟 | Official `wintun.dll` Layer-3 ring buffer | Valorant, CS2, PUBG, Apex, The Finals, Warzone, Delta Force | `lagvex-client.exe` *(opens Standalone Desktop Window HUD)* |
 | **Linux & Steam Deck** 🐧 | Linux Kernel `/dev/net/tun` + `ip route` | Steam Deck (SteamOS), Proton gaming, CS2 native, Dota 2, Apex | `sudo ./lagvex-client-linux-amd64` |
-| **macOS (Apple Silicon)** 🍎 | Darwin native `utun` + BSD `route` | League of Legends (Mac native), Dota 2, Apple GPTK2 games | `sudo ./lagvex-client-darwin-arm64` |
+| **macOS (Apple Silicon)** 🍎 | Darwin native `utun` + BSD `route` | League of Legends & TFT (Mac native), Dota 2, Apple GPTK2 games | `sudo ./lagvex-client-darwin-arm64` |
 
-#### 🌟 Quick Launch Options:
+#### 🌟 Advanced CLI Headless Launch:
 ```bash
-# 🖥️ 1. Start Desktop HUD Window (auto-launches standalone app window at http://127.0.0.1:18888):
-lagvex-client.exe
-
-# ⚡ 2. Or connect immediately via headless Command Line (CLI):
+# Connect immediately via command line without opening HUD:
 lagvex-client.exe -connect -relay 123.45.67.89:4433 -psk your_secret_psk -game valorant -region asia-sg
 ```
 
