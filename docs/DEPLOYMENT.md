@@ -1,29 +1,30 @@
-# Lagvex Relay VPS Deployment & Operations
+# 🚀 Lagvex Relay VPS Deployment & Operations ☁️
 
-This guide explains how to deploy, configure, and operate a self-hosted **Lagvex Relay** on any standard Linux Virtual Private Server (VPS).
-
----
-
-## 1. System Requirements
-
-- **Virtualization**: KVM, Xen, or Bare Metal. *(OpenVZ and basic LXC containers cannot create TUN interfaces and are not supported).*
-- **Operating System**: Ubuntu 20.04+, Debian 11+, CentOS 8+, Rocky Linux, AlmaLinux 9+, or Arch Linux.
-- **Kernel**: Linux 5.4 or newer with `tun` module support.
-- **Firewall**: `iptables` or `firewalld` with root / `sudo` access.
-- **Hardware**: 1 vCPU, 512 MB RAM, 10 GB Disk (Lagvex is extremely lightweight; a $3.50/month VPS can easily support 100+ concurrent players).
+> **Step-by-Step Operator Guide for Self-Hosting Lagvex**  
+> 🔗 [Back to Project README.md](../README.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 
-## 2. Choosing Optimal VPS Locations
+## 1. 📋 System Requirements
 
-For players based in Vietnam or Southeast Asia:
-- **Singapore (SGP)**: The primary routing hub for Southeast Asian gaming servers (Valorant, CS2, PUBG, Apex, LoL). Providers with excellent direct routing: Vultr, Linode, AWS EC2 (`ap-southeast-1`), Oracle Cloud SG, OVH Singapore.
-- **Tokyo, Japan (TYO)**: Ideal for connecting to Japanese and East Asian game servers.
-- **Hong Kong (HKG)**: Low-latency hop for southern China, Taiwan, and Korean gaming clusters.
+- 💻 **Virtualization**: KVM, Xen, or Bare Metal. *(OpenVZ and basic LXC containers cannot create TUN interfaces and are not supported).*
+- 🐧 **Operating System**: Ubuntu 20.04+, Debian 11+, CentOS 8+, Rocky Linux, AlmaLinux 9+, or Arch Linux.
+- ⚙️ **Kernel**: Linux 5.4 or newer with `tun` module support.
+- 🛡️ **Firewall**: `iptables` or `firewalld` with root / `sudo` access.
+- ⚡ **Hardware**: 1 vCPU, 512 MB RAM, 10 GB Disk (Lagvex is ultra-lightweight; a $3.50/month VPS can easily support 100+ concurrent players).
 
 ---
 
-## 3. Quick Deployment (One-Liner)
+## 2. 🌍 Choosing Optimal VPS Locations
+
+For players based in Southeast Asia / Vietnam:
+- 🇸🇬 **Singapore (SGP)**: The primary routing hub for Southeast Asian gaming servers (**Valorant, CS2, PUBG, Apex, LoL**). Providers with direct fiber peering: Vultr, Linode, AWS EC2 (`ap-southeast-1`), Oracle Cloud SG, OVH Singapore.
+- 🇯🇵 **Tokyo, Japan (TYO)**: Ideal for connecting to Japanese and East Asian game servers.
+- 🇭🇰 **Hong Kong (HKG)**: Low-latency hop for southern China, Taiwan, and Korean gaming clusters.
+
+---
+
+## 3. ⚡ Quick Deployment (One-Liner) 🏁
 
 Run this single command as root on your VPS:
 
@@ -31,28 +32,28 @@ Run this single command as root on your VPS:
 curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
 
-The script automatically executes:
-1. Validates kernel TUN support (`/dev/net/tun`).
-2. Configures `sysctl` for high-speed packet forwarding:
+**What the installer does automatically:**
+1. 🔌 Verifies kernel TUN support (`/dev/net/tun`).
+2. 🔧 Configures `sysctl` for high-speed packet forwarding:
    ```ini
    net.ipv4.ip_forward = 1
    net.ipv4.conf.all.rp_filter = 2
    net.core.rmem_max = 8388608
    net.core.wmem_max = 8388608
    ```
-3. Configures `iptables` / `ufw` NAT MASQUERADE and TCP MSS clamping, saving rules to persist across reboots.
-4. Generates a cryptographically random 32-character Pre-Shared Key (PSK) stored securely in `/etc/lagvex/psk.key`.
-5. Installs the `lagvex-relay` binary to `/usr/local/bin/lagvex-relay`.
-6. Configures and starts the systemd service `lagvex-relay.service`.
-7. Displays your server IP, Port, PSK, and ready-to-use client JSON snippet.
+3. 🛡️ Sets up `iptables` / `ufw` NAT MASQUERADE and TCP MSS clamping, saving rules to persist across reboots.
+4. 🔑 Generates a cryptographically random 32-character Pre-Shared Key (PSK) stored securely in `/etc/lagvex/psk.key`.
+5. 📦 Installs the `lagvex-relay` binary to `/usr/local/bin/lagvex-relay`.
+6. ⚙️ Registers and starts the systemd service `lagvex-relay.service`.
+7. 📋 Displays your server IP, Port, PSK, and ready-to-use client JSON snippet.
 
 ---
 
-## 4. Manual Deployment Step-by-Step
+## 4. 🛠️ Manual Deployment Step-by-Step 🧑‍💻
 
 If you prefer configuring your server manually:
 
-### Step 1: Enable IP Forwarding
+### 🔧 Step 1: Enable IP Forwarding
 Create `/etc/sysctl.d/99-lagvex.conf`:
 ```ini
 net.ipv4.ip_forward = 1
@@ -66,7 +67,7 @@ Apply settings:
 sudo sysctl -q --system
 ```
 
-### Step 2: Configure NAT Masquerade
+### 🛡️ Step 2: Configure NAT Masquerade
 Assuming your public network interface is `eth0`:
 ```bash
 # Allow incoming UDP on relay port (default 51820)
@@ -83,7 +84,7 @@ sudo iptables -t nat -I POSTROUTING 1 -s 10.88.0.0/24 -o eth0 -j MASQUERADE
 sudo iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 ```
 
-### Step 3: Build & Install Binary
+### 📦 Step 3: Build & Install Binary
 ```bash
 git clone https://github.com/ThanhNguyxnOrg/lagvex.git
 cd lagvex
@@ -91,7 +92,7 @@ make relay
 sudo install -m 755 bin/lagvex-relay /usr/local/bin/lagvex-relay
 ```
 
-### Step 4: Configure Systemd Unit
+### ⚙️ Step 4: Configure Systemd Unit
 Create `/etc/systemd/system/lagvex-relay.service`:
 ```ini
 [Unit]
@@ -123,7 +124,7 @@ sudo systemctl enable --now lagvex-relay
 
 ---
 
-## 5. Docker Deployment
+## 5. 🐳 Docker Deployment 📦
 
 Deploying with Docker Compose:
 
@@ -131,28 +132,36 @@ Deploying with Docker Compose:
 git clone https://github.com/ThanhNguyxnOrg/lagvex.git
 cd lagvex
 
-# Edit environment variables
+# Set custom Pre-Shared Key
 export LAGVEX_PSK="your_custom_psk"
 
-# Start container
+# Launch container in background
 docker compose up -d
 ```
 
 ---
 
-## 6. Maintenance & Troubleshooting
+## 6. 🔍 Maintenance & Troubleshooting 🩺
 
-### Inspect Service Logs:
+### 📜 Inspect Live Service Logs:
 ```bash
 sudo journalctl -u lagvex-relay -f
 ```
 
-### Check Active Sessions:
+### 👥 Check Active Handshakes & Player Count:
 ```bash
 sudo journalctl -u lagvex-relay | grep "Handshake OK"
 ```
 
-### Verify TUN Interface:
+### 🔌 Verify TUN Interface State:
 ```bash
 ip addr show dev lagvex0
 ```
+
+---
+
+🔗 **Navigation**:
+- 🏠 [**Project README**](../README.md)
+- 📐 [**Architecture Overview**](ARCHITECTURE.md)
+- 📡 [**Protocol Specification**](PROTOCOL.md)
+- ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)

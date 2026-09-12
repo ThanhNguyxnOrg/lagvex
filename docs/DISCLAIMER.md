@@ -1,45 +1,63 @@
-# Legal Disclaimer & Educational Use Notice
+# ⚖️ Legal Disclaimer & Ban Liability Waiver 🛡️
 
-> **IMPORTANT NOTICE: PLEASE READ CAREFULLY BEFORE USING THIS SOFTWARE.**
-
----
-
-## 1. Educational and Research Purpose
-
-**Lagvex** is an open-source project created strictly for **academic research, educational purposes, and network engineering study**. 
-
-The primary goal of the project is to demonstrate and evaluate:
-- The technical mechanics of Layer-3 virtual network adapters (WinTun, macOS utun, Linux TUN).
-- Operating system routing table manipulation (`store=active` transient routes).
-- Split-tunneling network architecture to isolate specific destination CIDR ranges.
-- Lightweight binary wire protocols over UDP with Pre-Shared Key (HMAC-SHA256) authentication.
+> [!CAUTION]
+> **CRITICAL LEGAL NOTICE: PLEASE READ THIS DOCUMENT IN ITS ENTIRETY PRIOR TO INSTALLING, COMPILING, OR EXECUTING LAGVEX.**  
+> 🔗 [Back to Project README.md](../README.md)
 
 ---
 
-## 2. No Game Tampering & No Cheating Guarantee
+## 1. 🔬 Academic, Research & Educational Scope
 
-Lagvex is **not** a cheat, exploit, hack, or circumventive software. Specifically:
-- **No Memory Reading or Writing**: Lagvex never accesses, reads, scans, or modifies the virtual memory of any running game process.
-- **No Code Injection**: Lagvex never injects DLLs, shellcode, or hooks into game processes.
-- **No Socket Interception**: Lagvex does not use WinDivert, LSP, or WFP packet filters to hijack sockets from within the game application layer.
-- **Pure Routing**: Lagvex operates strictly as a virtual network adapter managed through standard operating system routing tables, identical in function to standard corporate or enterprise VPN software.
+**Lagvex** is an open-source technical research demonstration exploring:
+- 🔌 **Layer-3 Virtual Network Interfaces**: Architecture and performance of user-space packet rings (`wintun` on Windows, `utun` on macOS, and `/dev/net/tun` on Linux).
+- 🛣️ **Dynamic Routing Table Management**: Safe application and deletion of `store=active` (RAM-only) transient routes to minimize blast radius on client machines.
+- ⚡ **Lightweight UDP Encapsulation**: Performance characteristics of minimal fixed-header binary tunneling with HMAC-SHA256 authenticated handshakes.
+- 🐧 **Zero-Copy Kernel NAT**: Benchmarking Linux kernel `iptables` MASQUERADE and TCP MSS clamping over virtual interfaces.
 
----
-
-## 3. Terms of Service & Third-Party Game Policies
-
-Online multiplayer game publishers and operators—including but not limited to **Riot Games, Valve Corporation, Krafton, Electronic Arts, Activision Blizzard, Ubisoft, and Embark Studios**—maintain their own independent Terms of Service (ToS), End User License Agreements (EULA), and anti-cheat enforcement policies.
-
-- While standard network routing through a VPN or relay server is permitted by many publishers, some game titles or regional servers may enforce policies prohibiting proxy or routing manipulation.
-- Anti-cheat systems (such as Riot Vanguard, Valve Anti-Cheat, BattlEye, Easy Anti-Cheat, RICOCHET, and ACE) are proprietary closed-source systems. The developers of Lagvex cannot guarantee how third-party anti-cheat software will interpret network routing changes or virtual adapter presence on your system.
-- Users are solely responsible for reviewing, understanding, and complying with the Terms of Service of any game they play while Lagvex is active.
+This codebase is provided as free reference material for network engineers, students, and systems researchers.
 
 ---
 
-## 4. Limitation of Liability & "As Is" Warranty
+## 2. 🚫 Zero Game Tampering & Anti-Cheat Ethics
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW:
+Lagvex is strictly a network routing tool. To preserve competitive integrity:
+- ❌ **No Virtual Memory Access**: Lagvex never invokes `OpenProcess`, `ReadProcessMemory`, or `WriteProcessMemory`. It cannot read or alter game state.
+- ❌ **No Code / DLL Injection**: Lagvex does not inject `.dll` files, load libraries into game addresses, or install API detours/hooks.
+- ❌ **No Socket Hooking (WinDivert / LSP / WFP)**: Unlike traditional tools, Lagvex never sits inside the game's internal socket layer.
+- ❌ **No Gameplay Exploits**: Lagvex does not alter packet contents, forge timestamps, duplicate inputs, or provide any unfair gameplay advantage.
 
-1. **NO WARRANTY**: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
-2. **NO LIABILITY FOR ACCOUNT RESTRICTIONS**: IN NO EVENT SHALL THE AUTHORS, MAINTAINERS, CONTRIBUTORS, OR AFFILIATED ORGANIZATIONS BE LIABLE FOR ANY ACCOUNT BANS, PENALTIES, SUSPENSIONS, LOSS OF IN-GAME ASSETS, LOSS OF PROGRESS, DISRUPTIONS, OR SANCTIONS IMPOSED BY GAME PUBLISHERS, ANTI-CHEAT VENDORS, OR PLATFORMS.
-3. **ASSUMPTION OF RISK**: YOU EXPRESSLY ACKNOWLEDGE AND AGREE THAT YOUR USE OF LAGVEX IS AT YOUR SOLE RISK AND DISCRETION.
+---
+
+## 3. 🛑 COMPLETE DISCLAIMER OF LIABILITY REGARDING ACCOUNT BANS ⚠️
+
+> [!WARNING]
+> ### 🚨 READ CAREFULLY: NO RESPONSIBILITY FOR ACCOUNT SANCTIONS 🚨
+> 
+> Game publishers and anti-cheat developers—including **Riot Games, Valve Corporation, Krafton, Electronic Arts (EA), Activision Blizzard, Ubisoft, Tencent, and BattlEye Innovations**—maintain proprietary, closed-source security solutions (such as **Riot Vanguard, Valve Anti-Cheat, BattlEye, Easy Anti-Cheat, RICOCHET, and ACE**).
+> 
+> 1. **Proprietary Anti-Cheat Autonomy**: Anti-cheat systems use automated behavioral heuristics and telemetry. While Lagvex operates purely at the OS network layer (identical to an enterprise VPN), the developers of Lagvex **CANNOT guarantee** that a third-party anti-cheat will not flag network proxies or virtual network adapters.
+> 2. **Terms of Service (ToS) Discretion**: Game publishers retain the unilateral legal right to terminate, suspend, or restrict accounts for any reason, including the use of third-party network routing software.
+> 3. **EXPRESS WAIVER OF LIABILITY**:  
+>    **UNDER NO LEGAL THEORY (WHETHER IN CONTRACT, TORT, NEGLIGENCE, OR OTHERWISE) SHALL THE AUTHORS, REPOSITORY OWNERS, MAINTAINERS, OR CONTRIBUTORS OF LAGVEX BE LIABLE FOR ANY:**
+>    - ⛔ **Permanent or Temporary Account Bans / Suspensions**
+>    - 💻 **Hardware ID (HWID) Bans or System Blacklisting**
+>    - 🎖️ **Loss of Competitive Ranks, Match History, or Leaderboard Standing**
+>    - 💸 **Loss of In-Game Currency, Skins, Battle Passes, or Digital Purchases**
+>    - 📉 **Damages, System Instability, or Network Downtime**
+> 4. **User Assumption of Risk**: By using Lagvex, you acknowledge that you have read and understood this notice and that **you choose to use this software entirely at your own individual risk and discretion**.
+
+---
+
+## 4. 📜 License & "AS IS" Warranty Clause
+
+As stipulated in the **[MIT License](../LICENSE)**:
+
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+🔗 **Return to Main Documentation**:
+- 🏠 [**Project README**](../README.md)
+- 📐 [**Architecture Overview**](ARCHITECTURE.md)
+- 📡 [**Protocol Specification**](PROTOCOL.md)
+- 🚀 [**Deployment Guide**](DEPLOYMENT.md)
