@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>🔥 Open-Source Gaming Latency Reducer & Split-Tunneling Ping Booster 🔥</strong><br>
-  <em>⚡ Ultra-low ping • 🛡️ Zero memory injection • 🌐 Bypasses ISP throttling • 🎮 100% Anti-Cheat Safe</em>
+  <em>⚡ Ultra-low ping • 🛡️ Zero memory injection • 🌐 Bypasses ISP throttling • 🛡️ Non-invasive kernel routing</em>
 </p>
 
 <p align="center">
   <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go" alt="Go Version"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform"></a>
-  <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Anti--Cheat-100%25%20Safe%20(No%20Hooks)-brightgreen" alt="Anti-Cheat Safe"></a>
-  <a href="#️-strict-disclaimer--zero-liability-notice"><img src="https://img.shields.io/badge/Disclaimer-Educational%20Use%20Only-orange" alt="Disclaimer"></a>
+  <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Anti--Cheat-Non--Invasive%20(No%20Hooks)-brightgreen" alt="Anti-Cheat: Non-Invasive"></a>
+  <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Disclaimer-Educational%20Use%20Only-orange" alt="Disclaimer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -58,7 +58,7 @@ When playing competitive online games (like **Valorant, CS2, PUBG, or Apex Legen
 |---|---|---|---|
 | **Routing Scope** | 🐌 100% of whole PC traffic | 🎮 Process hooked | 🎯 **Only Game Server CIDRs** |
 | **Discord / Browser Speed** | ⚠️ Ruined / Laggy | ✅ Direct | 🚀 **Full Gigabit Direct Speed** |
-| **Anti-Cheat Ban Risk** | 🟡 Medium (IP flags) | 🔴 **HIGH (DLL / Socket Hook ban)** | 🟢 **100% Safe (Route-level only)** |
+| **Anti-Cheat Interaction** | 🟡 Full-tunnel proxy | 🔴 **HIGH RISK (DLL / Socket Hook ban)** | 🟢 **Non-Invasive (Layer-3 Routes Only, [See Terms](docs/DISCLAIMER.md))** |
 | **Memory Injection** | ❌ None | ⚠️ Intercepts sockets / memory | 🛡️ **Zero DLLs / Zero Memory hooks** |
 | **Monthly Subscription** | 💸 $8 – $13 / month | 💸 $7 – $10 / month | 🎁 **100% FREE & Open-Source (MIT)** |
 | **Self-Hostable** | ❌ Proprietary | ❌ Proprietary | ☁️ **1-Command Deploy on any VPS** |

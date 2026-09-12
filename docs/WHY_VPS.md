@@ -109,7 +109,7 @@ Traditional commercial VPN services also use remote servers, but they route **10
 | **Discord / Voice Quality** | Can introduce robotic voice or lag | 🎙️ **Untouched** (flows directly via local ISP) |
 | **Web Browsing & YouTube** | Triggers CAPTCHAs, geoblocks, and streaming slowdowns | 🚀 **Untouched** (full local fiber bandwidth) |
 | **Privacy & Security** | VPN operator can inspect all personal web browsing | 🔒 **Zero web traffic passes through relay** |
-| **Anti-Cheat Trust** | Frequently flagged as suspicious proxy by anti-cheats | 🛡️ **100% Safe** (Layer-3 network routing only) |
+| **Anti-Cheat Interaction** | Frequently flagged as suspicious proxy by anti-cheats | 🛡️ **Non-Invasive** (Layer-3 kernel routing only, zero memory access) |
 
 ---
 
