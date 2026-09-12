@@ -1,0 +1,29 @@
+# GolangCI-Lint Configuration for Lagvex
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - unconvert
+
+linters-settings:
+  govet:
+    enable-all: false
+    disable:
+      - shadow
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+
+issues:
+  exclude-use-default: true
+  max-issues-per-linter: 50
+  max-same-issues: 10

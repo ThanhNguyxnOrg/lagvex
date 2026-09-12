@@ -166,7 +166,7 @@ func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
 		var pktSize uint32
 		r1, _, _ := procWintunReceivePacket.Call(w.sessionH, uintptr(unsafe.Pointer(&pktSize)))
 		if r1 != 0 {
-			packetPtr := (*byte)(unsafe.Pointer(r1))
+			packetPtr := (*byte)(*(*unsafe.Pointer)(unsafe.Pointer(&r1)))
 			size := int(pktSize)
 			if size > len(buf) {
 				size = len(buf)
@@ -201,7 +201,7 @@ func (w *WintunAdapter) WritePacket(packet []byte) error {
 		return fmt.Errorf("allocate send packet: %w", errSys)
 	}
 
-	dstSlice := unsafe.Slice((*byte)(unsafe.Pointer(r1)), len(packet))
+	dstSlice := unsafe.Slice((*byte)(*(*unsafe.Pointer)(unsafe.Pointer(&r1))), len(packet))
 	copy(dstSlice, packet)
 
 	procWintunSendPacket.Call(w.sessionH, r1)

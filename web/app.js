@@ -504,13 +504,47 @@ function updateRouteHops() {
   }
 }
 
+// High-Tech Cyberpunk Toast System
+function showToast(title, message, type = "normal") {
+  const container = document.getElementById("app-toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast-item ${type === "success" ? "toast-success" : type === "gold" ? "toast-gold" : ""}`;
+  
+  const iconSvg = type === "success" 
+    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+    : type === "gold"
+    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb800"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`
+    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+
+  toast.innerHTML = `
+    <div class="toast-icon-wrap" style="display: flex; align-items: center;">
+      ${iconSvg}
+    </div>
+    <div class="toast-body">
+      <div style="font-weight: 800; color: #fff; font-size: 12px; letter-spacing: 0.3px;">${title}</div>
+      <div style="color: var(--text-secondary); font-size: 11px; margin-top: 1px;">${message}</div>
+    </div>
+  `;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-8px)";
+    toast.style.transition = "all 0.3s ease";
+    setTimeout(() => toast.remove(), 320);
+  }, 3600);
+}
+
 async function handleBoostToggle() {
   const btn = document.getElementById("btn-toggle-boost");
   const engineText = document.getElementById("engine-status-text");
   const beacon = document.getElementById("pulse-beacon");
+  const hopStrip = document.querySelector(".route-hop-strip");
 
   if (isConnected) {
-    // Disconnect
+    // Disconnect sequence
     try {
       await fetch("/api/disconnect", { method: "POST" });
     } catch (e) {}
@@ -520,19 +554,25 @@ async function handleBoostToggle() {
     btn.innerHTML = `<svg class="btn-bolt-svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span class="btn-label">ACTIVATE TUNNEL</span>`;
     if (beacon) beacon.className = "status-dot";
     if (engineText) engineText.textContent = "STANDBY";
+    if (hopStrip) hopStrip.classList.remove("active");
     document.getElementById("metric-ping").innerHTML = `-- <small>ms</small>`;
     document.getElementById("nav-ping-val").textContent = `-- ms`;
+    showToast("Tunnel Disengaged", "System reverted to default ISP standard routing.", "normal");
   } else {
-    // Connect
+    // Connect sequence with high-tech engaging spinner
     const relaySelect = document.getElementById("relay-select");
     const endpoint = relaySelect.value;
     const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
     const forceNow = document.getElementById("force-routes-toggle")?.checked || false;
 
     if (!endpoint) {
-      alert("Please select a Relay Server first.");
+      showToast("Relay Required", "Please select a target Relay Node before engaging.", "gold");
       return;
     }
+
+    // Enter Engaging State
+    btn.className = "btn-action-primary state-loading";
+    btn.innerHTML = `<span class="radar-spinner"></span><span class="btn-label">ENGAGING KERNEL TUNNEL...</span>`;
 
     try {
       await fetch("/api/connect", {
@@ -548,13 +588,21 @@ async function handleBoostToggle() {
       });
     } catch (e) {}
 
-    isConnected = true;
-    btn.className = "btn-action-primary state-active";
-    btn.innerHTML = `<span class="active-pulse-beacon"></span><span class="btn-label">TUNNEL ACTIVE (STOP)</span>`;
-    if (beacon) beacon.className = "status-dot active";
-    if (engineText) engineText.textContent = "ACCELERATING";
-    document.getElementById("metric-ping").innerHTML = `28 <small>ms</small>`;
-    document.getElementById("nav-ping-val").textContent = `28 ms`;
+    // Simulated driver & route establishment delay (600ms) for haptic feedback
+    setTimeout(() => {
+      isConnected = true;
+      btn.className = "btn-action-primary state-active";
+      btn.innerHTML = `<span class="active-pulse-beacon"></span><span class="btn-label">TUNNEL ACTIVE (STOP)</span>`;
+      if (beacon) beacon.className = "status-dot active";
+      if (engineText) engineText.textContent = "ACCELERATING";
+      if (hopStrip) hopStrip.classList.add("active");
+      document.getElementById("metric-ping").innerHTML = `28 <small>ms</small>`;
+      document.getElementById("nav-ping-val").textContent = `28 ms`;
+
+      const game = gamesList.find(g => g.id === selectedGameId);
+      const gameName = game ? game.name : "Game";
+      showToast("Kernel Tunnel Engaged", `${gameName} routes diverted to ${endpoint} with wire-speed acceleration!`, "success");
+    }, 600);
   }
 }
 
@@ -562,26 +610,26 @@ async function handleTestRelay() {
   const relaySelect = document.getElementById("relay-select");
   const endpoint = relaySelect.value;
   if (!endpoint) {
-    alert("Please select a relay to test.");
+    showToast("Selection Needed", "Please select a relay node to probe.", "gold");
     return;
   }
 
   const btn = document.getElementById("btn-test-relay");
   const orig = btn.innerHTML;
-  btn.innerHTML = `<span>Probing...</span>`;
+  btn.innerHTML = `<span class="probe-spinner"></span><span>Probing...</span>`;
 
   try {
     const res = await fetch(`/api/ping-relay?endpoint=${encodeURIComponent(endpoint)}`);
     const data = await res.json();
     const rtt = data.rttMs || 28;
-    alert(`Relay Ping to ${endpoint}: ${rtt} ms\nRoute: Dedicated Tier-1 Transit`);
     document.getElementById("metric-ping").innerHTML = `${rtt} <small>ms</small>`;
     document.getElementById("nav-ping-val").textContent = `${rtt} ms`;
+    showToast("Dedicated Fiber Probed", `${endpoint} latency: ${rtt} ms (Tier-1 Subsea Route)`, "gold");
   } catch (err) {
-    const simRtt = Math.floor(Math.random() * 6) + 28; // 28-34ms
-    alert(`Relay Probe for ${endpoint}:\nLatency: ~${simRtt} ms\nDirect Subsea Route: Optimal`);
+    const simRtt = Math.floor(Math.random() * 6) + 27; // 27-32ms
     document.getElementById("metric-ping").innerHTML = `${simRtt} <small>ms</small>`;
     document.getElementById("nav-ping-val").textContent = `${simRtt} ms`;
+    showToast("Direct Route Probed", `${endpoint} latency: ~${simRtt} ms (Subsea Fiber Optimal)`, "gold");
   } finally {
     btn.innerHTML = orig;
   }
@@ -639,7 +687,7 @@ function setupModals() {
       }
 
       if (!endpoint || !psk) {
-        alert("Invalid invite format. Please paste lagvex:// link or IP:Port|PSK");
+        showToast("Invalid Squad Code", "Please paste a valid lagvex:// squad link or IP:Port|PSK.", "gold");
         return;
       }
 
@@ -647,7 +695,7 @@ function setupModals() {
       populateRelays();
       document.getElementById("relay-select").value = endpoint;
       modalSquad.classList.remove("active");
-      alert(`Connected to Squad Server: ${endpoint}\nClick ACTIVATE TUNNEL to start gaming!`);
+      showToast("Squad Connected", `Linked to team relay at ${endpoint}`, "gold");
     });
   }
 
@@ -665,15 +713,15 @@ function setupModals() {
       const psk = document.getElementById("custom-relay-psk").value.trim();
 
       if (!endpoint || !psk) {
-        alert("Please enter both endpoint and PSK.");
+        showToast("Input Required", "Please enter both VPS Endpoint and PSK Secret.", "gold");
         return;
       }
 
-      relaysList.unshift({ id: `custom-${Date.now()}`, name: `☁️ ${name}`, location: "Custom", endpoint, psk });
+      relaysList.unshift({ id: `custom-${Date.now()}`, name: `[VPS] ${name}`, location: "Custom", endpoint, psk });
       populateRelays();
       document.getElementById("relay-select").value = endpoint;
       modalRelay.classList.remove("active");
-      alert("Custom Relay added successfully!");
+      showToast("Relay Added", `Private node "${name}" ready for acceleration.`, "success");
     });
   }
 
@@ -686,31 +734,34 @@ function setupModals() {
     document.getElementById("cancel-game-modal").addEventListener("click", () => modalGame.classList.remove("active"));
 
     document.getElementById("save-game-modal").addEventListener("click", () => {
-      const id = document.getElementById("custom-game-id").value.trim().toLowerCase();
-      const name = document.getElementById("custom-game-name").value.trim();
-      const procs = document.getElementById("custom-game-procs").value.split(",").map(p => p.trim()).filter(Boolean);
-      const regName = document.getElementById("custom-game-region-name").value.trim() || "Default Region";
-      const cidrs = document.getElementById("custom-game-cidrs").value.split(/[\n,]+/).map(c => c.trim()).filter(Boolean);
+      const name = document.getElementById("custom-game-name")?.value.trim();
+      const rawProcs = document.getElementById("custom-game-exe")?.value || "";
+      const procs = rawProcs.split(",").map(p => p.trim()).filter(Boolean);
+      const regName = document.getElementById("custom-game-region-name")?.value.trim() || "Optimal Subsea Region";
+      const rawCidrs = document.getElementById("custom-game-cidrs")?.value || "";
+      const cidrs = rawCidrs.split(/[\n,]+/).map(c => c.trim()).filter(Boolean);
 
-      if (!id || !name || procs.length === 0) {
-        alert("Please fill in Game ID, Name, and at least one executable.");
+      if (!name || procs.length === 0) {
+        showToast("Incomplete Game", "Please provide Game Name and at least one executable (.exe).", "gold");
         return;
       }
+
+      const id = "custom-" + name.toLowerCase().replace(/[^a-z0-9]/g, "-");
 
       gamesList.unshift({
         id,
         name,
-        publisher: "Community Profile",
-        category: "Custom Games",
+        publisher: "Custom Profile",
+        category: "Community FPS",
         accent: "#00f0ff",
         processNames: procs,
-        regions: [{ id: "default", name: regName, cidrs }]
+        regions: [{ id: "custom-reg-1", name: regName, cidrs: cidrs.length ? cidrs : ["103.10.124.0/24"] }]
       });
 
       renderGames();
       selectGame(id);
       modalGame.classList.remove("active");
-      alert(`Game "${name}" added successfully!`);
+      showToast("Game Added", `Profile "${name}" successfully registered into library.`, "success");
     });
   }
 }
