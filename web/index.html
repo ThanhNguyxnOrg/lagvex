@@ -1,248 +1,315 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lagvex - Open-Source Gaming Latency Reducer</title>
+  <title>Lagvex // Pro Gaming Latency Reducer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="shortcut icon" type="image/png" href="assets/logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="bg-glow"></div>
+  <!-- Ambient Cosmic Glows -->
+  <div class="glow-orb orb-primary"></div>
+  <div class="glow-orb orb-secondary"></div>
+  <div class="noise-overlay"></div>
 
-  <!-- App Header -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="brand">
-        <img src="assets/logo.jpg" alt="Lagvex Logo" class="brand-logo-img">
-        <div class="brand-text">
-          <div class="brand-title">LAGVEX<span class="brand-tag">PRO</span></div>
-          <div class="brand-sub">Open-Source Game Ping Booster</div>
+  <!-- Floating Island Top Navigation -->
+  <header class="island-nav-wrapper">
+    <nav class="island-nav">
+      <div class="nav-brand">
+        <div class="logo-bezel">
+          <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img">
+        </div>
+        <div class="brand-info">
+          <div class="brand-name">LAGVEX<span class="pro-chip">PRO</span></div>
+          <span class="brand-slogan">Ultra-Low Latency Kernel Tunnel</span>
         </div>
       </div>
-    </div>
 
-    <div class="header-stats">
-      <div class="stat-pill" id="stat-ping-pill">
-        <span class="ping-dot" id="ping-indicator"></span>
-        <span class="stat-label">PING:</span>
-        <span class="stat-val" id="header-ping-val">-- ms</span>
+      <div class="nav-center-status">
+        <div class="live-pill" id="live-status-pill">
+          <span class="pulse-beacon" id="pulse-beacon"></span>
+          <span class="pill-label">ENGINE:</span>
+          <span class="pill-val" id="engine-status-text">STANDBY</span>
+        </div>
+        <div class="live-pill" id="ping-status-pill">
+          <span class="pill-icon">⚡</span>
+          <span class="pill-label">RTT:</span>
+          <span class="pill-val highlight-cyan" id="nav-ping-val">-- ms</span>
+        </div>
       </div>
-      <div class="stat-pill">
-        <span class="stat-label">STATUS:</span>
-        <span class="stat-val badge-idle" id="header-status-badge">DISCONNECTED</span>
+
+      <div class="nav-actions">
+        <button id="btn-quick-squad" class="btn-island-gold" title="Join Squad / Paste Link">
+          <span class="btn-icon">🤝</span>
+          <span>Join Squad</span>
+        </button>
+        <button id="btn-quick-relay" class="btn-island-ghost" title="Add Custom VPS Relay">
+          <span class="btn-icon">➕</span>
+          <span>Add VPS</span>
+        </button>
       </div>
-    </div>
+    </nav>
   </header>
 
   <!-- Main Container -->
-  <main class="main-container">
-    <!-- Top HUD / Control Dashboard -->
-    <section class="hud-section glass-panel">
-      <div class="hud-left">
-        <div class="hud-title-wrap">
-          <h1 class="hud-title" id="hud-game-title">Select a Game to Boost</h1>
-          <p class="hud-subtitle" id="hud-game-sub">Route-based split tunneling via WinTun & VPS Relay</p>
-        </div>
+  <main class="app-layout">
+    <!-- Double-Bezel Hero HUD Section -->
+    <section class="double-bezel-outer hero-hud-bezel">
+      <div class="double-bezel-inner hero-hud-core">
+        
+        <!-- Left: Engine Telemetry & Selectors -->
+        <div class="hud-telemetry-col">
+          <div class="hud-eyebrow">
+            <span class="eyebrow-dot"></span>
+            <span>REAL-TIME PACKET TELEMETRY & SPLIT ROUTING</span>
+          </div>
 
-        <div class="hud-metrics">
-          <div class="metric-card">
-            <div class="metric-icon">📶</div>
-            <div class="metric-info">
-              <span class="metric-name">LATENCY</span>
-              <span class="metric-number" id="metric-ping">-- <small>ms</small></span>
-            </div>
+          <div class="hud-headline-wrap">
+            <h1 class="hud-game-title" id="hud-game-title">Select a Game to Accelerate</h1>
+            <p class="hud-game-desc" id="hud-game-desc">Hardware-accelerated Layer-3 routing via WinTun & Dedicated VPS Relays</p>
           </div>
-          <div class="metric-card">
-            <div class="metric-icon">🚀</div>
-            <div class="metric-info">
-              <span class="metric-name">UP / DOWN</span>
-              <span class="metric-number" id="metric-rates">0 / 0 <small>KB/s</small></span>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon">🛡️</div>
-            <div class="metric-info">
-              <span class="metric-name">GAME ROUTES</span>
-              <span class="metric-number" id="metric-routes">0 <small>active</small></span>
-            </div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-icon">🎮</div>
-            <div class="metric-info">
-              <span class="metric-name">GAME STATE</span>
-              <span class="metric-number" id="metric-gamestate">Idle</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Connection Settings Bar -->
-        <div class="connection-bar">
-          <div class="selector-group">
-            <label for="relay-select">RELAY VPS SERVER</label>
-            <div class="select-with-btn">
-              <select id="relay-select">
-                <option value="">Loading relays...</option>
+          <!-- Glass Metrics Bento -->
+          <div class="metrics-bento">
+            <div class="metric-tile">
+              <div class="metric-top">
+                <span class="tile-icon">📶</span>
+                <span class="tile-label">ESTIMATED PING</span>
+              </div>
+              <div class="metric-val" id="metric-ping">-- <small>ms</small></div>
+              <div class="tile-foot" id="metric-ping-foot">Target: Direct Fiber</div>
+            </div>
+
+            <div class="metric-tile">
+              <div class="metric-top">
+                <span class="tile-icon">⚡</span>
+                <span class="tile-label">BANDWIDTH</span>
+              </div>
+              <div class="metric-val" id="metric-rates">0 <small class="text-sub">/ 0 KB/s</small></div>
+              <div class="tile-foot">▲ Up / ▼ Down</div>
+            </div>
+
+            <div class="metric-tile">
+              <div class="metric-top">
+                <span class="tile-icon">🛡️</span>
+                <span class="tile-label">TUNNEL ROUTES</span>
+              </div>
+              <div class="metric-val" id="metric-routes">0 <small>active</small></div>
+              <div class="tile-foot" id="metric-routes-foot">RAM-Only `store=active`</div>
+            </div>
+
+            <div class="metric-tile">
+              <div class="metric-top">
+                <span class="tile-icon">🎯</span>
+                <span class="tile-label">GAME PROCESS</span>
+              </div>
+              <div class="metric-val" id="metric-gamestate">Idle</div>
+              <div class="tile-foot" id="metric-gamestate-foot">Watcher: Scanning</div>
+            </div>
+          </div>
+
+          <!-- Controls Deck -->
+          <div class="controls-deck">
+            <div class="control-box">
+              <label class="control-lbl" for="relay-select">RELAY NODE / SQUAD SERVER</label>
+              <div class="input-with-action">
+                <select id="relay-select" class="glass-select">
+                  <option value="">Loading network nodes...</option>
+                </select>
+                <button id="btn-test-relay" class="btn-ghost-action" title="Probe Relay Latency">
+                  <span>Ping</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="control-box">
+              <label class="control-lbl" for="region-select">DESTINATION SERVER REGION</label>
+              <select id="region-select" class="glass-select">
+                <option value="">Select a game below</option>
               </select>
-              <button id="btn-test-relay" class="btn-secondary" title="Test Latency to Relay">Test Ping</button>
+            </div>
+
+            <div class="toggle-box">
+              <label class="switch-wrap">
+                <input type="checkbox" id="force-routes-toggle">
+                <span class="slider round"></span>
+                <span class="switch-txt">Force Route Immediately (Bypass Auto-Watcher)</span>
+              </label>
             </div>
           </div>
+        </div>
 
-          <div class="selector-group">
-            <label for="region-select">SERVER REGION</label>
-            <select id="region-select">
-              <option value="">Select a game first</option>
-            </select>
-          </div>
-
-          <div class="selector-group toggle-group">
-            <label class="toggle-label">
-              <input type="checkbox" id="force-routes-toggle">
-              <span>Force Route Always (Bypass Process Watcher)</span>
-            </label>
+        <!-- Right: The Hyper-Drive Reactor Boost Button -->
+        <div class="hud-reactor-col">
+          <div class="reactor-housing">
+            <button id="btn-toggle-boost" class="reactor-btn state-idle">
+              <div class="reactor-ring outer-ring"></div>
+              <div class="reactor-ring middle-ring"></div>
+              <div class="reactor-core">
+                <div class="reactor-icon-wrap">
+                  <span class="reactor-icon" id="reactor-icon">⚡</span>
+                </div>
+                <div class="reactor-text" id="boost-btn-text">ACTIVATE TUNNEL</div>
+                <div class="reactor-sub" id="boost-btn-sub">Click to Start</div>
+              </div>
+            </button>
+            <div class="reactor-status-caption" id="reactor-caption">
+              <span>● SYSTEM READY</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="hud-right">
-        <!-- Giant Power / Boost Button -->
-        <button id="btn-toggle-boost" class="boost-btn boost-idle">
-          <div class="boost-inner">
-            <span class="boost-icon">⚡</span>
-            <span class="boost-text" id="boost-btn-text">BOOST NOW</span>
-            <span class="boost-sub" id="boost-btn-sub">Click to Activate</span>
-          </div>
-        </button>
       </div>
     </section>
 
-    <!-- Games Library -->
-    <section class="games-section">
-      <div class="section-header">
-        <div class="section-title-wrap">
-          <h2 class="section-title">Supported Games Library</h2>
-          <p class="section-desc">Optimized CIDR IP pools for major competitive shooters and popular online titles</p>
+    <!-- Games Library Section -->
+    <section class="games-library-section">
+      <div class="library-header">
+        <div class="lib-titles">
+          <div class="eyebrow-pill">OPTIMIZED PROFILES</div>
+          <h2 class="lib-main-title">Supported Competitive Games</h2>
+          <p class="lib-desc">Direct kernel routing table overrides for Riot Direct, Valve SDR, AWS & Azure clusters</p>
         </div>
-        <div class="section-actions">
-          <button id="btn-open-squad-modal" class="btn-squad">🤝 Join Squad / Paste Code</button>
-          <button id="btn-open-custom-game" class="btn-primary">+ Add Custom Game</button>
-          <button id="btn-open-custom-relay" class="btn-secondary">+ Add Custom VPS</button>
+
+        <!-- Search and Action Bar -->
+        <div class="lib-controls">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="game-search-input" placeholder="Search game (e.g. Valorant, CS2, LoL)...">
+          </div>
+          <button id="btn-open-custom-game" class="btn-island-ghost">+ Custom Game</button>
         </div>
       </div>
 
-      <!-- Categories Filter -->
-      <div class="filter-tabs" id="filter-tabs">
-        <button class="filter-tab active" data-cat="all">All Games</button>
-        <button class="filter-tab" data-cat="Tactical FPS">Tactical FPS</button>
-        <button class="filter-tab" data-cat="Battle Royale">Battle Royale</button>
-        <button class="filter-tab" data-cat="Hero Shooter">Hero Shooter</button>
-        <button class="filter-tab" data-cat="MOBA">MOBA</button>
+      <!-- Category Filter Tabs -->
+      <div class="category-tabs-bar" id="filter-tabs">
+        <button class="cat-pill active" data-cat="all">All Titles</button>
+        <button class="cat-pill" data-cat="Tactical FPS">Tactical FPS</button>
+        <button class="cat-pill" data-cat="Battle Royale">Battle Royale</button>
+        <button class="cat-pill" data-cat="Hero Shooter">Hero Shooter</button>
+        <button class="cat-pill" data-cat="MOBA">MOBA & Strategy</button>
       </div>
 
-      <!-- Games Grid -->
-      <div class="games-grid" id="games-grid">
-        <!-- Dynamic game cards injected via JS -->
+      <!-- Games Bento Grid -->
+      <div class="games-bento-grid" id="games-grid">
+        <!-- Dynamically rendered via app.js -->
       </div>
     </section>
   </main>
 
-  <!-- Modal: Add Custom VPS Relay -->
-  <div class="modal" id="modal-relay">
-    <div class="modal-content glass-panel">
-      <div class="modal-header">
-        <h3>Add Custom VPS Relay</h3>
-        <button class="modal-close" id="close-modal-relay">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Relay Name</label>
-          <input type="text" id="custom-relay-name" placeholder="e.g. My Singapore VPS">
+  <!-- Modal: Join Squad / Paste Code -->
+  <div class="modal-backdrop" id="modal-squad">
+    <div class="modal-card double-bezel-outer">
+      <div class="double-bezel-inner modal-inner">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="modal-icon-badge">🤝</span>
+            <h3>Join Squad Server</h3>
+          </div>
+          <button class="modal-close-btn" id="close-modal-squad">&times;</button>
         </div>
-        <div class="form-group">
-          <label>Endpoint (IP:Port)</label>
-          <input type="text" id="custom-relay-endpoint" placeholder="e.g. 123.45.67.89:51820">
+        <div class="modal-body">
+          <p class="modal-hint">
+            Paste the <strong>1-Click Squad Link</strong> or <strong>Invite Code</strong> sent by your team leader:
+          </p>
+          <div class="form-field">
+            <label>SQUAD INVITE LINK OR CODE</label>
+            <input type="text" id="squad-invite-input" class="modal-input" placeholder="lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz or IP:Port|PSK">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Pre-Shared Key (PSK)</label>
-          <input type="password" id="custom-relay-psk" placeholder="32-character PSK">
+        <div class="modal-foot">
+          <button class="btn-ghost-modal" id="cancel-squad-modal">Cancel</button>
+          <button class="btn-gold-modal" id="import-squad-modal">Import & Connect</button>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" id="cancel-relay-modal">Cancel</button>
-        <button class="btn-primary" id="save-relay-modal">Save Relay</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Join Squad / Paste Code -->
-  <div class="modal" id="modal-squad">
-    <div class="modal-content glass-panel">
-      <div class="modal-header">
-        <h3>🤝 Join Squad Server</h3>
-        <button class="modal-close" id="close-modal-squad">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
-          Paste the <strong>Share Link</strong> or <strong>Invite Code</strong> sent by your squad leader or net cafe admin:
-        </p>
-        <div class="form-group">
-          <label>Squad Invite Link or Code</label>
-          <input type="text" id="squad-invite-input" placeholder="e.g. lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz or IP:Port|PSK">
+  <!-- Modal: Add Custom VPS Relay -->
+  <div class="modal-backdrop" id="modal-relay">
+    <div class="modal-card double-bezel-outer">
+      <div class="double-bezel-inner modal-inner">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="modal-icon-badge">☁️</span>
+            <h3>Add Custom VPS Relay</h3>
+          </div>
+          <button class="modal-close-btn" id="close-modal-relay">&times;</button>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" id="cancel-squad-modal">Cancel</button>
-        <button class="btn-primary" id="import-squad-modal" style="background: linear-gradient(135deg, #ffb800, #ff7300); color: #000; font-weight: 700;">Import & Join</button>
+        <div class="modal-body">
+          <div class="form-field">
+            <label>RELAY NAME</label>
+            <input type="text" id="custom-relay-name" class="modal-input" placeholder="e.g. My Singapore VPS">
+          </div>
+          <div class="form-field">
+            <label>PUBLIC ENDPOINT (IP:PORT)</label>
+            <input type="text" id="custom-relay-endpoint" class="modal-input" placeholder="e.g. 128.199.200.10:4433">
+          </div>
+          <div class="form-field">
+            <label>PRE-SHARED KEY (PSK)</label>
+            <input type="password" id="custom-relay-psk" class="modal-input" placeholder="32-character secret key">
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn-ghost-modal" id="cancel-relay-modal">Cancel</button>
+          <button class="btn-primary-modal" id="save-relay-modal">Save Node</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Modal: Add Custom Game -->
-  <div class="modal" id="modal-game">
-    <div class="modal-content glass-panel">
-      <div class="modal-header">
-        <h3>Add Custom Game</h3>
-        <button class="modal-close" id="close-modal-game">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Game ID (lowercase, e.g. tf2)</label>
-          <input type="text" id="custom-game-id" placeholder="e.g. tf2">
+  <div class="modal-backdrop" id="modal-game">
+    <div class="modal-card double-bezel-outer">
+      <div class="double-bezel-inner modal-inner">
+        <div class="modal-head">
+          <div class="modal-title-row">
+            <span class="modal-icon-badge">🎮</span>
+            <h3>Register Custom Game</h3>
+          </div>
+          <button class="modal-close-btn" id="close-modal-game">&times;</button>
         </div>
-        <div class="form-group">
-          <label>Game Name</label>
-          <input type="text" id="custom-game-name" placeholder="e.g. Team Fortress 2">
+        <div class="modal-body">
+          <div class="form-field">
+            <label>GAME ID (lowercase)</label>
+            <input type="text" id="custom-game-id" class="modal-input" placeholder="e.g. tf2">
+          </div>
+          <div class="form-field">
+            <label>GAME DISPLAY NAME</label>
+            <input type="text" id="custom-game-name" class="modal-input" placeholder="e.g. Team Fortress 2">
+          </div>
+          <div class="form-field">
+            <label>EXECUTABLE NAME(S) (comma separated)</label>
+            <input type="text" id="custom-game-procs" class="modal-input" placeholder="e.g. hl2.exe, tf.exe">
+          </div>
+          <div class="form-field">
+            <label>SERVER REGION NAME</label>
+            <input type="text" id="custom-game-region-name" class="modal-input" placeholder="e.g. Singapore Valve SDR">
+          </div>
+          <div class="form-field">
+            <label>SERVER CIDR IP BLOCKS (comma or newline separated)</label>
+            <textarea id="custom-game-cidrs" class="modal-textarea" rows="3" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Executable Name(s) (comma separated)</label>
-          <input type="text" id="custom-game-procs" placeholder="e.g. hl2.exe, tf.exe">
+        <div class="modal-foot">
+          <button class="btn-ghost-modal" id="cancel-game-modal">Cancel</button>
+          <button class="btn-primary-modal" id="save-game-modal">Save Game</button>
         </div>
-        <div class="form-group">
-          <label>Region Name</label>
-          <input type="text" id="custom-game-region-name" placeholder="e.g. Singapore Server">
-        </div>
-        <div class="form-group">
-          <label>Game Server CIDR IP Ranges (comma or newline separated)</label>
-          <textarea id="custom-game-cidrs" rows="3" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" id="cancel-game-modal">Cancel</button>
-        <button class="btn-primary" id="save-game-modal">Save Game</button>
       </div>
     </div>
   </div>
 
   <!-- App Footer -->
   <footer class="app-footer">
-    <div class="footer-content">
-      <span>Lagvex Open-Source Project &copy; 2026. MIT License.</span>
-      <span>⚖️ For Educational & Research Purposes Only. Use at your own risk.</span>
-      <span>Route-based Split Tunneling (Zero DLL injection).</span>
+    <div class="footer-inner">
+      <span>⚡ Lagvex Pro &bull; Open-Source Game Latency Reducer</span>
+      <span>⚖️ Academic Research Demonstration &bull; Zero DLL Hooking</span>
+      <span>MIT License &bull; <a href="https://github.com/ThanhNguyxnOrg/lagvex" target="_blank">GitHub Repository</a></span>
     </div>
   </footer>
 
