@@ -113,6 +113,7 @@ func main() {
 	log.Printf("==================================================")
 	log.Printf("  Lagvex Gaming Latency Reducer v%s", version)
 	log.Printf("  Dashboard: http://%s", *httpFlag)
+	log.Printf("  [Notice] Educational & network research use only.")
 	log.Printf("==================================================")
 
 	if err := uiServer.Start(*httpFlag); err != nil {

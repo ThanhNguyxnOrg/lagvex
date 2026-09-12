@@ -28,6 +28,7 @@
   - [1. Deploy Relay on VPS (One-Liner)](#1-deploy-relay-on-vps-one-liner)
   - [2. Run Client on Windows](#2-run-client-on-windows)
 - [Building from Source](#-building-from-source)
+- [Disclaimer & Educational Notice](#️-disclaimer--educational-use-notice)
 - [License](#-license)
 
 ---
@@ -76,6 +77,7 @@ Traditional workarounds fail in critical ways:
 | 📡 [**Wire Protocol v1 Specification**](docs/PROTOCOL.md) | Binary packet format, HMAC-SHA256 handshake, 9-byte data header, keepalive ping/pong, and MTU arithmetic. |
 | 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
 | 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md) | Profile JSON schema, cloud provider network maps (Valve SDR, Riot Direct, AWS, Azure), and capturing new games. |
+| ⚖️ [**Legal Disclaimer**](docs/DISCLAIMER.md) | Educational use statement, anti-cheat policy notice, and limitation of liability. |
 
 ---
 
@@ -163,6 +165,19 @@ make relay
 # Build Windows Client executable
 make client
 ```
+
+---
+
+## ⚖️ Disclaimer & Educational Use Notice
+
+> [!WARNING]
+> **PLEASE READ BEFORE USING THIS SOFTWARE:**
+> 
+> Lagvex is an open-source project created strictly for **educational, academic research, and network engineering study** regarding Layer-3 virtual network adapters and route-based split-tunneling.
+>
+> - **No Cheating or Tampering**: Lagvex operates solely at the operating system routing table level. It does **NOT** read game memory, modify game binaries, inject DLLs, or provide unfair gameplay advantages.
+> - **Terms of Service Compliance**: Game publishers (such as Riot Games, Valve, Krafton, EA, Activision, Ubisoft) maintain independent Terms of Service regarding network proxies. The authors and contributors cannot guarantee how third-party proprietary anti-cheat engines will evaluate network routing changes.
+> - **Limitation of Liability**: Use this software at your own discretion and risk. Under no circumstances shall the authors, maintainers, or contributors be held liable for any account penalties, bans, suspensions, or damages resulting from the use or misuse of this software. For full details, see [docs/DISCLAIMER.md](docs/DISCLAIMER.md).
 
 ---
 
