@@ -22,6 +22,7 @@ const (
 	StateConnecting    TunnelState = "connecting"
 	StateConnected     TunnelState = "connected"
 	StateDisconnecting TunnelState = "disconnecting"
+	StateError         TunnelState = "error"
 )
 
 // TunnelStats holds real-time telemetry.
@@ -39,6 +40,7 @@ type TunnelStats struct {
 	ActiveRegion string      `json:"activeRegion"`
 	RouteCount   int         `json:"routeCount"`
 	GameRunning  bool        `json:"gameRunning"`
+	LastError    string      `json:"lastError,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -59,6 +61,7 @@ type Engine struct {
 	routeManager *RouteManager
 	profileMgr   *profiles.Manager
 	watcher      *ProcessWatcher
+	crypto       *protocol.SessionCrypto
 
 	activeGame   string
 	activeRegion string
@@ -73,6 +76,8 @@ type Engine struct {
 	pingMs    atomic.Int64
 	upRate    atomic.Int64
 	downRate  atomic.Int64
+	lastPong  atomic.Int64 // Unix nanoseconds of the last authenticated Pong
+	lastErr   atomic.Pointer[string]
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -95,6 +100,11 @@ func (e *Engine) Stats() TunnelStats {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	var lastErrStr string
+	if ptr := e.lastErr.Load(); ptr != nil {
+		lastErrStr = *ptr
+	}
+
 	return TunnelStats{
 		State:        e.state,
 		RelayAddr:    e.relayAddr.String(),
@@ -109,13 +119,14 @@ func (e *Engine) Stats() TunnelStats {
 		ActiveRegion: e.activeRegion,
 		RouteCount:   e.routeManager.ActiveRouteCount(),
 		GameRunning:  e.isGameActive,
+		LastError:    lastErrStr,
 	}
 }
 
 // Connect initiates connection to the relay and configures adapter & routing.
 func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID string, forceRoutesNow bool) error {
 	e.mu.Lock()
-	if e.state != StateDisconnected {
+	if e.state != StateDisconnected && e.state != StateError {
 		e.mu.Unlock()
 		return fmt.Errorf("cannot connect in state %s", e.state)
 	}
@@ -181,6 +192,14 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	log.Printf("[Engine] Handshake OK: session=%016x assignedIP=%s gw=%s mtu=%d",
 		resp.SessionID, resp.ClientIP, resp.GatewayIP, resp.MTU)
 
+	// Phase P0.1: Initialize ChaCha20-Poly1305 AEAD session cipher
+	clientCrypto, err := protocol.NewClientCrypto(psk, nonce, resp.SessionID, e.clientID)
+	if err != nil {
+		conn.Close()
+		e.resetState()
+		return fmt.Errorf("initialize session crypto: %w", err)
+	}
+
 	// 4. Create WinTun adapter
 	adapter, err := OpenOrCreateWintunAdapter("Lagvex", "LagvexTunnel", "")
 	if err != nil {
@@ -221,10 +240,13 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.psk = psk
 	e.udpConn = conn
 	e.wintun = adapter
+	e.crypto = clientCrypto
 	e.activeGame = gameID
 	e.activeRegion = regionID
 	e.gameCIDRs = cidrs
 	e.cancelFunc = cancel
+	e.lastPong.Store(time.Now().UnixNano())
+	e.lastErr.Store(nil)
 	e.mu.Unlock()
 
 	// If manual mode, install routes right away
@@ -283,11 +305,12 @@ func (e *Engine) Disconnect() error {
 
 	log.Printf("[Engine] Disconnecting tunnel...")
 
-	// Send Disconnect message to relay
-	if conn != nil {
-		discBuf := protocol.EncodeDisconnect(sessID)
+	// Send authenticated Disconnect message to relay
+	if conn != nil && e.crypto != nil {
+		discBuf := make([]byte, protocol.SecureHeaderLen+protocol.TagLen)
+		sealedDisc := e.crypto.EncodeDisconnect(discBuf, sessID)
 		udpTarget := net.UDPAddrFromAddrPort(rAddr)
-		_, _ = conn.WriteToUDP(discBuf, udpTarget)
+		_, _ = conn.WriteToUDP(sealedDisc, udpTarget)
 	}
 
 	if cancel != nil {
@@ -307,7 +330,9 @@ func (e *Engine) Disconnect() error {
 	e.routeManager.RemoveAll()
 
 	e.mu.Lock()
-	e.state = StateDisconnected
+	if e.state != StateError {
+		e.state = StateDisconnected
+	}
 	e.isGameActive = false
 	e.activeGame = ""
 	e.activeRegion = ""
@@ -343,7 +368,7 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 			continue // Skip non-IPv4
 		}
 
-		pkt := protocol.EncodeDataPacket(outBuf, e.sessionID, inBuf[:n])
+		pkt := e.crypto.EncodeData(outBuf, e.sessionID, inBuf[:n])
 		_, err = e.udpConn.WriteToUDP(pkt, udpTarget)
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
@@ -354,6 +379,7 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 func (e *Engine) pumpUDPToWinTun(ctx context.Context) {
 	defer e.wg.Done()
 	inBuf := make([]byte, protocol.MaxPacketSize)
+	outBuf := make([]byte, protocol.MaxPacketSize)
 
 	for {
 		select {
@@ -362,7 +388,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context) {
 		default:
 		}
 
-		n, _, err := e.udpConn.ReadFromUDP(inBuf)
+		n, remoteAddr, err := e.udpConn.ReadFromUDP(inBuf)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
@@ -370,29 +396,39 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context) {
 			continue
 		}
 
-		if n < 1 {
+		if n < protocol.SecureHeaderLen+protocol.TagLen {
 			continue
 		}
 
-		ver, mtype := protocol.ParseHeader(inBuf[0])
-		if ver != protocol.Version {
+		// Phase 0.3: Drop packets whose source != configured relay
+		if remoteAddr.AddrPort() != e.relayAddr {
 			continue
+		}
+
+		mtype, payload, err := e.crypto.OpenPacket(outBuf, inBuf[:n])
+		if err != nil {
+			continue // Tag mismatch or replay drop
 		}
 
 		switch mtype {
 		case protocol.TypeData:
-			_, payload, err := protocol.DecodeDataPacket(inBuf[:n])
-			if err == nil && len(payload) > 0 {
+			if len(payload) >= 20 && (payload[0]>>4) == 4 {
 				_ = e.wintun.WritePacket(payload)
 				e.bytesDown.Add(uint64(len(payload)))
 			}
 
 		case protocol.TypePong:
-			_, sentTs, err := protocol.DecodePong(inBuf[:n])
+			ts, err := protocol.DecodeControlPayload(payload)
 			if err == nil {
-				rtt := time.Since(time.Unix(0, int64(sentTs)))
+				rtt := time.Since(time.Unix(0, int64(ts)))
 				e.pingMs.Store(rtt.Milliseconds())
+				e.lastPong.Store(time.Now().UnixNano())
 			}
+
+		case protocol.TypeDisconnect:
+			log.Printf("[Engine] Received server-initiated disconnect")
+			go e.Disconnect()
+			return
 		}
 	}
 }
@@ -402,14 +438,28 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	udpTarget := net.UDPAddrFromAddrPort(e.relayAddr)
+	pingBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			pingBuf := protocol.EncodePing(e.sessionID, uint64(time.Now().UnixNano()))
-			_, _ = e.udpConn.WriteToUDP(pingBuf, udpTarget)
+			// Phase 0.4: Dead-relay detection (10s without Pong = 5 missed pongs)
+			lastPongTime := time.Unix(0, e.lastPong.Load())
+			if time.Since(lastPongTime) > 10*time.Second {
+				log.Printf("[Engine] Dead relay detected! No pong received for %v (threshold: 10s)", time.Since(lastPongTime))
+				errMsg := "relay keepalive timeout (dead relay)"
+				e.lastErr.Store(&errMsg)
+				e.mu.Lock()
+				e.state = StateError
+				e.mu.Unlock()
+				go e.Disconnect()
+				return
+			}
+
+			sealedPing := e.crypto.EncodePing(pingBuf, e.sessionID, uint64(time.Now().UnixNano()))
+			_, _ = e.udpConn.WriteToUDP(sealedPing, udpTarget)
 		}
 	}
 }

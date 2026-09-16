@@ -49,3 +49,31 @@ func TestIPPoolAllocationAndReservation(t *testing.T) {
 		t.Fatalf("expected reconnected ip %s, got %s", ip1, ip1Reconnected)
 	}
 }
+
+func TestIPPoolReconnectStorm(t *testing.T) {
+	// Subnet /30: exactly 1 usable client IP (.2)
+	subnet := netip.MustParsePrefix("10.88.0.0/30")
+	pool, err := NewIPPool(subnet)
+	if err != nil {
+		t.Fatalf("failed to create pool: %v", err)
+	}
+
+	clientID := uint64(0xcafe)
+
+	// Simulate rapid reconnects: each release then allocate
+	var lastIP netip.Addr
+	for i := 1; i <= 50; i++ {
+		sessID := uint64(1000 + i)
+		if lastIP.IsValid() {
+			pool.Release(lastIP, clientID, true)
+		}
+		ip, _, err := pool.Allocate(clientID, sessID)
+		if err != nil {
+			t.Fatalf("reconnect #%d failed: %v (pool exhausted unexpectedly)", i, err)
+		}
+		if ip.String() != "10.88.0.2" {
+			t.Fatalf("expected IP 10.88.0.2, got %s", ip)
+		}
+		lastIP = ip
+	}
+}

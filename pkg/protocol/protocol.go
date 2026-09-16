@@ -1,6 +1,8 @@
 // Package protocol implements the Lagvex binary wire protocol over UDP.
-// It is designed from scratch for minimum packet overhead, high throughput,
-// and secure authentication via Pre-Shared Key (HMAC-SHA256).
+// The handshake authenticates both peers via a Pre-Shared Key (HMAC-SHA256)
+// and bootstraps per-session keys; all post-handshake traffic (data,
+// keepalive, disconnect) is protected with ChaCha20-Poly1305 AEAD plus a
+// per-direction replay window. See crypto.go for the session cipher.
 package protocol
 
 import (
@@ -30,12 +32,9 @@ const (
 	// Packet lengths in bytes.
 	HandshakeReqLen  = 57
 	HandshakeRespLen = 60
-	DataHeaderLen    = 9
-	PingLen          = 17
-	PongLen          = 17
-	DisconnectLen    = 9
 
-	// MaxPacketSize is the maximum MTU plus protocol header.
+	// MaxPacketSize is the maximum MTU plus protocol overhead
+	// (secure header + Poly1305 tag).
 	MaxPacketSize = 2048
 
 	// MaxClockSkew is the allowable drift window for handshake timestamps (replay guard).
@@ -222,112 +221,12 @@ func DecodeHandshakeResponse(psk, buf []byte, expectedNonce uint64) (*HandshakeR
 	}, nil
 }
 
-// --- Data Packet ---
-
-// EncodeDataPacket wraps an IPv4 packet with a 9-byte Lagvex data header.
-// buf must have at least len(payload) + DataHeaderLen capacity.
-func EncodeDataPacket(buf []byte, sessionID uint64, payload []byte) []byte {
-	out := buf[:DataHeaderLen+len(payload)]
-	out[0] = HeaderByte(TypeData)
-	binary.BigEndian.PutUint64(out[1:9], sessionID)
-	copy(out[9:], payload)
-	return out
-}
-
-// DecodeDataPacket parses a Data packet, extracting the session ID and IPv4 payload.
-func DecodeDataPacket(buf []byte) (sessionID uint64, payload []byte, err error) {
-	if len(buf) < DataHeaderLen+20 { // 9 bytes header + min 20 bytes IPv4 header
-		return 0, nil, ErrPacketTooShort
-	}
-	ver, mtype := ParseHeader(buf[0])
-	if ver != Version {
-		return 0, nil, ErrInvalidVersion
-	}
-	if mtype != TypeData {
-		return 0, nil, ErrInvalidType
-	}
-	// Fast IPv4 sanity check: first nibble of IP payload must be 4
-	if (buf[9] >> 4) != 4 {
-		return 0, nil, ErrNotIPv4
-	}
-	sessionID = binary.BigEndian.Uint64(buf[1:9])
-	return sessionID, buf[9:], nil
-}
-
-// --- Ping & Pong ---
-
-// EncodePing creates a 17-byte Ping message.
-func EncodePing(sessionID uint64, timestamp uint64) []byte {
-	buf := make([]byte, PingLen)
-	buf[0] = HeaderByte(TypePing)
-	binary.BigEndian.PutUint64(buf[1:9], sessionID)
-	binary.BigEndian.PutUint64(buf[9:17], timestamp)
-	return buf
-}
-
-// DecodePing parses a Ping message.
-func DecodePing(buf []byte) (sessionID uint64, timestamp uint64, err error) {
-	if len(buf) < PingLen {
-		return 0, 0, ErrPacketTooShort
-	}
-	ver, mtype := ParseHeader(buf[0])
-	if ver != Version {
-		return 0, 0, ErrInvalidVersion
-	}
-	if mtype != TypePing {
-		return 0, 0, ErrInvalidType
-	}
-	return binary.BigEndian.Uint64(buf[1:9]), binary.BigEndian.Uint64(buf[9:17]), nil
-}
-
-// EncodePong creates a 17-byte Pong message.
-func EncodePong(sessionID uint64, timestamp uint64) []byte {
-	buf := make([]byte, PongLen)
-	buf[0] = HeaderByte(TypePong)
-	binary.BigEndian.PutUint64(buf[1:9], sessionID)
-	binary.BigEndian.PutUint64(buf[9:17], timestamp)
-	return buf
-}
-
-// DecodePong parses a Pong message.
-func DecodePong(buf []byte) (sessionID uint64, timestamp uint64, err error) {
-	if len(buf) < PongLen {
-		return 0, 0, ErrPacketTooShort
-	}
-	ver, mtype := ParseHeader(buf[0])
-	if ver != Version {
-		return 0, 0, ErrInvalidVersion
-	}
-	if mtype != TypePong {
-		return 0, 0, ErrInvalidType
-	}
-	return binary.BigEndian.Uint64(buf[1:9]), binary.BigEndian.Uint64(buf[9:17]), nil
-}
-
-// --- Disconnect ---
-
-// EncodeDisconnect creates a 9-byte Disconnect message.
-func EncodeDisconnect(sessionID uint64) []byte {
-	buf := make([]byte, DisconnectLen)
-	buf[0] = HeaderByte(TypeDisconnect)
-	binary.BigEndian.PutUint64(buf[1:9], sessionID)
-	return buf
-}
-
-// DecodeDisconnect parses a Disconnect message.
-func DecodeDisconnect(buf []byte) (sessionID uint64, err error) {
-	if len(buf) < DisconnectLen {
-		return 0, ErrPacketTooShort
-	}
-	ver, mtype := ParseHeader(buf[0])
-	if ver != Version {
-		return 0, ErrInvalidVersion
-	}
-	if mtype != TypeDisconnect {
-		return 0, ErrInvalidType
-	}
-	return binary.BigEndian.Uint64(buf[1:9]), nil
-}
+// --- Sealed session messages (Data / Ping / Pong / Disconnect) ---
+//
+// These message types are encoded and decoded exclusively through
+// SessionCrypto (see crypto.go). There is intentionally NO plaintext
+// encoding path: accepting one would let an attacker downgrade a session
+// by flipping the message-type nibble.
 
 // String provides a human-readable name for a message type.
 func TypeString(mtype byte) string {

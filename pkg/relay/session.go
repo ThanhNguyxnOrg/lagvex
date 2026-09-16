@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"sync/atomic"
 	"time"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 )
 
 // Session represents an authenticated connected client.
@@ -12,6 +13,7 @@ type Session struct {
 	ClientID  uint64
 	InnerIP   netip.Addr
 	RemoteUDP atomic.Pointer[netip.AddrPort]
+	Crypto    *protocol.SessionCrypto
 
 	lastSeen  atomic.Int64 // Unix nanoseconds
 	createdAt time.Time
@@ -21,11 +23,12 @@ type Session struct {
 }
 
 // NewSession initializes a new client session.
-func NewSession(id, clientID uint64, innerIP netip.Addr, remote netip.AddrPort) *Session {
+func NewSession(id, clientID uint64, innerIP netip.Addr, remote netip.AddrPort, crypto *protocol.SessionCrypto) *Session {
 	s := &Session{
 		ID:        id,
 		ClientID:  clientID,
 		InnerIP:   innerIP,
+		Crypto:    crypto,
 		createdAt: time.Now(),
 	}
 	s.RemoteUDP.Store(&remote)

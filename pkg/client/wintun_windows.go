@@ -43,7 +43,6 @@ func initWintunProcs(dllPath string) error {
 		candidates := []string{
 			filepath.Join(filepath.Dir(exe), "wintun.dll"),
 			filepath.Join(filepath.Dir(exe), "bin", "amd64", "wintun.dll"),
-			`D:\Code\Lagvex\bin\amd64\wintun.dll`,
 			"wintun.dll",
 		}
 		for _, c := range candidates {

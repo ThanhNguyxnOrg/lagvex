@@ -48,7 +48,6 @@ func main() {
 		exe, _ := os.Executable()
 		candidates := []string{
 			filepath.Join(filepath.Dir(exe), "configs", "profiles.json"),
-			`D:\Code\Lagvex\configs\profiles.json`,
 			"configs/profiles.json",
 		}
 		for _, c := range candidates {

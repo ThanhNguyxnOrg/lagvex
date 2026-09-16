@@ -25,11 +25,13 @@ type GameDefinition struct {
 
 // RelayEndpoint describes a Lagvex relay server.
 type RelayEndpoint struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Location string `json:"location"`
-	Endpoint string `json:"endpoint"` // host:port
-	PSK      string `json:"psk,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Continent string `json:"continent,omitempty"`
+	Location  string `json:"location"`
+	Endpoint  string `json:"endpoint"` // host:port
+	PSK       string `json:"psk,omitempty"`
+	Tier      string `json:"tier,omitempty"`
 }
 
 // ProfileCatalog contains all games and known relays.

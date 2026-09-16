@@ -79,46 +79,146 @@ func TestHandshakeAuthFailure(t *testing.T) {
 	}
 }
 
-func TestDataPacket(t *testing.T) {
+func TestSessionCryptoData(t *testing.T) {
+	psk := []byte("secret-key-for-session-crypto-32b")
+	nonce := uint64(999888777)
 	sessionID := uint64(0x1122334455667788)
-	// Sample minimal IPv4 packet (20 bytes header)
+	clientID := uint64(1001)
+
+	clientCrypto, err := NewClientCrypto(psk, nonce, sessionID, clientID)
+	if err != nil {
+		t.Fatalf("failed to create client crypto: %v", err)
+	}
+	relayCrypto, err := NewRelayCrypto(psk, nonce, sessionID, clientID)
+	if err != nil {
+		t.Fatalf("failed to create relay crypto: %v", err)
+	}
+
+	// Minimal IPv4 packet (28 bytes)
 	rawIPv4 := make([]byte, 28)
-	rawIPv4[0] = 0x45 // IPv4, IHL 5
-	rawIPv4[9] = 17   // UDP
+	rawIPv4[0] = 0x45
+	rawIPv4[9] = 17
 	copy(rawIPv4[20:], []byte("DATA"))
 
 	buf := make([]byte, 1024)
-	packet := EncodeDataPacket(buf, sessionID, rawIPv4)
+	sealed := clientCrypto.EncodeData(buf, sessionID, rawIPv4)
 
-	if len(packet) != DataHeaderLen+len(rawIPv4) {
-		t.Fatalf("expected packet length %d, got %d", DataHeaderLen+len(rawIPv4), len(packet))
+	mtype, sid, err := ReadPacketHeader(sealed)
+	if err != nil || mtype != TypeData || sid != sessionID {
+		t.Fatalf("ReadPacketHeader failed: err=%v, mtype=%d, sid=%x", err, mtype, sid)
 	}
 
-	decSession, decPayload, err := DecodeDataPacket(packet)
+	plainBuf := make([]byte, 1024)
+	decType, payload, err := relayCrypto.OpenPacket(plainBuf, sealed)
 	if err != nil {
-		t.Fatalf("decode data packet failed: %v", err)
+		t.Fatalf("OpenPacket failed: %v", err)
 	}
-	if decSession != sessionID {
-		t.Fatalf("expected session ID %d, got %d", sessionID, decSession)
+	if decType != TypeData {
+		t.Fatalf("expected TypeData, got %d", decType)
 	}
-	if !bytes.Equal(decPayload, rawIPv4) {
+	if !bytes.Equal(payload, rawIPv4) {
 		t.Fatalf("payload mismatch")
 	}
 }
 
-func TestPingPong(t *testing.T) {
-	sessionID := uint64(555)
-	ts := uint64(time.Now().UnixNano())
+func TestSessionCryptoPingPong(t *testing.T) {
+	psk := []byte("secret-key-for-session-crypto-32b")
+	nonce := uint64(111222333)
+	sessionID := uint64(0xaabbccddeeff0011)
+	clientID := uint64(2002)
 
-	ping := EncodePing(sessionID, ts)
-	sID, rts, err := DecodePing(ping)
-	if err != nil || sID != sessionID || rts != ts {
-		t.Fatalf("ping failed: %v, sID=%d, rts=%d", err, sID, rts)
+	clientCrypto, _ := NewClientCrypto(psk, nonce, sessionID, clientID)
+	relayCrypto, _ := NewRelayCrypto(psk, nonce, sessionID, clientID)
+
+	ts := uint64(time.Now().UnixNano())
+	buf := make([]byte, 256)
+
+	// Client -> Relay: Ping
+	pingSealed := clientCrypto.EncodePing(buf, sessionID, ts)
+	mtype, pingPayload, err := relayCrypto.OpenPacket(nil, pingSealed)
+	if err != nil || mtype != TypePing {
+		t.Fatalf("relay open ping failed: err=%v, mtype=%d", err, mtype)
+	}
+	decTs, err := DecodeControlPayload(pingPayload)
+	if err != nil || decTs != ts {
+		t.Fatalf("relay decode ping ts failed: %v, decTs=%d, orig=%d", err, decTs, ts)
 	}
 
-	pong := EncodePong(sessionID, ts)
-	sID2, rts2, err := DecodePong(pong)
-	if err != nil || sID2 != sessionID || rts2 != ts {
-		t.Fatalf("pong failed: %v, sID=%d, rts=%d", err, sID2, rts2)
+	// Relay -> Client: Pong
+	pongSealed := relayCrypto.EncodePong(buf, sessionID, ts)
+	mtype2, pongPayload, err := clientCrypto.OpenPacket(nil, pongSealed)
+	if err != nil || mtype2 != TypePong {
+		t.Fatalf("client open pong failed: err=%v, mtype=%d", err, mtype2)
+	}
+	decTs2, err := DecodeControlPayload(pongPayload)
+	if err != nil || decTs2 != ts {
+		t.Fatalf("client decode pong ts failed: %v, decTs2=%d, orig=%d", err, decTs2, ts)
+	}
+}
+
+func TestSessionCryptoReplayAndTamper(t *testing.T) {
+	psk := []byte("secret-key-for-session-crypto-32b")
+	nonce := uint64(555666777)
+	sessionID := uint64(0x3344556677889900)
+	clientID := uint64(3003)
+
+	clientCrypto, _ := NewClientCrypto(psk, nonce, sessionID, clientID)
+	relayCrypto, _ := NewRelayCrypto(psk, nonce, sessionID, clientID)
+
+	data := []byte("important game packet payload")
+	buf := make([]byte, 256)
+	sealed := clientCrypto.EncodeData(buf, sessionID, data)
+
+	// 1. Legitimate decrypt
+	_, _, err := relayCrypto.OpenPacket(nil, sealed)
+	if err != nil {
+		t.Fatalf("first decrypt failed: %v", err)
+	}
+
+	// 2. Replay attack: duplicate packet should fail
+	_, _, err = relayCrypto.OpenPacket(nil, sealed)
+	if err != ErrReplay {
+		t.Fatalf("expected ErrReplay for duplicate packet, got %v", err)
+	}
+
+	// 3. Tamper attack: modify payload byte
+	sealed2 := clientCrypto.EncodeData(buf, sessionID, data)
+	tampered := make([]byte, len(sealed2))
+	copy(tampered, sealed2)
+	tampered[len(tampered)-1] ^= 0xff // flip bit in Poly1305 tag
+
+	_, _, err = relayCrypto.OpenPacket(nil, tampered)
+	if err != ErrAuthFailed {
+		t.Fatalf("expected ErrAuthFailed for tampered tag, got %v", err)
+	}
+}
+
+func TestSessionCryptoOutOfOrderWithinWindow(t *testing.T) {
+	psk := []byte("secret-key-for-session-crypto-32b")
+	nonce := uint64(444333222)
+	sessionID := uint64(0x778899aabbccddee)
+	clientID := uint64(4004)
+
+	clientCrypto, _ := NewClientCrypto(psk, nonce, sessionID, clientID)
+	relayCrypto, _ := NewRelayCrypto(psk, nonce, sessionID, clientID)
+
+	p1 := clientCrypto.EncodeData(make([]byte, 128), sessionID, []byte("p1"))
+	p2 := clientCrypto.EncodeData(make([]byte, 128), sessionID, []byte("p2"))
+	p3 := clientCrypto.EncodeData(make([]byte, 128), sessionID, []byte("p3"))
+
+	// Receive p3 first, then p1, then p2
+	if _, _, err := relayCrypto.OpenPacket(nil, p3); err != nil {
+		t.Fatalf("open p3 failed: %v", err)
+	}
+	if _, _, err := relayCrypto.OpenPacket(nil, p1); err != nil {
+		t.Fatalf("open p1 (out of order) failed: %v", err)
+	}
+	if _, _, err := relayCrypto.OpenPacket(nil, p2); err != nil {
+		t.Fatalf("open p2 (out of order) failed: %v", err)
+	}
+
+	// Now replay p1 -> must fail
+	if _, _, err := relayCrypto.OpenPacket(nil, p1); err != ErrReplay {
+		t.Fatalf("expected ErrReplay for replayed p1, got %v", err)
 	}
 }

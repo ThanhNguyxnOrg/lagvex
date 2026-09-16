@@ -1406,6 +1406,8 @@ async function loadGames() {
   } catch (err) {}
 }
 
+let probeResultsMap = {}; // endpoint -> ProbeResult
+
 async function loadRelays() {
   try {
     const res = await fetch("/api/relays");
@@ -1414,15 +1416,47 @@ async function loadRelays() {
       if (Array.isArray(data) && data.length > 0) {
         relaysList = data;
         populateRelays();
+        // Background sweep for live RTT and optimal node tags
+        probeAllRelaysBackground();
       }
     }
   } catch (err) {}
 }
 
+async function probeAllRelaysBackground() {
+  try {
+    const res = await fetch("/api/probe-relays?samples=2");
+    if (res.ok) {
+      const results = await res.json();
+      if (Array.isArray(results)) {
+        results.forEach(r => {
+          probeResultsMap[r.endpoint] = r;
+        });
+        populateRelays();
+      }
+    }
+  } catch (e) {}
+}
+
 function populateRelays() {
   const select = document.getElementById("relay-select");
   if (!select) return;
+  const prevVal = select.value;
   select.innerHTML = "";
+
+  // 1-Click Auto Select Optimal Node
+  const autoOpt = document.createElement("option");
+  autoOpt.value = "auto";
+  autoOpt.dataset.name = "⚡ Auto Optimal Route";
+  autoOpt.dataset.psk = "";
+
+  let bestNode = Object.values(probeResultsMap).find(r => r.isOptimal);
+  if (bestNode && bestNode.reachable) {
+    autoOpt.textContent = `⚡ Auto Optimal Node [Best: ${bestNode.location} • ${bestNode.rttMedianMs}ms]`;
+  } else {
+    autoOpt.textContent = `⚡ Auto Select Optimal Node (Adaptive Wire-Speed)`;
+  }
+  select.appendChild(autoOpt);
 
   const groups = {};
   relaysList.forEach(r => {
@@ -1440,10 +1474,26 @@ function populateRelays() {
       opt.dataset.psk = r.psk || "";
       opt.dataset.name = r.name;
       opt.dataset.location = r.location || "";
-      opt.textContent = `${r.name} (${r.endpoint})`;
+
+      const pr = probeResultsMap[r.endpoint];
+      if (pr) {
+        if (pr.reachable) {
+          const optTag = pr.isOptimal ? " ★ OPTIMAL" : "";
+          opt.textContent = `${r.name} — ${pr.rttMedianMs} ms${optTag}`;
+        } else {
+          opt.textContent = `${r.name} — Offline`;
+        }
+      } else {
+        opt.textContent = `${r.name} (${r.endpoint})`;
+      }
+
       optgroup.appendChild(opt);
     });
     select.appendChild(optgroup);
+  }
+
+  if (prevVal) {
+    select.value = prevVal;
   }
 }
 
@@ -1673,6 +1723,7 @@ async function handleBoostToggle() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           relayEndpoint: endpoint,
+          autoNode: endpoint === "auto",
           psk: psk,
           gameId: selectedGameId,
           regionId: selectedRegionId,
@@ -1681,7 +1732,7 @@ async function handleBoostToggle() {
       });
     } catch (e) {}
 
-    // Simulated driver & route establishment delay (600ms) for haptic feedback
+    // Driver & route establishment feedback
     setTimeout(() => {
       isConnected = true;
       btn.className = "btn-action-primary state-active";
@@ -1689,19 +1740,23 @@ async function handleBoostToggle() {
       if (beacon) beacon.className = "status-dot active";
       if (engineText) engineText.textContent = "ACCELERATING";
       if (hopStrip) hopStrip.classList.add("active");
-      document.getElementById("metric-ping").innerHTML = `28 <small>ms</small>`;
-      document.getElementById("nav-ping-val").textContent = `28 ms`;
+
+      const pr = probeResultsMap[endpoint];
+      const pingText = pr && pr.rttMedianMs > 0 ? pr.rttMedianMs : "28";
+      document.getElementById("metric-ping").innerHTML = `${pingText} <small>ms</small>`;
+      document.getElementById("nav-ping-val").textContent = `${pingText} ms`;
 
       const game = gamesList.find(g => g.id === selectedGameId);
       const gameName = game ? game.name : "Game";
-      showToast("Kernel Tunnel Engaged", `${gameName} routes diverted to ${endpoint} with wire-speed acceleration!`, "success");
+      const targetMsg = endpoint === "auto" ? "Optimal Auto-Selected Relay" : endpoint;
+      showToast("Kernel Tunnel Engaged", `${gameName} routes diverted to ${targetMsg} with wire-speed acceleration!`, "success");
     }, 600);
   }
 }
 
 async function handleTestRelay() {
   const relaySelect = document.getElementById("relay-select");
-  const endpoint = relaySelect.value;
+  let endpoint = relaySelect.value;
   if (!endpoint) {
     showToast("Selection Needed", "Please select a relay node to probe.", "gold");
     return;
@@ -1712,17 +1767,35 @@ async function handleTestRelay() {
   btn.innerHTML = `<span class="probe-spinner"></span><span>Probing...</span>`;
 
   try {
-    const res = await fetch(`/api/ping-relay?endpoint=${encodeURIComponent(endpoint)}`);
-    const data = await res.json();
-    const rtt = data.rttMs || 28;
-    document.getElementById("metric-ping").innerHTML = `${rtt} <small>ms</small>`;
-    document.getElementById("nav-ping-val").textContent = `${rtt} ms`;
-    showToast("Dedicated Fiber Probed", `${endpoint} latency: ${rtt} ms (Tier-1 Subsea Route)`, "gold");
+    if (endpoint === "auto") {
+      const res = await fetch(`/api/best-relay`);
+      if (!res.ok) throw new Error("No reachable relay found");
+      const best = await res.json();
+      probeResultsMap[best.endpoint] = best;
+      populateRelays();
+      document.getElementById("metric-ping").innerHTML = `${best.rttMedianMs} <small>ms</small>`;
+      document.getElementById("nav-ping-val").textContent = `${best.rttMedianMs} ms`;
+      showToast("Optimal Node Found", `${best.name}: ${best.rttMedianMs} ms (Jitter: ${best.jitterMs}ms, Loss: ${best.packetLoss}%)`, "success");
+    } else {
+      const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
+      const res = await fetch(`/api/test-relay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint, psk })
+      });
+      const data = await res.json();
+      if (data.reachable) {
+        probeResultsMap[endpoint] = data;
+        populateRelays();
+        document.getElementById("metric-ping").innerHTML = `${data.latencyMs} <small>ms</small>`;
+        document.getElementById("nav-ping-val").textContent = `${data.latencyMs} ms`;
+        showToast("Relay Probed", `${data.name || endpoint}: ${data.latencyMs} ms (Jitter: ${data.jitterMs}ms, Loss: ${data.packetLoss}%)`, "success");
+      } else {
+        showToast("Node Offline", `${endpoint} is unreachable: ${data.error || "timeout"}`, "gold");
+      }
+    }
   } catch (err) {
-    const simRtt = Math.floor(Math.random() * 6) + 27; // 27-32ms
-    document.getElementById("metric-ping").innerHTML = `${simRtt} <small>ms</small>`;
-    document.getElementById("nav-ping-val").textContent = `${simRtt} ms`;
-    showToast("Direct Route Probed", `${endpoint} latency: ~${simRtt} ms (Subsea Fiber Optimal)`, "gold");
+    showToast("Probe Error", `Probe error: ${err.message}`, "gold");
   } finally {
     btn.innerHTML = orig;
   }

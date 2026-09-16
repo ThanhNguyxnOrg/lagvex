@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -38,6 +39,17 @@ func NewManager(filePath string) (*Manager, error) {
 
 	if err := json.Unmarshal(data, &m.catalog); err != nil {
 		return nil, fmt.Errorf("parse profile JSON: %w", err)
+	}
+
+	// If catalog has no relays, attempt to load from sibling relays.json
+	if len(m.catalog.Relays) == 0 && filePath != "" {
+		relaysPath := filepath.Join(filepath.Dir(filePath), "relays.json")
+		if rData, err := os.ReadFile(relaysPath); err == nil {
+			var relays []RelayEndpoint
+			if err := json.Unmarshal(rData, &relays); err == nil {
+				m.catalog.Relays = relays
+			}
+		}
 	}
 
 	return m, nil

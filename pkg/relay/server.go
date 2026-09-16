@@ -153,15 +153,8 @@ func (s *Server) loopUDP(ctx context.Context) {
 		switch mtype {
 		case protocol.TypeHandshakeReq:
 			s.handleHandshake(buf[:n], remoteEndpoint)
-
-		case protocol.TypeData:
-			s.handleData(buf[:n], remoteEndpoint)
-
-		case protocol.TypePing:
-			s.handlePing(buf[:n], remoteEndpoint)
-
-		case protocol.TypeDisconnect:
-			s.handleDisconnect(buf[:n])
+		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect:
+			s.handleSessionPacket(buf[:n], remoteEndpoint)
 		}
 
 		s.bufPool.Put(bufPtr)
@@ -188,6 +181,20 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		return
 	}
 
+	// Phase 0.1: Clean previous session if same client ID reconnected BEFORE allocating IP
+	s.mu.Lock()
+	for _, old := range s.sessionsByID {
+		if old.ClientID == req.ClientID {
+			delete(s.sessionsByID, old.ID)
+			delete(s.sessionsByIP, old.InnerIP)
+			s.pool.Release(old.InnerIP, old.ClientID, true) // Keep reservation for this client!
+			s.activeSessions.Add(-1)
+			log.Printf("[Relay] Reconnect: purged stale session=%016x for client=%016x", old.ID, req.ClientID)
+			break
+		}
+	}
+	s.mu.Unlock()
+
 	innerIP, _, err := s.pool.Allocate(req.ClientID, sessionID)
 	if err != nil {
 		respBuf := protocol.EncodeHandshakeResponse(s.cfg.PSK, protocol.HandshakeResponse{
@@ -197,18 +204,16 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		return
 	}
 
-	sess := NewSession(sessionID, req.ClientID, innerIP, remote)
+	// Phase P0.1: Derive symmetric ChaCha20-Poly1305 session keys for relay
+	sessCrypto, err := protocol.NewRelayCrypto(s.cfg.PSK, req.Nonce, sessionID, req.ClientID)
+	if err != nil {
+		log.Printf("[Relay] Failed to init session crypto: %v", err)
+		return
+	}
+
+	sess := NewSession(sessionID, req.ClientID, innerIP, remote, sessCrypto)
 
 	s.mu.Lock()
-	// Clean previous session if same client ID reconnected
-	for _, old := range s.sessionsByID {
-		if old.ClientID == req.ClientID {
-			delete(s.sessionsByID, old.ID)
-			delete(s.sessionsByIP, old.InnerIP)
-			s.activeSessions.Add(-1)
-			break
-		}
-	}
 	s.sessionsByID[sessionID] = sess
 	s.sessionsByIP[innerIP] = sess
 	s.activeSessions.Add(1)
@@ -229,8 +234,8 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 	s.sendUDP(respBuf, remote)
 }
 
-func (s *Server) handleData(raw []byte, remote netip.AddrPort) {
-	sessionID, payload, err := protocol.DecodeDataPacket(raw)
+func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
+	mtype, sessionID, err := protocol.ReadPacketHeader(raw)
 	if err != nil {
 		return
 	}
@@ -239,67 +244,62 @@ func (s *Server) handleData(raw []byte, remote netip.AddrPort) {
 	sess, exists := s.sessionsByID[sessionID]
 	s.mu.RUnlock()
 
-	if !exists {
+	if !exists || sess.Crypto == nil {
 		return
 	}
 
+	plainBuf := make([]byte, protocol.MaxPacketSize)
+	decType, payload, err := sess.Crypto.OpenPacket(plainBuf, raw)
+	if err != nil || decType != mtype {
+		return // Dropped: AEAD auth failure or anti-replay violation
+	}
+
+	// Phase P0.3: Authenticated Roaming — update endpoint strictly AFTER Poly1305 authentication succeeds
 	sess.Touch()
 	sess.UpdateRemote(remote)
 
-	// Anti-spoofing: Verify inner source IPv4 matches assigned session IP
-	srcIP := netip.AddrFrom4([4]byte{payload[12], payload[13], payload[14], payload[15]})
-	if srcIP != sess.InnerIP {
-		return
+	switch decType {
+	case protocol.TypeData:
+		if len(payload) < 20 || (payload[0]>>4) != 4 {
+			return
+		}
+		// Anti-spoofing: Verify inner source IPv4 matches assigned session IP
+		srcIP := netip.AddrFrom4([4]byte{payload[12], payload[13], payload[14], payload[15]})
+		if srcIP != sess.InnerIP {
+			return
+		}
+
+		// Security: Prevent accessing private / bogon destinations
+		dstIP := netip.AddrFrom4([4]byte{payload[16], payload[17], payload[18], payload[19]})
+		if isForbiddenDestination(dstIP) {
+			return
+		}
+
+		sess.BytesUp.Add(uint64(len(payload)))
+
+		// Push packet into Linux TUN device
+		_, _ = s.tunDev.Write(payload)
+
+	case protocol.TypePing:
+		ts, err := protocol.DecodeControlPayload(payload)
+		if err != nil {
+			return
+		}
+		pongBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+		pong := sess.Crypto.EncodePong(pongBuf, sessionID, ts)
+		s.sendUDP(pong, remote)
+
+	case protocol.TypeDisconnect:
+		s.mu.Lock()
+		if curSess, ok := s.sessionsByID[sessionID]; ok {
+			delete(s.sessionsByID, sessionID)
+			delete(s.sessionsByIP, curSess.InnerIP)
+			s.pool.Release(curSess.InnerIP, curSess.ClientID, false)
+			s.activeSessions.Add(-1)
+			log.Printf("[Relay] Authenticated Disconnect: session=%016x innerIP=%s", sessionID, curSess.InnerIP)
+		}
+		s.mu.Unlock()
 	}
-
-	// Security: Prevent accessing private / bogon destinations
-	dstIP := netip.AddrFrom4([4]byte{payload[16], payload[17], payload[18], payload[19]})
-	if isForbiddenDestination(dstIP) {
-		return
-	}
-
-	sess.BytesUp.Add(uint64(len(payload)))
-
-	// Push packet into Linux TUN device
-	_, _ = s.tunDev.Write(payload)
-}
-
-func (s *Server) handlePing(raw []byte, remote netip.AddrPort) {
-	sessionID, ts, err := protocol.DecodePing(raw)
-	if err != nil {
-		return
-	}
-
-	s.mu.RLock()
-	sess, exists := s.sessionsByID[sessionID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return
-	}
-
-	sess.Touch()
-	sess.UpdateRemote(remote)
-
-	pong := protocol.EncodePong(sessionID, ts)
-	s.sendUDP(pong, remote)
-}
-
-func (s *Server) handleDisconnect(raw []byte) {
-	sessionID, err := protocol.DecodeDisconnect(raw)
-	if err != nil {
-		return
-	}
-
-	s.mu.Lock()
-	if sess, ok := s.sessionsByID[sessionID]; ok {
-		delete(s.sessionsByID, sessionID)
-		delete(s.sessionsByIP, sess.InnerIP)
-		s.pool.Release(sess.InnerIP, sess.ClientID, false)
-		s.activeSessions.Add(-1)
-		log.Printf("[Relay] Disconnect: session=%016x innerIP=%s", sessionID, sess.InnerIP)
-	}
-	s.mu.Unlock()
 }
 
 // loopTUN reads return packets from the Linux TUN device and sends them to clients.
@@ -339,11 +339,11 @@ func (s *Server) loopTUN(ctx context.Context) {
 
 		if ok {
 			remote := sess.RemoteUDP.Load()
-			if remote != nil {
+			if remote != nil && sess.Crypto != nil {
 				sess.Touch()
 				sess.BytesDown.Add(uint64(n))
 
-				packet := protocol.EncodeDataPacket(outBuf, sess.ID, buf[:n])
+				packet := sess.Crypto.EncodeData(outBuf, sess.ID, buf[:n])
 				s.sendUDP(packet, *remote)
 			}
 		}
