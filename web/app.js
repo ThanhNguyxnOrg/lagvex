@@ -366,9 +366,21 @@
 
       showToast(`Tunnel established for ${selectedGame.name} via ${selectedGame.region}`, 'success');
 
-      // Call backend API
+      // Call Go backend API with full connectReq payload
       try {
-        await fetch('/api/connect', { method: 'POST' });
+        await fetch('/api/connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            relayEndpoint: 'auto',
+            autoNode: true,
+            gameId: selectedGame.id,
+            regionId: selectedGame.region || '',
+            forceNow: true
+          })
+        });
       } catch (e) {
         console.warn('Backend connect notice:', e);
       }
@@ -385,9 +397,14 @@
 
       showToast('Acceleration stopped — Returned to standby', 'info');
 
-      // Call backend API
+      // Call Go backend API
       try {
-        await fetch('/api/disconnect', { method: 'POST' });
+        await fetch('/api/disconnect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
       } catch (e) {
         console.warn('Backend disconnect notice:', e);
       }
@@ -425,13 +442,20 @@
       if (!res.ok) return;
       const data = await res.json();
 
-      if (data.state === 'accelerating' && !isAccelerating) {
-        isAccelerating = true;
-        btnToggleBoost.classList.add('is-active');
-        boostButtonLabel.textContent = 'Acceleration active';
-        telemetryLiveLabel.textContent = 'Boosting now';
-        engineStatusLabel.textContent = 'Accelerating';
-        updateHeroCard(selectedGame);
+      if (data.state === 'accelerating') {
+        if (!isAccelerating) {
+          isAccelerating = true;
+          btnToggleBoost.classList.add('is-active');
+          boostButtonLabel.textContent = 'Acceleration active';
+          telemetryLiveLabel.textContent = 'Boosting now';
+          engineStatusLabel.textContent = 'Accelerating';
+          updateHeroCard(selectedGame);
+        }
+        // Update live stats from real Go engine
+        if (data.pingMs && data.pingMs > 0) {
+          metricValLatency.textContent = data.pingMs;
+          heroMetaPing.textContent = `${data.pingMs} ms`;
+        }
       } else if (data.state === 'standby' && isAccelerating) {
         isAccelerating = false;
         btnToggleBoost.classList.remove('is-active');
