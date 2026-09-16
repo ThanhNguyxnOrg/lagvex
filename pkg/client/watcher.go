@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +41,13 @@ func (pw *ProcessWatcher) UpdateTargets(targets []string) {
 	pw.targets = lowered
 }
 
+// ActivePID returns the currently tracked game process ID, or 0 if not running.
+func (pw *ProcessWatcher) ActivePID() int {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	return pw.activePID
+}
+
 // Start begins periodic process scanning.
 func (pw *ProcessWatcher) Start(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
@@ -73,12 +79,13 @@ func (pw *ProcessWatcher) scan() {
 		return
 	}
 
-	running, foundProc := isAnyProcessRunning(targets)
+	running, foundProc, pid := findRunningProcess(targets)
 
 	pw.mu.Lock()
 	if running && !wasRunning {
 		pw.isRunning = true
 		pw.matchedProc = foundProc
+		pw.activePID = pid
 		pw.mu.Unlock()
 		if pw.OnGameStarted != nil {
 			pw.OnGameStarted(foundProc)
@@ -86,6 +93,7 @@ func (pw *ProcessWatcher) scan() {
 	} else if !running && wasRunning {
 		pw.isRunning = false
 		pw.matchedProc = ""
+		pw.activePID = 0
 		pw.mu.Unlock()
 		if pw.OnGameStopped != nil {
 			pw.OnGameStopped(lastMatched)
@@ -93,33 +101,4 @@ func (pw *ProcessWatcher) scan() {
 	} else {
 		pw.mu.Unlock()
 	}
-}
-
-// isAnyProcessRunning checks running Windows tasks using tasklist.
-func isAnyProcessRunning(targets []string) (bool, string) {
-	// Query tasklist with CSV format
-	cmd := exec.Command("tasklist", "/FO", "CSV", "/NH")
-	out, err := cmd.Output()
-	if err != nil {
-		return false, ""
-	}
-
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.Split(line, ",")
-		if len(parts) >= 1 {
-			procName := strings.ToLower(strings.Trim(parts[0], "\" \r\t"))
-			for _, target := range targets {
-				if procName == target {
-					return true, target
-				}
-			}
-		}
-	}
-
-	return false, ""
 }

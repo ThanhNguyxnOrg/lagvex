@@ -12,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 // RouteManager safely manages Windows network routes with store=active (RAM-only).
@@ -55,6 +59,11 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 	cmdDAD := fmt.Sprintf("interface ipv4 set interface interface=%d dadtransmits=0 store=active",
 		tunIfIndex)
 	_ = runNetsh(cmdDAD)
+
+	// 4. IPv6 Leak Protection: Disable IPv6 on WinTun adapter to prevent game dual-stack traffic bypass
+	cmdNoIPv6 := fmt.Sprintf("interface ipv6 set interface interface=%d admin=disabled store=active",
+		tunIfIndex)
+	_ = runNetsh(cmdNoIPv6)
 
 	return nil
 }
@@ -205,8 +214,51 @@ func prefixLengthToSubnetMask(prefixLen int) string {
 		byte(mask>>24), byte(mask>>16), byte(mask>>8), byte(mask))
 }
 
-// getDefaultGatewayRoute parses `route print 0.0.0.0` to find the default physical route.
+// getDefaultGatewayRoute retrieves the default physical gateway and interface index
+// directly via Windows IP Helper API (GetAdaptersAddresses), avoiding command-line string scraping.
 func getDefaultGatewayRoute() (uint32, netip.Addr, error) {
+	flags := uint32(windows.GAA_FLAG_INCLUDE_GATEWAYS)
+	family := uint32(windows.AF_INET)
+
+	var size uint32 = 16384
+	buf := make([]byte, size)
+	pAdapter := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
+
+	err := windows.GetAdaptersAddresses(family, flags, 0, pAdapter, &size)
+	if err == windows.ERROR_BUFFER_OVERFLOW {
+		buf = make([]byte, size)
+		pAdapter = (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
+		err = windows.GetAdaptersAddresses(family, flags, 0, pAdapter, &size)
+	}
+
+	if err == nil {
+		for curr := pAdapter; curr != nil; curr = curr.Next {
+			if curr.OperStatus != windows.IfOperStatusUp {
+				continue
+			}
+			if curr.FirstGatewayAddress == nil {
+				continue
+			}
+
+			sockAddr, err := curr.FirstGatewayAddress.Address.Sockaddr.Sockaddr()
+			if err != nil {
+				continue
+			}
+
+			if sa4, ok := sockAddr.(*syscall.SockaddrInet4); ok {
+				gw := netip.AddrFrom4(sa4.Addr)
+				if gw.IsValid() && !gw.IsUnspecified() && curr.IfIndex > 0 {
+					return curr.IfIndex, gw, nil
+				}
+			}
+		}
+	}
+
+	return getDefaultGatewayRouteFallback()
+}
+
+// getDefaultGatewayRouteFallback is a language-agnostic fallback that parses `route print 0.0.0.0`.
+func getDefaultGatewayRouteFallback() (uint32, netip.Addr, error) {
 	cmd := exec.Command("route", "print", "0.0.0.0")
 	out, err := cmd.Output()
 	if err != nil {
@@ -214,32 +266,24 @@ func getDefaultGatewayRoute() (uint32, netip.Addr, error) {
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(out))
-	inActiveRoutes := false
-
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.Contains(line, "Active Routes:") {
-			inActiveRoutes = true
-			continue
-		}
-		if inActiveRoutes {
-			fields := strings.Fields(line)
-			// e.g.: 0.0.0.0  0.0.0.0  192.168.1.1  192.168.1.50  25
-			if len(fields) >= 5 && fields[0] == "0.0.0.0" && fields[1] == "0.0.0.0" {
-				gwIP, err := netip.ParseAddr(fields[2])
-				if err != nil {
-					continue
-				}
-				nicIP, err := netip.ParseAddr(fields[3])
-				if err != nil {
-					continue
-				}
+		fields := strings.Fields(line)
+		// e.g.: 0.0.0.0  0.0.0.0  192.168.1.1  192.168.1.50  25
+		if len(fields) >= 5 && fields[0] == "0.0.0.0" && fields[1] == "0.0.0.0" {
+			gwIP, err := netip.ParseAddr(fields[2])
+			if err != nil || !gwIP.IsValid() || gwIP.IsUnspecified() {
+				continue
+			}
+			nicIP, err := netip.ParseAddr(fields[3])
+			if err != nil {
+				continue
+			}
 
-				// Find interface index from IP
-				ifIndex, err := findIfIndexByIP(nicIP)
-				if err == nil {
-					return ifIndex, gwIP, nil
-				}
+			// Find interface index from IP
+			ifIndex, err := findIfIndexByIP(nicIP)
+			if err == nil && ifIndex > 0 {
+				return ifIndex, gwIP, nil
 			}
 		}
 	}
