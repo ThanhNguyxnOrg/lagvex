@@ -118,8 +118,8 @@ class LagvexDemoHandler(http.server.SimpleHTTPRequestHandler):
         return []
 
 if __name__ == "__main__":
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", PORT), LagvexDemoHandler) as httpd:
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    with socketserver.ThreadingTCPServer(("127.0.0.1", PORT), LagvexDemoHandler) as httpd:
         print(f"[Lagvex Demo Server] Active at http://127.0.0.1:{PORT}")
         sys.stdout.flush()
         try:

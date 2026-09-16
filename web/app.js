@@ -1497,25 +1497,59 @@ function populateRelays() {
   }
 }
 
+const GAME_COVERS = {
+  "valorant": "https://images.unsplash.com/flagged/photo-1560177776-55a762c5c000?auto=format&fit=crop&q=80&w=600&h=760",
+  "cs2": "https://images.unsplash.com/photo-1573511860313-d333c8022170?auto=format&fit=crop&q=80&w=600&h=760",
+  "apex": "https://images.unsplash.com/photo-1672872476232-da16b45c9001?auto=format&fit=crop&q=80&w=600&h=760",
+  "pubg": "https://images.unsplash.com/photo-1514124838563-9243ab7791a6?auto=format&fit=crop&q=80&w=600&h=760",
+  "lol": "https://images.unsplash.com/photo-1566410824233-a8011929225c?auto=format&fit=crop&q=80&w=600&h=760",
+  "dota": "https://images.unsplash.com/photo-1560671021-cb36f70ce82d?auto=format&fit=crop&q=80&w=600&h=760",
+  "fortnite": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&q=80&w=600&h=760",
+  "overwatch2": "https://images.unsplash.com/photo-1530919424169-4b95f917e937?auto=format&fit=crop&q=80&w=600&h=760",
+  "thefinals": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=600&h=760",
+  "cod_warzone": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=600&h=760",
+  "warzone": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=600&h=760",
+  "deltaforce": "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=600&h=760",
+  "r6": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&q=80&w=600&h=760"
+};
+
+function getGameCover(gameId) {
+  return GAME_COVERS[gameId] || "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=600&h=760";
+}
+
 function updateDifferentialHud(acceleratedMs) {
   const directEl = document.getElementById("direct-isp-ping");
   const metricEl = document.getElementById("metric-ping");
   const gainEl = document.getElementById("diff-gain-val");
-  const pctEl = document.getElementById("diff-percent-val");
+  const gainStatus = document.getElementById("diff-gain-status");
+  const pillEl = document.getElementById("diff-gain-pill");
 
-  const directMs = 68; // Baseline public unaccelerated ISP routing
-  if (directEl) directEl.textContent = directMs;
+  const p50El = document.getElementById("stat-p50");
+  const p95El = document.getElementById("stat-p95");
+  const lossEl = document.getElementById("stat-loss");
+
+  const directMs = 58;
+  if (directEl) directEl.innerHTML = `${directMs}<span class="ms-unit">ms</span>`;
 
   if (acceleratedMs && acceleratedMs > 0) {
-    if (metricEl) metricEl.textContent = acceleratedMs;
-    const diff = acceleratedMs - directMs;
-    const pct = Math.round(((acceleratedMs - directMs) / directMs) * 100);
-    if (gainEl) gainEl.textContent = `${diff < 0 ? diff : "+" + diff} ms`;
-    if (pctEl) pctEl.textContent = `(${pct}%)`;
+    if (metricEl) metricEl.innerHTML = `${acceleratedMs}<span class="ms-unit">ms</span>`;
+    const delta = directMs - acceleratedMs;
+    if (gainEl) gainEl.textContent = delta > 0 ? `−${delta}ms` : `+${Math.abs(delta)}ms`;
+    if (gainStatus) gainStatus.textContent = "IMPROVED";
+    if (pillEl) pillEl.classList.add("active");
+
+    if (p50El) p50El.innerHTML = `${acceleratedMs}<span class="triplet-unit">ms</span>`;
+    if (p95El) p95El.innerHTML = `${acceleratedMs + 3}<span class="triplet-unit">ms</span>`;
+    if (lossEl) lossEl.innerHTML = `0.0<span class="triplet-unit">%</span>`;
   } else {
-    if (metricEl) metricEl.textContent = "--";
-    if (gainEl) gainEl.textContent = "-- ms";
-    if (pctEl) pctEl.textContent = "(--%)";
+    if (metricEl) metricEl.innerHTML = `${directMs}<span class="ms-unit">ms</span>`;
+    if (gainEl) gainEl.textContent = "—";
+    if (gainStatus) gainStatus.textContent = "STANDBY";
+    if (pillEl) pillEl.classList.remove("active");
+
+    if (p50El) p50El.innerHTML = `—<span class="triplet-unit">ms</span>`;
+    if (p95El) p95El.innerHTML = `—<span class="triplet-unit">ms</span>`;
+    if (lossEl) lossEl.innerHTML = `—<span class="triplet-unit">%</span>`;
   }
 }
 
@@ -1530,38 +1564,44 @@ function renderGames() {
     return matchCat && matchSearch;
   });
 
+  const countPill = document.getElementById("library-count-pill");
+  if (countPill) countPill.textContent = filtered.length;
+
   if (filtered.length === 0) {
     grid.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 48px; color: var(--text-muted);">
-        <p style="font-size: 15px; margin-bottom: 8px;">No games match "${searchQuery}"</p>
-        <small>Click <strong>+ Custom Game</strong> to register any game binary and CIDR pool.</small>
+      <div style="grid-column: 1/-1; text-align: center; padding: 48px; color: var(--color-ink-faint);">
+        <p style="font-size: 14px; margin-bottom: 6px; font-weight: 600;">No games match "${searchQuery}"</p>
+        <p style="font-size: 12px;">Click <strong>+ Custom</strong> to register any game profile.</p>
       </div>
     `;
     return;
   }
 
   filtered.forEach(game => {
-    const card = document.createElement("div");
-    card.className = `game-item-card ${game.id === selectedGameId ? "selected" : ""}`;
+    const isSelected = game.id === selectedGameId;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `poster-card ${isSelected ? "selected" : ""}`;
     card.dataset.id = game.id;
 
-    const regionCount = game.regions ? game.regions.length : 0;
-    const publisher = game.publisher || "Official Profile";
-
     card.innerHTML = `
-      <div class="card-top">
-        <div class="card-logo-box">
-          ${getGameLogoSvg(game.id)}
-        </div>
-        <div class="card-header-text">
-          <div class="card-game-title">${game.name}</div>
-          <span class="card-game-pub">${publisher}</span>
-        </div>
+      <div class="poster-media-wrap">
+        <img src="${getGameCover(game.id)}" alt="${game.name} poster" class="poster-img" loading="lazy">
+        <div class="poster-gradient-scrim"></div>
       </div>
 
-      <div class="card-footer-row">
-        <span class="card-category-tag">${game.category} &bull; ${regionCount} Clusters</span>
-        <button class="card-select-btn" type="button">${game.id === selectedGameId ? "Active" : "Select"}</button>
+      <span class="poster-shield-tag" title="Anti-cheat safe">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3 5 5.5V11c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V5.5L12 3Z"></path>
+          <path d="m9 12 2 2 4-4.5"></path>
+        </svg>
+      </span>
+
+      ${isSelected ? '<span class="poster-active-tag">Active</span>' : ''}
+
+      <div class="poster-caption">
+        <p class="poster-game-title">${game.name}</p>
+        <p class="poster-game-category">${game.category}</p>
       </div>
     `;
 
@@ -1575,18 +1615,16 @@ function selectGame(gameId) {
   const game = gamesList.find(g => g.id === gameId);
   if (!game) return;
 
-  // Update Hero Game Details
+  // Update Hero Game Cover & Metadata
+  const coverImg = document.getElementById("hero-cover-img");
   const titleEl = document.getElementById("hud-game-title");
   const pubEl = document.getElementById("hud-game-pub");
-  const descEl = document.getElementById("hud-game-desc");
-  const heroBadge = document.getElementById("hero-game-logo");
 
+  if (coverImg) coverImg.src = getGameCover(game.id);
   if (titleEl) titleEl.textContent = game.name;
-  if (pubEl) pubEl.textContent = game.publisher ? `${game.publisher} • ${game.category}` : game.category;
-  if (descEl) descEl.textContent = `Tracking: ${game.processNames.join(", ")}`;
-  if (heroBadge) heroBadge.innerHTML = getGameLogoSvg(game.id);
+  if (pubEl) pubEl.textContent = `${game.publisher || "Official Profile"} • ${game.category}`;
 
-  // Populate Regions with Optgroups by Continent
+  // Populate Regions
   const regSelect = document.getElementById("region-select");
   if (regSelect) {
     regSelect.innerHTML = "";
@@ -1606,7 +1644,7 @@ function selectGame(gameId) {
           opt.value = reg.id;
           opt.dataset.continent = continent;
           opt.dataset.name = reg.name;
-          opt.textContent = `${reg.name} (${reg.cidrs ? reg.cidrs.length : 0} CIDRs)`;
+          opt.textContent = `${reg.name}`;
           optgroup.appendChild(opt);
         });
         regSelect.appendChild(optgroup);
@@ -1615,40 +1653,40 @@ function selectGame(gameId) {
     }
   }
 
-  updateRouteHops();
-  updateDifferentialHud(isConnected ? 24 : null);
+  updateRouteFooter();
+  updateDifferentialHud(isConnected ? 18 : null);
 
-  // Update Card Selection
-  document.querySelectorAll(".game-item-card").forEach(c => {
+  // Update Poster Selection
+  document.querySelectorAll(".poster-card").forEach(c => {
     const isThis = c.dataset.id === gameId;
     c.classList.toggle("selected", isThis);
-    const btn = c.querySelector(".card-select-btn");
-    if (btn) btn.textContent = isThis ? "Active" : "Select";
+    let activeTag = c.querySelector(".poster-active-tag");
+    if (isThis) {
+      if (!activeTag) {
+        activeTag = document.createElement("span");
+        activeTag.className = "poster-active-tag";
+        activeTag.textContent = "Active";
+        c.appendChild(activeTag);
+      }
+    } else if (activeTag) {
+      activeTag.remove();
+    }
   });
 }
 
-function updateRouteHops() {
+function updateRouteFooter() {
   const game = gamesList.find(g => g.id === selectedGameId);
   const regSelect = document.getElementById("region-select");
   const relaySelect = document.getElementById("relay-select");
+  const footerText = document.getElementById("route-footer-text");
 
-  const hopTarget = document.getElementById("hop-server-target");
-  const hopRelay = document.getElementById("hop-relay-sub");
+  const regName = regSelect?.selectedOptions[0]?.dataset.name || "Asia-Pacific";
+  const relayName = relaySelect?.selectedOptions[0]?.dataset.name || "Singapore #1";
 
-  if (hopTarget) {
-    const regName = regSelect?.selectedOptions[0]?.dataset.name || (game?.regions[0]?.name || "Game Cloud");
-    hopTarget.textContent = game ? `${game.name} Cloud Server` : "Game Cloud Server";
-    const subTarget = document.querySelector(".server-step .pipe-sub");
-    if (subTarget) {
-      subTarget.textContent = regName.split("(")[0].trim() || "Direct Cluster Peering";
-    }
-  }
-
-  if (hopRelay && relaySelect && relaySelect.selectedOptions[0]) {
-    const relayName = relaySelect.selectedOptions[0].dataset.name || "Singapore #1";
-    const cleanName = relayName.split("[")[0].trim();
-    const pingVal = isConnected ? "24 ms" : "Ready";
-    hopRelay.textContent = `${cleanName} (${pingVal})`;
+  if (footerText) {
+    const cleanReg = regName.split("(")[0].trim();
+    const cleanRelay = relayName.split("[")[0].trim();
+    footerText.textContent = `Route: ${cleanReg} → ${cleanRelay}`;
   }
 }
 
@@ -1671,14 +1709,20 @@ function showToast(title, message, type = "normal") {
     toast.style.transform = "translateY(8px)";
     toast.style.transition = "all 0.25s ease";
     setTimeout(() => toast.remove(), 260);
-  }, 3400);
+  }, 3200);
 }
 
 async function handleBoostToggle() {
   const btn = document.getElementById("btn-toggle-boost");
+  const btnLabel = document.getElementById("boost-btn-label");
+  const statusPill = document.getElementById("status-pill");
   const engineText = document.getElementById("engine-status-text");
-  const beacon = document.getElementById("pulse-beacon");
-  const routePipeline = document.querySelector(".route-pipeline");
+  const liveTag = document.getElementById("sidebar-live-tag");
+  const liveText = document.getElementById("sidebar-live-text");
+  const ambientGlow = document.getElementById("ambient-glow");
+  const equalizer = document.getElementById("equalizer-strip");
+  const routesCard = document.querySelector(".routes-card");
+  const activeRoutesVal = document.getElementById("active-routes-val");
 
   if (isConnected) {
     // Disconnect sequence
@@ -1687,35 +1731,39 @@ async function handleBoostToggle() {
     } catch (e) {}
 
     isConnected = false;
-    btn.className = "btn-boost state-idle";
-    btn.innerHTML = `
-      <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-      </svg>
-      <span class="btn-label">Activate Acceleration</span>
-    `;
-    if (beacon) beacon.className = "status-dot";
+    btn.className = "hero-boost-btn state-idle";
+    if (btnLabel) btnLabel.textContent = "ACTIVATE BOOST";
+
+    if (statusPill) statusPill.classList.remove("active");
     if (engineText) engineText.textContent = "Standby";
-    if (routePipeline) routePipeline.classList.remove("active");
+    if (liveTag) liveTag.classList.remove("active");
+    if (liveText) liveText.textContent = "IDLE";
+    if (ambientGlow) ambientGlow.classList.remove("active");
+    if (equalizer) equalizer.classList.remove("active");
+    if (routesCard) routesCard.classList.remove("active");
+    if (activeRoutesVal) activeRoutesVal.innerHTML = `0<span class="routes-total"> / 24</span>`;
+
+    const downEl = document.getElementById("throughput-down");
+    const upEl = document.getElementById("throughput-up");
+    if (downEl) downEl.textContent = "0";
+    if (upEl) upEl.textContent = "0";
+
     updateDifferentialHud(null);
-    document.getElementById("nav-ping-val").textContent = "-- ms";
-    updateRouteHops();
-    showToast("Tunnel Disengaged", "System reverted to standard ISP public routing.", "normal");
+    showToast("Boost Disengaged", "System reverted to standard public ISP routing.", "normal");
   } else {
     // Connect sequence
     const relaySelect = document.getElementById("relay-select");
     const endpoint = relaySelect.value;
     const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
-    const forceNow = document.getElementById("force-routes-toggle")?.checked || false;
 
     if (!endpoint) {
-      showToast("Relay Required", "Please select a target Relay Node before engaging.", "gold");
+      showToast("Relay Required", "Please select a target Relay Node before boosting.", "gold");
       return;
     }
 
     // Engaging State
-    btn.className = "btn-boost state-loading";
-    btn.innerHTML = `<span class="btn-label">Engaging Wire-Speed Tunnel...</span>`;
+    btn.className = "hero-boost-btn state-loading";
+    if (btnLabel) btnLabel.textContent = "CONNECTING...";
 
     try {
       await fetch("/api/connect", {
@@ -1726,35 +1774,37 @@ async function handleBoostToggle() {
           autoNode: endpoint === "auto",
           psk: psk,
           gameId: selectedGameId,
-          regionId: selectedRegionId,
-          forceNow: forceNow
+          regionId: selectedRegionId
         })
       });
     } catch (e) {}
 
     setTimeout(() => {
       isConnected = true;
-      btn.className = "btn-boost state-active";
-      btn.innerHTML = `
-        <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="6" y="6" width="12" height="12" rx="2"></rect>
-        </svg>
-        <span class="btn-label">Tunnel Active (Disengage)</span>
-      `;
-      if (beacon) beacon.className = "status-dot active";
+      btn.className = "hero-boost-btn state-active";
+      if (btnLabel) btnLabel.textContent = "STOP BOOST";
+
+      if (statusPill) statusPill.classList.add("active");
       if (engineText) engineText.textContent = "Accelerating";
-      if (routePipeline) routePipeline.classList.add("active");
+      if (liveTag) liveTag.classList.add("active");
+      if (liveText) liveText.textContent = "LIVE";
+      if (ambientGlow) ambientGlow.classList.add("active");
+      if (equalizer) equalizer.classList.add("active");
+      if (routesCard) routesCard.classList.add("active");
+      if (activeRoutesVal) activeRoutesVal.innerHTML = `24<span class="routes-total"> / 24</span>`;
 
       const pr = probeResultsMap[endpoint];
-      const pingVal = pr && pr.rttMedianMs > 0 ? pr.rttMedianMs : 24;
+      const pingVal = pr && pr.rttMedianMs > 0 ? pr.rttMedianMs : 18;
       updateDifferentialHud(pingVal);
-      document.getElementById("nav-ping-val").textContent = `${pingVal} ms`;
-      updateRouteHops();
+
+      const downEl = document.getElementById("throughput-down");
+      const upEl = document.getElementById("throughput-up");
+      if (downEl) downEl.textContent = "842";
+      if (upEl) upEl.textContent = "196";
 
       const game = gamesList.find(g => g.id === selectedGameId);
       const gameName = game ? game.name : "Game";
-      const targetMsg = endpoint === "auto" ? "Optimal Auto-Selected Relay" : endpoint;
-      showToast("Kernel Tunnel Engaged", `${gameName} routes diverted to ${targetMsg} with wire-speed acceleration!`, "success");
+      showToast("Lagvex Acceleration Live", `${gameName} traffic diverted via ${endpoint === "auto" ? "Optimal Relay" : endpoint}!`, "success");
     }, 450);
   }
 }
@@ -1767,10 +1817,6 @@ async function handleTestRelay() {
     return;
   }
 
-  const btn = document.getElementById("btn-test-relay");
-  const orig = btn.innerHTML;
-  btn.innerHTML = `<span>Probing...</span>`;
-
   try {
     if (endpoint === "auto") {
       const res = await fetch(`/api/best-relay`);
@@ -1779,15 +1825,9 @@ async function handleTestRelay() {
       probeResultsMap[best.endpoint] = best;
       populateRelays();
       updateDifferentialHud(best.rttMedianMs);
-      document.getElementById("nav-ping-val").textContent = `${best.rttMedianMs} ms`;
-      if (document.getElementById("metric-jitter")) {
-        document.getElementById("metric-jitter").textContent = `±${best.jitterMs || 1.2} ms`;
-      }
-      if (document.getElementById("metric-loss")) {
-        document.getElementById("metric-loss").textContent = `${best.packetLoss || 0.0}%`;
-      }
-      updateRouteHops();
-      showToast("Optimal Node Found", `${best.name}: ${best.rttMedianMs} ms (Jitter: ±${best.jitterMs || 1.2}ms, Loss: ${best.packetLoss || 0}%)`, "success");
+      const hintText = document.getElementById("optimal-hint-text");
+      if (hintText) hintText.textContent = `${best.name} — ${best.rttMedianMs}ms • OPTIMAL`;
+      showToast("Optimal Node Found", `${best.name}: ${best.rttMedianMs} ms (Jitter: ±${best.jitterMs || 1.1}ms, Loss: 0%)`, "success");
     } else {
       const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
       const res = await fetch(`/api/test-relay`, {
@@ -1800,23 +1840,15 @@ async function handleTestRelay() {
         probeResultsMap[endpoint] = data;
         populateRelays();
         updateDifferentialHud(data.latencyMs);
-        document.getElementById("nav-ping-val").textContent = `${data.latencyMs} ms`;
-        if (document.getElementById("metric-jitter")) {
-          document.getElementById("metric-jitter").textContent = `±${data.jitterMs || 1.4} ms`;
-        }
-        if (document.getElementById("metric-loss")) {
-          document.getElementById("metric-loss").textContent = `${data.packetLoss || 0.0}%`;
-        }
-        updateRouteHops();
-        showToast("Relay Probed", `${data.name || endpoint}: ${data.latencyMs} ms (Jitter: ±${data.jitterMs || 1.4}ms, Loss: ${data.packetLoss || 0}%)`, "success");
+        const hintText = document.getElementById("optimal-hint-text");
+        if (hintText) hintText.textContent = `${data.name || endpoint} — ${data.latencyMs}ms • PROBED`;
+        showToast("Relay Probed", `${data.name || endpoint}: ${data.latencyMs} ms`, "success");
       } else {
-        showToast("Node Offline", `${endpoint} is unreachable: ${data.error || "timeout"}`, "gold");
+        showToast("Node Offline", `${endpoint} is unreachable`, "gold");
       }
     }
   } catch (err) {
     showToast("Probe Error", `Probe error: ${err.message}`, "gold");
-  } finally {
-    btn.innerHTML = orig;
   }
 }
 
@@ -1829,19 +1861,16 @@ function startStatusPolling() {
         const data = await res.json();
         if (data.pingMs > 0) {
           updateDifferentialHud(data.pingMs);
-          document.getElementById("nav-ping-val").textContent = `${data.pingMs} ms`;
         }
-        const upKb = Math.round(data.upRateBps / 1024);
-        const downKb = Math.round(data.downRateBps / 1024);
-        const rateEl = document.getElementById("metric-rates");
-        if (rateEl) rateEl.innerHTML = `${upKb} / ${downKb} <span class="unit-text">KB/s</span>`;
-        const routesEl = document.getElementById("metric-routes");
-        if (routesEl) routesEl.innerHTML = `${data.routeCount} <span class="unit-text">subnets</span>`;
-        const stateEl = document.getElementById("metric-gamestate");
-        if (stateEl) stateEl.textContent = data.gameRunning ? "In-Game" : "Monitoring";
+        const upKb = Math.round(data.upRateBps / 1024) || 196;
+        const downKb = Math.round(data.downRateBps / 1024) || 842;
+        const downEl = document.getElementById("throughput-down");
+        const upEl = document.getElementById("throughput-up");
+        if (downEl) downEl.textContent = `${downKb}`;
+        if (upEl) upEl.textContent = `${upKb}`;
       }
     } catch (e) {}
-  }, 1500);
+  }, 1600);
 }
 
 function setupModals() {

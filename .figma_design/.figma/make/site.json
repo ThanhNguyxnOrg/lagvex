@@ -1,0 +1,10 @@
+{
+  "description": "Enhance your gaming experience with a sleek application that reduces latency and optimizes performance for competitive gamers, ensuring smooth gameplay.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

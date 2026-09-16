@@ -6,326 +6,291 @@
   <title>Lagvex // Pro Gaming Latency Accelerator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="assets/logo.png">
   <link rel="shortcut icon" type="image/png" href="assets/logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Header Navigation -->
-  <header class="app-header">
-    <div class="header-container">
-      <div class="header-brand">
-        <a href="#" class="brand-link" aria-label="Lagvex Home">
-          <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img" width="36" height="36">
-          <div class="brand-text-group">
-            <div class="brand-name-row">
-              <span class="brand-title">LAGVEX</span>
-              <span class="pro-tag">PRO</span>
-            </div>
-            <span class="brand-caption">Wire-Speed Layer-3 Accelerator</span>
+  <div class="app-viewport">
+    <div class="app-window">
+      <!-- Ambient Glow behind window -->
+      <div class="ambient-glow" id="ambient-glow" aria-hidden="true"></div>
+
+      <!-- ==================== HEADER ==================== -->
+      <header class="window-header">
+        <div class="header-brand-group">
+          <div class="brand-avatar">
+            <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img" width="32" height="32">
           </div>
-        </a>
-      </div>
-
-      <div class="header-center">
-        <div class="status-chip" id="engine-status-chip">
-          <span class="status-dot" id="pulse-beacon" aria-hidden="true"></span>
-          <span class="status-label">Engine</span>
-          <span class="status-value" id="engine-status-text">Standby</span>
-        </div>
-        <div class="status-chip">
-          <svg class="chip-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-          <span class="status-label">RTT</span>
-          <span class="status-value highlight-cyan tabular-num" id="nav-ping-val">-- ms</span>
-        </div>
-      </div>
-
-      <div class="header-actions">
-        <button id="btn-quick-squad" class="btn-secondary-nav" type="button">
-          <svg class="btn-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          <span>Join Squad</span>
-        </button>
-        <button id="btn-quick-relay" class="btn-ghost-nav" type="button">
-          <svg class="btn-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <span>Add Custom VPS</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Application Shell -->
-  <main class="main-container">
-    <!-- Hero Section: Acceleration Cockpit -->
-    <section class="cockpit-stage" aria-labelledby="cockpit-heading">
-      <div class="cockpit-main-card">
-        <!-- Top Row: Game Profile & Primary Trigger -->
-        <div class="cockpit-header-row">
-          <div class="selected-game-profile">
-            <div class="game-avatar-frame" id="hero-game-logo">
-              <!-- Official vector SVG logo injected via JS -->
-            </div>
-            <div class="game-meta-group">
-              <h1 class="game-title" id="hud-game-title">Valorant</h1>
-              <p class="game-sub" id="hud-game-pub">Riot Games &bull; Tactical FPS</p>
-              <span class="process-tag" id="hud-game-desc">Tracking: VALORANT-Win64-Shipping.exe</span>
-            </div>
-          </div>
-
-          <div class="cockpit-cta-block">
-            <button id="btn-toggle-boost" class="btn-boost state-idle" type="button">
-              <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-              <span class="btn-label">Activate Acceleration</span>
-            </button>
+          <div class="brand-heading">
+            <span class="brand-name">LAGVEX</span>
+            <span class="brand-badge-pro">PRO</span>
           </div>
         </div>
 
-        <!-- Before vs. After Differential Latency HUD -->
-        <div class="differential-hud">
-          <div class="diff-card diff-baseline">
-            <div class="diff-meta">
-              <span class="diff-title">Standard ISP Ping</span>
-              <span class="diff-badge isp-tag">Direct Route</span>
-            </div>
-            <div class="diff-metric-group">
-              <span class="diff-number tabular-num" id="direct-isp-ping">68</span>
-              <span class="diff-unit">ms</span>
-            </div>
-            <p class="diff-note">Unoptimized default public routing</p>
+        <div class="header-actions-group">
+          <div class="status-pill" id="status-pill">
+            <span class="status-dot" id="pulse-beacon" aria-hidden="true"></span>
+            <span class="status-text" id="engine-status-text">Standby</span>
           </div>
-
-          <div class="diff-separator" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
+          <button id="btn-quick-squad" class="btn-ghost-header" type="button" title="Join team tunnel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
-          </div>
-
-          <div class="diff-card diff-accelerated">
-            <div class="diff-meta">
-              <span class="diff-title">Accelerated Ping</span>
-              <span class="diff-badge relay-tag">Lagvex AEAD</span>
-            </div>
-            <div class="diff-metric-group">
-              <span class="diff-number highlight-cyan tabular-num" id="metric-ping">24</span>
-              <span class="diff-unit">ms</span>
-            </div>
-            <p class="diff-note">Direct carrier peering via fast relay</p>
-          </div>
-
-          <div class="diff-card diff-gain">
-            <div class="diff-meta">
-              <span class="diff-title">Latency Gain</span>
-              <span class="diff-badge gain-tag">Net Improvement</span>
-            </div>
-            <div class="diff-metric-group">
-              <span class="diff-number highlight-green tabular-num" id="diff-gain-val">-44 ms</span>
-              <span class="diff-percentage tabular-num" id="diff-percent-val">(-64%)</span>
-            </div>
-            <p class="diff-note">Measured round-trip reduction</p>
-          </div>
-        </div>
-
-        <!-- Live Network Route Hop Path -->
-        <div class="route-pipeline" aria-label="Route Transit Pipeline">
-          <div class="pipe-node client-step">
-            <div class="pipe-icon-frame">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-              </svg>
-            </div>
-            <div class="pipe-info">
-              <span class="pipe-label">Client Machine</span>
-              <span class="pipe-sub">WinTun / utun Driver</span>
-            </div>
-          </div>
-
-          <div class="pipe-segment">
-            <div class="pipe-line" aria-hidden="true"></div>
-            <span class="pipe-tag">ChaCha20-Poly1305</span>
-          </div>
-
-          <div class="pipe-node relay-step">
-            <div class="pipe-icon-frame">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18"></line>
-              </svg>
-            </div>
-            <div class="pipe-info">
-              <span class="pipe-label">Relay Node</span>
-              <span class="pipe-sub" id="hop-relay-sub">Auto-Selected Relay</span>
-            </div>
-          </div>
-
-          <div class="pipe-segment">
-            <div class="pipe-line" aria-hidden="true"></div>
-            <span class="pipe-tag">Subsea Fiber</span>
-          </div>
-
-          <div class="pipe-node server-step">
-            <div class="pipe-icon-frame">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="22" y1="12" x2="18" y2="12"></line>
-                <line x1="6" y1="12" x2="2" y2="12"></line>
-                <line x1="12" y1="6" x2="12" y2="2"></line>
-                <line x1="12" y1="22" x2="12" y2="18"></line>
-              </svg>
-            </div>
-            <div class="pipe-info">
-              <span class="pipe-label" id="hop-server-target">Game Server</span>
-              <span class="pipe-sub">Direct Cluster Peering</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Configuration & Telemetry Row -->
-        <div class="cockpit-controls-grid">
-          <div class="control-box">
-            <label class="control-label" for="region-select">Target Game Region</label>
-            <div class="select-wrapper">
-              <select id="region-select" class="custom-select">
-                <option value="">Select Game Region</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="control-box">
-            <label class="control-label" for="relay-select">Acceleration Relay Node</label>
-            <div class="select-with-action">
-              <div class="select-wrapper flex-grow">
-                <select id="relay-select" class="custom-select">
-                  <option value="">Discovering community nodes...</option>
-                </select>
-              </div>
-              <button id="btn-test-relay" class="btn-probe" type="button" title="Probe node latency and jitter">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                </svg>
-                <span>Probe</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="telemetry-deck">
-            <div class="stat-card">
-              <span class="stat-name">P50 / P95 Jitter</span>
-              <div class="stat-value-group">
-                <span class="stat-value tabular-num" id="metric-jitter">&plusmn;1.4 ms</span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <span class="stat-name">Packet Loss</span>
-              <div class="stat-value-group">
-                <span class="stat-value highlight-green tabular-num" id="metric-loss">0.0%</span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <span class="stat-name">Throughput</span>
-              <div class="stat-value-group">
-                <span class="stat-value tabular-num" id="metric-rates">0 / 0 <span class="unit-text">KB/s</span></span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <span class="stat-name">Active Routes</span>
-              <div class="stat-value-group">
-                <span class="stat-value tabular-num" id="metric-routes">0 <span class="unit-text">subnets</span></span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <span class="stat-name">Process State</span>
-              <div class="stat-value-group">
-                <span class="stat-value status-monitoring" id="metric-gamestate">Monitoring</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Supported Games Section -->
-    <section class="library-stage" aria-labelledby="library-heading">
-      <div class="library-header-row">
-        <div class="library-heading-group">
-          <h2 id="library-heading" class="library-title">Supported Game Profiles</h2>
-          <p class="library-description">Hardware-accelerated CIDR routing for major competitive titles</p>
-        </div>
-
-        <div class="library-toolbar">
-          <div class="search-field">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <span>Squad</span>
+          </button>
+          <button id="btn-quick-relay" class="btn-ghost-header" type="button" title="Add private relay server">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"></path>
             </svg>
-            <input type="text" id="game-search-input" placeholder="Search by game title or publisher..." aria-label="Search games">
-          </div>
-          <button id="btn-open-custom-game" class="btn-add-game" type="button">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Custom Game</span>
+            <span>Custom VPS</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <!-- Category Filter Pills -->
-      <div class="filter-tabs" id="filter-tabs" role="tablist" aria-label="Game categories">
-        <button class="cat-pill active" data-cat="all" role="tab" aria-selected="true">All Games</button>
-        <button class="cat-pill" data-cat="Tactical FPS" role="tab" aria-selected="false">Tactical FPS</button>
-        <button class="cat-pill" data-cat="Battle Royale" role="tab" aria-selected="false">Battle Royale</button>
-        <button class="cat-pill" data-cat="Hero Shooter" role="tab" aria-selected="false">Hero Shooter</button>
-        <button class="cat-pill" data-cat="MOBA" role="tab" aria-selected="false">MOBA &amp; Strategy</button>
-      </div>
+      <!-- ==================== 2-COLUMN BODY ==================== -->
+      <div class="window-body">
+        <!-- LEFT COLUMN: Hero HUD + Game Library -->
+        <div class="content-column">
+          <!-- Hero Section -->
+          <section class="hero-card" id="hero-card">
+            <div class="hero-bg-media">
+              <img id="hero-cover-img" src="https://images.unsplash.com/flagged/photo-1560177776-55a762c5c000?auto=format&fit=crop&q=80&w=1200&h=600" alt="Game cover artwork" class="hero-cover-img">
+              <div class="hero-scrim-x" aria-hidden="true"></div>
+              <div class="hero-scrim-y" aria-hidden="true"></div>
+            </div>
 
-      <!-- Bento Grid of Games -->
-      <div class="games-grid" id="games-grid" role="region" aria-label="Games list">
-        <!-- Rendered dynamically by app.js with high-fidelity vector logos -->
+            <div class="hero-content-wrap">
+              <div class="hero-info-pane">
+                <div class="hero-badge-row">
+                  <span class="safe-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 3 5 5.5V11c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V5.5L12 3Z"></path>
+                      <path d="m9 12 2 2 4-4.5"></path>
+                    </svg>
+                    <span>Anti-Cheat Safe</span>
+                  </span>
+                  <span class="micro-label">Selected Game</span>
+                </div>
+
+                <h1 class="hero-game-title" id="hud-game-title">Valorant</h1>
+                <p class="hero-game-studio" id="hud-game-pub">Riot Games &bull; Tactical FPS</p>
+
+                <!-- Selectors Grid -->
+                <div class="hero-selectors-grid">
+                  <!-- Region Dropdown -->
+                  <div class="selector-field">
+                    <label class="field-label" for="region-select">Target Region</label>
+                    <div class="dropdown-box">
+                      <select id="region-select" class="native-dropdown">
+                        <option value="">Loading regions...</option>
+                      </select>
+                      <svg class="dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6"></path>
+                      </svg>
+                    </div>
+                  </div>
+
+                  <!-- Relay Node Dropdown -->
+                  <div class="selector-field">
+                    <label class="field-label" for="relay-select">Relay Node</label>
+                    <div class="dropdown-box">
+                      <select id="relay-select" class="native-dropdown">
+                        <option value="">Discovering optimal nodes...</option>
+                      </select>
+                      <svg class="dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6"></path>
+                      </svg>
+                    </div>
+                    <div class="optimal-hint" id="optimal-hint">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="m12 3 2.5 5.4 5.9.7-4.4 4 1.2 5.8L12 16.9 6.8 19.9 8 14.1 3.6 10l5.9-.7L12 3Z"></path>
+                      </svg>
+                      <span id="optimal-hint-text">Singapore #1 &mdash; 18ms &bull; OPTIMAL</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Big Boost Button (176px x 104px) -->
+              <button id="btn-toggle-boost" class="hero-boost-btn state-idle" type="button">
+                <span class="btn-sweep" aria-hidden="true"></span>
+                <svg class="btn-bolt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <span class="btn-action-text" id="boost-btn-label">ACTIVATE BOOST</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Game Library Section -->
+          <section class="library-deck">
+            <div class="library-header-bar">
+              <div class="library-title-wrap">
+                <h2 class="library-heading">Game Library</h2>
+                <span class="game-counter tabular-num" id="library-count-pill">10</span>
+              </div>
+              <div class="library-controls-wrap">
+                <div class="search-input-shell">
+                  <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input type="text" id="game-search-input" placeholder="Search games..." aria-label="Search games">
+                </div>
+                <button id="btn-open-custom-game" class="btn-outline-small" type="button">+ Custom</button>
+              </div>
+            </div>
+
+            <!-- Filter Pills -->
+            <div class="filter-pills-row" id="filter-tabs" role="tablist">
+              <button class="filter-pill active" data-cat="all" role="tab" aria-selected="true">All Games</button>
+              <button class="filter-pill" data-cat="Tactical FPS" role="tab" aria-selected="false">Tactical FPS</button>
+              <button class="filter-pill" data-cat="Battle Royale" role="tab" aria-selected="false">Battle Royale</button>
+              <button class="filter-pill" data-cat="MOBA" role="tab" aria-selected="false">MOBA</button>
+            </div>
+
+            <!-- 4-Column Poster Grid -->
+            <div class="games-poster-grid" id="games-grid" role="region" aria-label="Games catalog">
+              <!-- Dynamically populated by app.js -->
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT COLUMN: Telemetry Cockpit Sidebar (360px) -->
+        <aside class="telemetry-sidebar">
+          <div class="sidebar-header">
+            <h2 class="sidebar-title">Telemetry</h2>
+            <span class="live-indicator" id="sidebar-live-tag">
+              <span class="live-dot" id="sidebar-live-dot" aria-hidden="true"></span>
+              <span id="sidebar-live-text">IDLE</span>
+            </span>
+          </div>
+
+          <!-- Differential Ping Card -->
+          <div class="telemetry-card">
+            <div class="ping-pair-grid">
+              <div class="ping-sub-box">
+                <span class="metric-tiny-label">Direct ISP</span>
+                <p class="ping-large-val tabular-num" id="direct-isp-ping">58<span class="ms-unit">ms</span></p>
+              </div>
+              <div class="ping-sub-box highlight-box">
+                <span class="metric-tiny-label">Lagvex Accel.</span>
+                <p class="ping-large-val highlight-cyan tabular-num" id="metric-ping">18<span class="ms-unit">ms</span></p>
+              </div>
+            </div>
+            <div class="delta-pill-wrap">
+              <span class="delta-pill tabular-num" id="diff-gain-pill">
+                <span id="diff-gain-val">&minus;40ms</span>
+                <span class="delta-tag" id="diff-gain-status">IMPROVED</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Stability Card (P50, P95, Packet Loss) -->
+          <div class="telemetry-card">
+            <span class="metric-tiny-label">Stability</span>
+            <div class="stability-triplet-grid">
+              <div class="triplet-cell">
+                <span class="triplet-lbl">P50</span>
+                <p class="triplet-val tabular-num" id="stat-p50">&mdash;<span class="triplet-unit">ms</span></p>
+              </div>
+              <div class="triplet-cell">
+                <span class="triplet-lbl">P95 Tail</span>
+                <p class="triplet-val tabular-num" id="stat-p95">&mdash;<span class="triplet-unit">ms</span></p>
+                <span class="triplet-hint">spike guard</span>
+              </div>
+              <div class="triplet-cell">
+                <span class="triplet-lbl">Loss</span>
+                <p class="triplet-val highlight-green tabular-num" id="stat-loss">&mdash;<span class="triplet-unit">%</span></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Throughput Card with Equalizer -->
+          <div class="telemetry-card">
+            <div class="card-meta-header">
+              <span class="metric-tiny-label">Live Throughput</span>
+              <span class="unit-tag">KB/s</span>
+            </div>
+            <div class="throughput-duo-grid">
+              <div class="tp-cell">
+                <div class="tp-dir-label">
+                  <svg class="tp-arrow-down" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5v14m0 0-5-5m5 5 5-5"></path>
+                  </svg>
+                  <span>Download</span>
+                </div>
+                <p class="tp-number tabular-num" id="throughput-down">0</p>
+              </div>
+              <div class="tp-cell">
+                <div class="tp-dir-label">
+                  <svg class="tp-arrow-up" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 19V5m0 0-5 5m5-5 5 5"></path>
+                  </svg>
+                  <span>Upload</span>
+                </div>
+                <p class="tp-number tabular-num" id="throughput-up">0</p>
+              </div>
+            </div>
+            <!-- Live Animated Equalizer Bars -->
+            <div class="equalizer-strip" id="equalizer-strip" aria-hidden="true">
+              <span class="eq-bar" style="--h: 30%"></span>
+              <span class="eq-bar" style="--h: 55%"></span>
+              <span class="eq-bar" style="--h: 42%"></span>
+              <span class="eq-bar" style="--h: 68%"></span>
+              <span class="eq-bar" style="--h: 50%"></span>
+              <span class="eq-bar" style="--h: 74%"></span>
+              <span class="eq-bar" style="--h: 60%"></span>
+              <span class="eq-bar" style="--h: 82%"></span>
+              <span class="eq-bar" style="--h: 58%"></span>
+              <span class="eq-bar" style="--h: 70%"></span>
+              <span class="eq-bar" style="--h: 48%"></span>
+              <span class="eq-bar" style="--h: 64%"></span>
+            </div>
+          </div>
+
+          <!-- Active Routes Card -->
+          <div class="telemetry-card routes-card">
+            <div>
+              <span class="metric-tiny-label">Active Routes</span>
+              <p class="routes-count tabular-num" id="active-routes-val">0<span class="routes-total"> / 24</span></p>
+            </div>
+            <div class="multipath-group">
+              <span class="multipath-tag">Multi-Path Relay</span>
+              <div class="multipath-dots" id="multipath-dots">
+                <span class="route-pip"></span>
+                <span class="route-pip"></span>
+                <span class="route-pip"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Route Breadcrumb -->
+          <div class="sidebar-route-footer">
+            <span id="route-footer-text">Route: Asia-Pacific &rarr; Singapore #1</span>
+          </div>
+        </aside>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <!-- Modal: Join Squad -->
   <div class="modal-backdrop" id="modal-squad" role="dialog" aria-modal="true" aria-labelledby="modal-squad-title">
     <div class="modal-card">
       <div class="modal-card-header">
-        <div class="modal-title-group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          <h3 id="modal-squad-title" class="modal-title">Join Squad Tunnel</h3>
-        </div>
-        <button class="modal-close-btn" id="close-modal-squad" type="button" aria-label="Close dialog">&times;</button>
+        <h3 id="modal-squad-title" class="modal-title">Join Squad Tunnel</h3>
+        <button class="modal-close-btn" id="close-modal-squad" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="modal-card-body">
-        <p class="modal-lead">Paste a 1-click squad share URL or team invite code:</p>
+        <p class="modal-lead">Paste a 1-click squad share link or invite code from your team:</p>
         <div class="form-group">
-          <label class="form-label" for="squad-invite-input">Squad Invite Code or Link</label>
-          <input type="text" id="squad-invite-input" class="form-input" placeholder="lagvex://connect?endpoint=123.45.67.89:4433&psk=secret">
+          <label class="form-label" for="squad-invite-input">Squad Invite Code</label>
+          <input type="text" id="squad-invite-input" class="form-input" placeholder="lagvex://connect?endpoint=128.199.200.10:4433&psk=secret">
         </div>
       </div>
       <div class="modal-card-footer">
@@ -339,16 +304,8 @@
   <div class="modal-backdrop" id="modal-relay" role="dialog" aria-modal="true" aria-labelledby="modal-relay-title">
     <div class="modal-card">
       <div class="modal-card-header">
-        <div class="modal-title-group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-            <line x1="6" y1="18" x2="6.01" y2="18"></line>
-          </svg>
-          <h3 id="modal-relay-title" class="modal-title">Add Custom Relay Server</h3>
-        </div>
-        <button class="modal-close-btn" id="close-modal-relay" type="button" aria-label="Close dialog">&times;</button>
+        <h3 id="modal-relay-title" class="modal-title">Add Custom Relay Server</h3>
+        <button class="modal-close-btn" id="close-modal-relay" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="modal-card-body">
         <div class="form-group">
@@ -356,12 +313,12 @@
           <input type="text" id="custom-relay-name" class="form-input" placeholder="e.g. My Private Tokyo VPS">
         </div>
         <div class="form-group">
-          <label class="form-label" for="custom-relay-endpoint">Relay Endpoint (IP:Port)</label>
+          <label class="form-label" for="custom-relay-endpoint">Endpoint (IP:Port)</label>
           <input type="text" id="custom-relay-endpoint" class="form-input" placeholder="e.g. 139.162.115.10:4433">
         </div>
         <div class="form-group">
           <label class="form-label" for="custom-relay-psk">Pre-Shared Key (PSK)</label>
-          <input type="password" id="custom-relay-psk" class="form-input" placeholder="32-character authentication key">
+          <input type="password" id="custom-relay-psk" class="form-input" placeholder="32-character encryption key">
         </div>
       </div>
       <div class="modal-card-footer">
@@ -375,15 +332,8 @@
   <div class="modal-backdrop" id="modal-game" role="dialog" aria-modal="true" aria-labelledby="modal-game-title">
     <div class="modal-card">
       <div class="modal-card-header">
-        <div class="modal-title-group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="16"></line>
-            <line x1="8" y1="12" x2="16" y2="12"></line>
-          </svg>
-          <h3 id="modal-game-title" class="modal-title">Add Custom Game Profile</h3>
-        </div>
-        <button class="modal-close-btn" id="close-modal-game" type="button" aria-label="Close dialog">&times;</button>
+        <h3 id="modal-game-title" class="modal-title">Add Custom Game Profile</h3>
+        <button class="modal-close-btn" id="close-modal-game" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="modal-card-body">
         <div class="form-group">
@@ -391,7 +341,7 @@
           <input type="text" id="custom-game-name" class="form-input" placeholder="e.g. Marvel Rivals">
         </div>
         <div class="form-group">
-          <label class="form-label" for="custom-game-exe">Process Executables (comma separated)</label>
+          <label class="form-label" for="custom-game-exe">Process Names (comma separated)</label>
           <input type="text" id="custom-game-exe" class="form-input" placeholder="e.g. Marvel-Win64-Shipping.exe">
         </div>
         <div class="form-group">
@@ -399,8 +349,8 @@
           <input type="text" id="custom-game-region-name" class="form-input" placeholder="e.g. Singapore Server">
         </div>
         <div class="form-group">
-          <label class="form-label" for="custom-game-cidrs">CIDR IP Subnets</label>
-          <textarea id="custom-game-cidrs" class="form-textarea" rows="3" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
+          <label class="form-label" for="custom-game-cidrs">CIDR Subnets (comma separated)</label>
+          <textarea id="custom-game-cidrs" class="form-textarea" rows="2" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
         </div>
       </div>
       <div class="modal-card-footer">
@@ -410,35 +360,8 @@
     </div>
   </div>
 
-  <!-- Legal & Trademark Notice -->
-  <aside class="legal-notice-strip" aria-label="Trademark Notice">
-    <div class="legal-notice-inner">
-      <p>
-        <strong>Legal &amp; Trademark Notice:</strong> All game titles, publisher names, and associated brand insignia (Valve, Riot Games, Electronic Arts, Krafton, Activision, Ubisoft, TiMi Studio Group) are trademarks of their respective copyright holders. Lagvex is an independent, non-profit academic research tool and kernel latency accelerator, and is not affiliated with or endorsed by any game publisher. Vector logos are reproduced strictly under Nominative Fair Use solely for user process routing identification.
-      </p>
-    </div>
-  </aside>
-
-  <!-- Application Footer -->
-  <footer class="app-footer">
-    <div class="footer-inner">
-      <div class="footer-left">
-        <span class="footer-brand">LAGVEX PRO</span>
-        <span class="footer-sep">&bull;</span>
-        <span>Layer-3 Wire-Speed Game Tunnel</span>
-      </div>
-      <div class="footer-right">
-        <span>Zero DLL Injection</span>
-        <span class="footer-sep">&bull;</span>
-        <span>100% Kernel Split-Tunneling</span>
-        <span class="footer-sep">&bull;</span>
-        <a href="https://github.com/ThanhNguyxnOrg/lagvex" target="_blank" rel="noopener" class="footer-link">GitHub Repository</a>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Toast Notification Container -->
-  <div id="app-toast-container" class="toast-shelf" aria-live="polite" aria-atomic="true"></div>
+  <!-- Toast Container -->
+  <div id="app-toast-container" class="toast-shelf" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>
