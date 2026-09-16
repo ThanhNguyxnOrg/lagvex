@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
+	"github.com/ThanhNguyxnOrg/lagvex/web"
 )
 
 // UIServer serves the modern Gaming Booster Dashboard and REST API.
@@ -62,11 +63,9 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("/api/ping-relay", u.handleTestRelay)
 	mux.HandleFunc("/api/add-game", u.handleAddGame)
 
-	// Static Web Assets
-	if u.webDir != "" {
-		fs := http.FileServer(http.Dir(u.webDir))
-		mux.Handle("/", fs)
-	}
+	// Static Web Assets (disk prioritization with embedded binary fallback)
+	fs := http.FileServer(web.GetFileSystem(u.webDir))
+	mux.Handle("/", fs)
 
 	u.server = &http.Server{
 		Addr:         addr,

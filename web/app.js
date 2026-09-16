@@ -538,11 +538,107 @@
       showToast('Synchronized with Squad party tunnel', 'success');
     });
 
+    // Custom Game Modal
+    const modalCustomGame = document.getElementById('modal-custom-game');
+    const btnOpenCustomGame = document.getElementById('btn-open-custom-game');
+    const closeModalCustomGame = document.getElementById('close-modal-custom-game');
+    const cancelModalCustomGame = document.getElementById('cancel-modal-custom-game');
+    const saveCustomGameBtn = document.getElementById('save-custom-game-btn');
+
+    if (btnOpenCustomGame) {
+      btnOpenCustomGame.addEventListener('click', () => {
+        modalCustomGame.classList.add('open');
+      });
+    }
+    if (closeModalCustomGame) {
+      closeModalCustomGame.addEventListener('click', () => {
+        modalCustomGame.classList.remove('open');
+      });
+    }
+    if (cancelModalCustomGame) {
+      cancelModalCustomGame.addEventListener('click', () => {
+        modalCustomGame.classList.remove('open');
+      });
+    }
+    if (saveCustomGameBtn) {
+      saveCustomGameBtn.addEventListener('click', async () => {
+        const nameInput = document.getElementById('custom-game-name');
+        const exeInput = document.getElementById('custom-game-exe');
+        const regInput = document.getElementById('custom-game-region');
+        const cidrsInput = document.getElementById('custom-game-cidrs');
+
+        const name = (nameInput.value || '').trim();
+        const exe = (exeInput.value || '').trim();
+        const region = (regInput.value || 'Custom Server').trim();
+        const cidrsStr = (cidrsInput.value || '').trim();
+
+        if (!name) {
+          showToast('Please enter a game title', 'info');
+          return;
+        }
+
+        const cidrs = cidrsStr ? cidrsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const newGame = {
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          name: name,
+          publisher: 'Custom User Profile',
+          category: 'Custom',
+          accent: '#00f0ff',
+          processNames: exe ? [exe] : [name + '.exe'],
+          regions: [
+            {
+              id: 'custom-region',
+              continent: 'Global',
+              name: region,
+              cidrs: cidrs.length > 0 ? cidrs : ['1.1.1.1/32']
+            }
+          ]
+        };
+
+        // Post to backend API
+        try {
+          await fetch('/api/add-game', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newGame)
+          });
+        } catch (e) {
+          console.warn('Backend add-game notice:', e);
+        }
+
+        // Add to local catalog & select
+        const catalogItem = {
+          id: newGame.id,
+          name: newGame.name,
+          genre: 'Custom profile',
+          tag: 'Custom',
+          accent: '#00f0ff',
+          image: 'assets/games/valorant.png',
+          ping: '20 ms',
+          baselinePing: 60,
+          accelPing: 20,
+          region: region,
+          trend: '&minus; 35%'
+        };
+        GAMES_CATALOG.unshift(catalogItem);
+        selectGame(catalogItem);
+        renderGameList();
+
+        modalCustomGame.classList.remove('open');
+        nameInput.value = '';
+        exeInput.value = '';
+        regInput.value = '';
+        cidrsInput.value = '';
+        showToast(`Added custom profile for "${name}"`, 'success');
+      });
+    }
+
     // Close modals on Escape
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         modalSettings.classList.remove('open');
         modalSquad.classList.remove('open');
+        if (modalCustomGame) modalCustomGame.classList.remove('open');
       }
     });
   }

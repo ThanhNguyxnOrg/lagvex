@@ -222,7 +222,10 @@
             <div class="section-label">YOUR LIBRARY</div>
             <h2 class="section-title">Choose a game</h2>
           </div>
-          <span class="game-count" id="library-game-count">14 games</span>
+          <div class="library-header-actions">
+            <span class="game-count" id="library-game-count">14 games</span>
+            <button id="btn-open-custom-game" class="btn-ghost-small" type="button">+ Custom</button>
+          </div>
         </div>
 
         <!-- Search Box -->
@@ -349,6 +352,38 @@
       <div class="modal-card-footer">
         <button class="btn-cancel" id="cancel-modal-squad" type="button">Cancel</button>
         <button class="btn-confirm" id="join-squad-btn" type="button">Connect Squad</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADD CUSTOM GAME ==================== -->
+  <div class="modal-backdrop" id="modal-custom-game" role="dialog" aria-modal="true" aria-labelledby="modal-custom-game-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <h2 id="modal-custom-game-title" class="modal-title">Add Custom Game Profile</h2>
+        <button class="modal-close-btn" id="close-modal-custom-game" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-card-body">
+        <div class="form-group">
+          <label class="form-label" for="custom-game-name">Game Title</label>
+          <input type="text" id="custom-game-name" class="form-input" placeholder="e.g. Marvel Rivals">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-exe">Process Executable</label>
+          <input type="text" id="custom-game-exe" class="form-input" placeholder="e.g. MarvelRivals.exe">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-region">Server Region</label>
+          <input type="text" id="custom-game-region" class="form-input" placeholder="e.g. Singapore AWS">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-cidrs">Server Subnets (CIDRs)</label>
+          <input type="text" id="custom-game-cidrs" class="form-input" placeholder="e.g. 13.250.0.0/15, 54.251.0.0/16">
+        </div>
+      </div>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-modal-custom-game" type="button">Cancel</button>
+        <button class="btn-confirm" id="save-custom-game-btn" type="button">Add Game</button>
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 package profiles
 
 import (
+	"net/netip"
 	"path/filepath"
 	"testing"
 )
@@ -50,3 +51,41 @@ func TestProfilesLoading(t *testing.T) {
 		t.Fatalf("expected valorant asia-sg cidrs, got err: %v, len: %d", err, len(cidrs))
 	}
 }
+
+func TestAllCIDRsValidAndNoBogonCollision(t *testing.T) {
+	path := filepath.Join("..", "..", "configs", "profiles.json")
+	mgr, err := NewManager(path)
+	if err != nil {
+		t.Fatalf("failed to load profiles: %v", err)
+	}
+
+	catalog := mgr.Catalog()
+	totalCIDRs := 0
+
+	for _, game := range catalog.Games {
+		for _, reg := range game.Regions {
+			for _, cidr := range reg.CIDRs {
+				totalCIDRs++
+				prefix, err := netip.ParsePrefix(cidr)
+				if err != nil {
+					t.Errorf("game %s, region %s has invalid CIDR %q: %v", game.ID, reg.ID, cidr, err)
+					continue
+				}
+
+				addr := prefix.Addr()
+				if !addr.Is4() {
+					t.Errorf("game %s, region %s has non-IPv4 CIDR %q", game.ID, reg.ID, cidr)
+					continue
+				}
+
+				// Check bogon/private collision
+				if addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsMulticast() {
+					t.Errorf("game %s, region %s has loopback/link-local/multicast CIDR %q", game.ID, reg.ID, cidr)
+				}
+			}
+		}
+	}
+
+	t.Logf("Validated %d total game CIDRs successfully", totalCIDRs)
+}
+

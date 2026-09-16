@@ -470,10 +470,32 @@ button {
   margin-bottom: 14px;
 }
 
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .game-count {
   color: #7a8c9b;
   font-size: 12px;
   font-weight: 600;
+}
+
+.btn-ghost-small {
+  color: var(--cyan);
+  background: var(--cyan-soft);
+  border: 1px solid rgba(88, 214, 230, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.btn-ghost-small:hover {
+  background: rgba(88, 214, 230, 0.22);
+  border-color: var(--cyan);
 }
 
 .search-box {
@@ -812,8 +834,7 @@ footer i {
 .form-label {
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   color: #8c9ba9;
 }
 
