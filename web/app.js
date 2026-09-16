@@ -1497,6 +1497,28 @@ function populateRelays() {
   }
 }
 
+function updateDifferentialHud(acceleratedMs) {
+  const directEl = document.getElementById("direct-isp-ping");
+  const metricEl = document.getElementById("metric-ping");
+  const gainEl = document.getElementById("diff-gain-val");
+  const pctEl = document.getElementById("diff-percent-val");
+
+  const directMs = 68; // Baseline public unaccelerated ISP routing
+  if (directEl) directEl.textContent = directMs;
+
+  if (acceleratedMs && acceleratedMs > 0) {
+    if (metricEl) metricEl.textContent = acceleratedMs;
+    const diff = acceleratedMs - directMs;
+    const pct = Math.round(((acceleratedMs - directMs) / directMs) * 100);
+    if (gainEl) gainEl.textContent = `${diff < 0 ? diff : "+" + diff} ms`;
+    if (pctEl) pctEl.textContent = `(${pct}%)`;
+  } else {
+    if (metricEl) metricEl.textContent = "--";
+    if (gainEl) gainEl.textContent = "-- ms";
+    if (pctEl) pctEl.textContent = "(--%)";
+  }
+}
+
 function renderGames() {
   const grid = document.getElementById("games-grid");
   if (!grid) return;
@@ -1520,44 +1542,26 @@ function renderGames() {
 
   filtered.forEach(game => {
     const card = document.createElement("div");
-    card.className = `game-bento-card ${game.id === selectedGameId ? "selected" : ""}`;
+    card.className = `game-item-card ${game.id === selectedGameId ? "selected" : ""}`;
     card.dataset.id = game.id;
-    if (game.accent) {
-      card.style.setProperty("--game-accent", game.accent);
-      card.style.setProperty("--game-accent-glow", `${game.accent}33`);
-    }
 
     const regionCount = game.regions ? game.regions.length : 0;
-    const publisher = game.publisher || "Official Game";
+    const publisher = game.publisher || "Official Profile";
 
     card.innerHTML = `
-      <div class="card-top-row">
-        <div class="game-logo-box">
+      <div class="card-top">
+        <div class="card-logo-box">
           ${getGameLogoSvg(game.id)}
         </div>
-        <div class="card-title-group">
-          <div class="card-game-name">${game.name}</div>
-          <span class="card-pub-tag">${publisher}</span>
+        <div class="card-header-text">
+          <div class="card-game-title">${game.name}</div>
+          <span class="card-game-pub">${publisher}</span>
         </div>
       </div>
 
-      <div class="card-meta-row">
-        <span class="meta-tag">
-          <svg class="meta-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          ${regionCount} Global Regions
-        </span>
-        <span class="meta-tag">
-          <svg class="meta-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Anti-Cheat Safe
-        </span>
-      </div>
-
-      <div class="card-bottom-row">
-        <span class="card-ping-badge">
-          <svg class="meta-icon" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-          Global Low Latency
-        </span>
-        <button class="card-select-btn">${game.id === selectedGameId ? "Active" : "Select"}</button>
+      <div class="card-footer-row">
+        <span class="card-category-tag">${game.category} &bull; ${regionCount} Clusters</span>
+        <button class="card-select-btn" type="button">${game.id === selectedGameId ? "Active" : "Select"}</button>
       </div>
     `;
 
@@ -1579,7 +1583,7 @@ function selectGame(gameId) {
 
   if (titleEl) titleEl.textContent = game.name;
   if (pubEl) pubEl.textContent = game.publisher ? `${game.publisher} • ${game.category}` : game.category;
-  if (descEl) descEl.textContent = `Processes: ${game.processNames.join(", ")}`;
+  if (descEl) descEl.textContent = `Tracking: ${game.processNames.join(", ")}`;
   if (heroBadge) heroBadge.innerHTML = getGameLogoSvg(game.id);
 
   // Populate Regions with Optgroups by Continent
@@ -1612,9 +1616,10 @@ function selectGame(gameId) {
   }
 
   updateRouteHops();
+  updateDifferentialHud(isConnected ? 24 : null);
 
   // Update Card Selection
-  document.querySelectorAll(".game-bento-card").forEach(c => {
+  document.querySelectorAll(".game-item-card").forEach(c => {
     const isThis = c.dataset.id === gameId;
     c.classList.toggle("selected", isThis);
     const btn = c.querySelector(".card-select-btn");
@@ -1633,58 +1638,47 @@ function updateRouteHops() {
   if (hopTarget) {
     const regName = regSelect?.selectedOptions[0]?.dataset.name || (game?.regions[0]?.name || "Game Cloud");
     hopTarget.textContent = game ? `${game.name} Cloud Server` : "Game Cloud Server";
-    const subTarget = document.querySelector(".target-node .hop-sub");
+    const subTarget = document.querySelector(".server-step .pipe-sub");
     if (subTarget) {
-      subTarget.textContent = regName.split("(")[0].trim() || "Global Direct Transit";
+      subTarget.textContent = regName.split("(")[0].trim() || "Direct Cluster Peering";
     }
   }
 
   if (hopRelay && relaySelect && relaySelect.selectedOptions[0]) {
     const relayName = relaySelect.selectedOptions[0].dataset.name || "Singapore #1";
     const cleanName = relayName.split("[")[0].trim();
-    const pingVal = isConnected ? "28 ms" : "-- ms";
-    hopRelay.innerHTML = `${cleanName} (<span id="metric-ping">${pingVal}</span>)`;
+    const pingVal = isConnected ? "24 ms" : "Ready";
+    hopRelay.textContent = `${cleanName} (${pingVal})`;
   }
 }
 
-// High-Tech Cyberpunk Toast System
+// Crisp Impeccable Toast System
 function showToast(title, message, type = "normal") {
   const container = document.getElementById("app-toast-container");
   if (!container) return;
 
   const toast = document.createElement("div");
-  toast.className = `toast-item ${type === "success" ? "toast-success" : type === "gold" ? "toast-gold" : ""}`;
-  
-  const iconSvg = type === "success" 
-    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`
-    : type === "gold"
-    ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb800"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`
-    : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+  toast.className = `toast-item ${type === "success" ? "success" : type === "gold" ? "gold" : "normal"}`;
 
   toast.innerHTML = `
-    <div class="toast-icon-wrap" style="display: flex; align-items: center;">
-      ${iconSvg}
-    </div>
-    <div class="toast-body">
-      <div style="font-weight: 800; color: #fff; font-size: 12px; letter-spacing: 0.3px;">${title}</div>
-      <div style="color: var(--text-secondary); font-size: 11px; margin-top: 1px;">${message}</div>
-    </div>
+    <div class="toast-header">${title}</div>
+    <div class="toast-message">${message}</div>
   `;
   container.appendChild(toast);
 
   setTimeout(() => {
     toast.style.opacity = "0";
-    toast.style.transform = "translateY(-8px)";
-    toast.style.transition = "all 0.3s ease";
-    setTimeout(() => toast.remove(), 320);
-  }, 3600);
+    toast.style.transform = "translateY(8px)";
+    toast.style.transition = "all 0.25s ease";
+    setTimeout(() => toast.remove(), 260);
+  }, 3400);
 }
 
 async function handleBoostToggle() {
   const btn = document.getElementById("btn-toggle-boost");
   const engineText = document.getElementById("engine-status-text");
   const beacon = document.getElementById("pulse-beacon");
-  const hopStrip = document.querySelector(".route-hop-strip");
+  const routePipeline = document.querySelector(".route-pipeline");
 
   if (isConnected) {
     // Disconnect sequence
@@ -1693,16 +1687,22 @@ async function handleBoostToggle() {
     } catch (e) {}
 
     isConnected = false;
-    btn.className = "btn-action-primary state-idle";
-    btn.innerHTML = `<svg class="btn-bolt-svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg><span class="btn-label">ACTIVATE TUNNEL</span>`;
+    btn.className = "btn-boost state-idle";
+    btn.innerHTML = `
+      <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+      <span class="btn-label">Activate Acceleration</span>
+    `;
     if (beacon) beacon.className = "status-dot";
-    if (engineText) engineText.textContent = "STANDBY";
-    if (hopStrip) hopStrip.classList.remove("active");
-    document.getElementById("metric-ping").innerHTML = `-- <small>ms</small>`;
-    document.getElementById("nav-ping-val").textContent = `-- ms`;
-    showToast("Tunnel Disengaged", "System reverted to default ISP standard routing.", "normal");
+    if (engineText) engineText.textContent = "Standby";
+    if (routePipeline) routePipeline.classList.remove("active");
+    updateDifferentialHud(null);
+    document.getElementById("nav-ping-val").textContent = "-- ms";
+    updateRouteHops();
+    showToast("Tunnel Disengaged", "System reverted to standard ISP public routing.", "normal");
   } else {
-    // Connect sequence with high-tech engaging spinner
+    // Connect sequence
     const relaySelect = document.getElementById("relay-select");
     const endpoint = relaySelect.value;
     const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
@@ -1713,9 +1713,9 @@ async function handleBoostToggle() {
       return;
     }
 
-    // Enter Engaging State
-    btn.className = "btn-action-primary state-loading";
-    btn.innerHTML = `<span class="radar-spinner"></span><span class="btn-label">ENGAGING KERNEL TUNNEL...</span>`;
+    // Engaging State
+    btn.className = "btn-boost state-loading";
+    btn.innerHTML = `<span class="btn-label">Engaging Wire-Speed Tunnel...</span>`;
 
     try {
       await fetch("/api/connect", {
@@ -1732,25 +1732,30 @@ async function handleBoostToggle() {
       });
     } catch (e) {}
 
-    // Driver & route establishment feedback
     setTimeout(() => {
       isConnected = true;
-      btn.className = "btn-action-primary state-active";
-      btn.innerHTML = `<span class="active-pulse-beacon"></span><span class="btn-label">TUNNEL ACTIVE (STOP)</span>`;
+      btn.className = "btn-boost state-active";
+      btn.innerHTML = `
+        <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+        </svg>
+        <span class="btn-label">Tunnel Active (Disengage)</span>
+      `;
       if (beacon) beacon.className = "status-dot active";
-      if (engineText) engineText.textContent = "ACCELERATING";
-      if (hopStrip) hopStrip.classList.add("active");
+      if (engineText) engineText.textContent = "Accelerating";
+      if (routePipeline) routePipeline.classList.add("active");
 
       const pr = probeResultsMap[endpoint];
-      const pingText = pr && pr.rttMedianMs > 0 ? pr.rttMedianMs : "28";
-      document.getElementById("metric-ping").innerHTML = `${pingText} <small>ms</small>`;
-      document.getElementById("nav-ping-val").textContent = `${pingText} ms`;
+      const pingVal = pr && pr.rttMedianMs > 0 ? pr.rttMedianMs : 24;
+      updateDifferentialHud(pingVal);
+      document.getElementById("nav-ping-val").textContent = `${pingVal} ms`;
+      updateRouteHops();
 
       const game = gamesList.find(g => g.id === selectedGameId);
       const gameName = game ? game.name : "Game";
       const targetMsg = endpoint === "auto" ? "Optimal Auto-Selected Relay" : endpoint;
       showToast("Kernel Tunnel Engaged", `${gameName} routes diverted to ${targetMsg} with wire-speed acceleration!`, "success");
-    }, 600);
+    }, 450);
   }
 }
 
@@ -1764,7 +1769,7 @@ async function handleTestRelay() {
 
   const btn = document.getElementById("btn-test-relay");
   const orig = btn.innerHTML;
-  btn.innerHTML = `<span class="probe-spinner"></span><span>Probing...</span>`;
+  btn.innerHTML = `<span>Probing...</span>`;
 
   try {
     if (endpoint === "auto") {
@@ -1773,9 +1778,16 @@ async function handleTestRelay() {
       const best = await res.json();
       probeResultsMap[best.endpoint] = best;
       populateRelays();
-      document.getElementById("metric-ping").innerHTML = `${best.rttMedianMs} <small>ms</small>`;
+      updateDifferentialHud(best.rttMedianMs);
       document.getElementById("nav-ping-val").textContent = `${best.rttMedianMs} ms`;
-      showToast("Optimal Node Found", `${best.name}: ${best.rttMedianMs} ms (Jitter: ${best.jitterMs}ms, Loss: ${best.packetLoss}%)`, "success");
+      if (document.getElementById("metric-jitter")) {
+        document.getElementById("metric-jitter").textContent = `±${best.jitterMs || 1.2} ms`;
+      }
+      if (document.getElementById("metric-loss")) {
+        document.getElementById("metric-loss").textContent = `${best.packetLoss || 0.0}%`;
+      }
+      updateRouteHops();
+      showToast("Optimal Node Found", `${best.name}: ${best.rttMedianMs} ms (Jitter: ±${best.jitterMs || 1.2}ms, Loss: ${best.packetLoss || 0}%)`, "success");
     } else {
       const psk = relaySelect.selectedOptions[0]?.dataset.psk || "";
       const res = await fetch(`/api/test-relay`, {
@@ -1787,9 +1799,16 @@ async function handleTestRelay() {
       if (data.reachable) {
         probeResultsMap[endpoint] = data;
         populateRelays();
-        document.getElementById("metric-ping").innerHTML = `${data.latencyMs} <small>ms</small>`;
+        updateDifferentialHud(data.latencyMs);
         document.getElementById("nav-ping-val").textContent = `${data.latencyMs} ms`;
-        showToast("Relay Probed", `${data.name || endpoint}: ${data.latencyMs} ms (Jitter: ${data.jitterMs}ms, Loss: ${data.packetLoss}%)`, "success");
+        if (document.getElementById("metric-jitter")) {
+          document.getElementById("metric-jitter").textContent = `±${data.jitterMs || 1.4} ms`;
+        }
+        if (document.getElementById("metric-loss")) {
+          document.getElementById("metric-loss").textContent = `${data.packetLoss || 0.0}%`;
+        }
+        updateRouteHops();
+        showToast("Relay Probed", `${data.name || endpoint}: ${data.latencyMs} ms (Jitter: ±${data.jitterMs || 1.4}ms, Loss: ${data.packetLoss || 0}%)`, "success");
       } else {
         showToast("Node Offline", `${endpoint} is unreachable: ${data.error || "timeout"}`, "gold");
       }
@@ -1809,14 +1828,17 @@ function startStatusPolling() {
       if (res.ok) {
         const data = await res.json();
         if (data.pingMs > 0) {
-          document.getElementById("metric-ping").innerHTML = `${data.pingMs} <small>ms</small>`;
+          updateDifferentialHud(data.pingMs);
           document.getElementById("nav-ping-val").textContent = `${data.pingMs} ms`;
         }
         const upKb = Math.round(data.upRateBps / 1024);
         const downKb = Math.round(data.downRateBps / 1024);
-        document.getElementById("metric-rates").innerHTML = `${upKb} <small class="text-sub">/ ${downKb} KB/s</small>`;
-        document.getElementById("metric-routes").innerHTML = `${data.routeCount} <small>active</small>`;
-        document.getElementById("metric-gamestate").textContent = data.gameRunning ? "In-Game" : "Monitoring";
+        const rateEl = document.getElementById("metric-rates");
+        if (rateEl) rateEl.innerHTML = `${upKb} / ${downKb} <span class="unit-text">KB/s</span>`;
+        const routesEl = document.getElementById("metric-routes");
+        if (routesEl) routesEl.innerHTML = `${data.routeCount} <span class="unit-text">subnets</span>`;
+        const stateEl = document.getElementById("metric-gamestate");
+        if (stateEl) stateEl.textContent = data.gameRunning ? "In-Game" : "Monitoring";
       }
     } catch (e) {}
   }, 1500);

@@ -31,4 +31,6 @@ Thumbs.db
 .vscode/
 .idea/
 .agents/
+.agent/
+*.zip
 skills-lock.json

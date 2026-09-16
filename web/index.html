@@ -3,314 +3,442 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lagvex // Pro Gaming Latency Reducer</title>
+  <title>Lagvex // Pro Gaming Latency Accelerator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="assets/logo.png">
   <link rel="shortcut icon" type="image/png" href="assets/logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Ambient Gradients & Texture -->
-  <div class="mesh-glow mesh-1"></div>
-  <div class="mesh-glow mesh-2"></div>
-  <div class="grid-texture"></div>
-
   <!-- Header Navigation -->
   <header class="app-header">
-    <div class="header-content">
-      <div class="header-left">
-        <div class="brand-badge">
-          <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img">
-        </div>
-        <div class="brand-text">
-          <div class="brand-title">LAGVEX<span class="pro-tag">PRO</span></div>
-          <span class="brand-sub">Layer-3 Gaming Tunnel &bull; Wire-Speed Relay</span>
-        </div>
+    <div class="header-container">
+      <div class="header-brand">
+        <a href="#" class="brand-link" aria-label="Lagvex Home">
+          <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img" width="36" height="36">
+          <div class="brand-text-group">
+            <div class="brand-name-row">
+              <span class="brand-title">LAGVEX</span>
+              <span class="pro-tag">PRO</span>
+            </div>
+            <span class="brand-caption">Wire-Speed Layer-3 Accelerator</span>
+          </div>
+        </a>
       </div>
 
       <div class="header-center">
         <div class="status-chip" id="engine-status-chip">
-          <span class="status-dot" id="pulse-beacon"></span>
-          <span class="status-label">ENGINE:</span>
-          <span class="status-value" id="engine-status-text">STANDBY</span>
+          <span class="status-dot" id="pulse-beacon" aria-hidden="true"></span>
+          <span class="status-label">Engine</span>
+          <span class="status-value" id="engine-status-text">Standby</span>
         </div>
         <div class="status-chip">
-          <svg class="chip-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-          <span class="status-label">PING:</span>
-          <span class="status-value highlight-green" id="nav-ping-val">-- ms</span>
+          <svg class="chip-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span class="status-label">RTT</span>
+          <span class="status-value highlight-cyan tabular-num" id="nav-ping-val">-- ms</span>
         </div>
       </div>
 
-      <div class="header-right">
-        <button id="btn-quick-squad" class="btn-squad-join" title="Join Squad via 1-Click Code">
-          <svg class="btn-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      <div class="header-actions">
+        <button id="btn-quick-squad" class="btn-secondary-nav" type="button">
+          <svg class="btn-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
           <span>Join Squad</span>
         </button>
-        <button id="btn-quick-relay" class="btn-ghost-nav" title="Add Custom Relay Server">
-          <span>+ Add VPS</span>
+        <button id="btn-quick-relay" class="btn-ghost-nav" type="button">
+          <svg class="btn-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Add Custom VPS</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Main App Layout -->
-  <main class="main-stage">
-    <!-- Hero Stage: Selected Game Cockpit & Live Route Hop Graph -->
-    <section class="cockpit-card">
-      <div class="cockpit-top">
-        <div class="cockpit-game-info">
-          <div class="cockpit-game-badge" id="hero-game-logo">
-            <!-- Dynamic SVG Logo injected via JS -->
+  <!-- Main Application Shell -->
+  <main class="main-container">
+    <!-- Hero Section: Acceleration Cockpit -->
+    <section class="cockpit-stage" aria-labelledby="cockpit-heading">
+      <div class="cockpit-main-card">
+        <!-- Top Row: Game Profile & Primary Trigger -->
+        <div class="cockpit-header-row">
+          <div class="selected-game-profile">
+            <div class="game-avatar-frame" id="hero-game-logo">
+              <!-- Official vector SVG logo injected via JS -->
+            </div>
+            <div class="game-meta-group">
+              <h1 class="game-title" id="hud-game-title">Valorant</h1>
+              <p class="game-sub" id="hud-game-pub">Riot Games &bull; Tactical FPS</p>
+              <span class="process-tag" id="hud-game-desc">Tracking: VALORANT-Win64-Shipping.exe</span>
+            </div>
           </div>
-          <div class="cockpit-game-meta">
-            <span class="cockpit-tag" id="hud-game-pub">Riot Games &bull; Tactical FPS</span>
-            <h1 class="cockpit-title" id="hud-game-title">Valorant</h1>
-            <p class="cockpit-desc" id="hud-game-desc">Tracking: VALORANT-Win64-Shipping.exe &bull; Route Pinned</p>
+
+          <div class="cockpit-cta-block">
+            <button id="btn-toggle-boost" class="btn-boost state-idle" type="button">
+              <svg class="btn-boost-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span class="btn-label">Activate Acceleration</span>
+            </button>
           </div>
         </div>
 
-        <!-- Primary Action Switch -->
-        <div class="cockpit-action-box">
-          <button id="btn-toggle-boost" class="btn-action-primary state-idle">
-            <svg class="btn-bolt-svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            <span class="btn-label">ACTIVATE TUNNEL</span>
+        <!-- Before vs. After Differential Latency HUD -->
+        <div class="differential-hud">
+          <div class="diff-card diff-baseline">
+            <div class="diff-meta">
+              <span class="diff-title">Standard ISP Ping</span>
+              <span class="diff-badge isp-tag">Direct Route</span>
+            </div>
+            <div class="diff-metric-group">
+              <span class="diff-number tabular-num" id="direct-isp-ping">68</span>
+              <span class="diff-unit">ms</span>
+            </div>
+            <p class="diff-note">Unoptimized default public routing</p>
+          </div>
+
+          <div class="diff-separator" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+
+          <div class="diff-card diff-accelerated">
+            <div class="diff-meta">
+              <span class="diff-title">Accelerated Ping</span>
+              <span class="diff-badge relay-tag">Lagvex AEAD</span>
+            </div>
+            <div class="diff-metric-group">
+              <span class="diff-number highlight-cyan tabular-num" id="metric-ping">24</span>
+              <span class="diff-unit">ms</span>
+            </div>
+            <p class="diff-note">Direct carrier peering via fast relay</p>
+          </div>
+
+          <div class="diff-card diff-gain">
+            <div class="diff-meta">
+              <span class="diff-title">Latency Gain</span>
+              <span class="diff-badge gain-tag">Net Improvement</span>
+            </div>
+            <div class="diff-metric-group">
+              <span class="diff-number highlight-green tabular-num" id="diff-gain-val">-44 ms</span>
+              <span class="diff-percentage tabular-num" id="diff-percent-val">(-64%)</span>
+            </div>
+            <p class="diff-note">Measured round-trip reduction</p>
+          </div>
+        </div>
+
+        <!-- Live Network Route Hop Path -->
+        <div class="route-pipeline" aria-label="Route Transit Pipeline">
+          <div class="pipe-node client-step">
+            <div class="pipe-icon-frame">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </div>
+            <div class="pipe-info">
+              <span class="pipe-label">Client Machine</span>
+              <span class="pipe-sub">WinTun / utun Driver</span>
+            </div>
+          </div>
+
+          <div class="pipe-segment">
+            <div class="pipe-line" aria-hidden="true"></div>
+            <span class="pipe-tag">ChaCha20-Poly1305</span>
+          </div>
+
+          <div class="pipe-node relay-step">
+            <div class="pipe-icon-frame">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div class="pipe-info">
+              <span class="pipe-label">Relay Node</span>
+              <span class="pipe-sub" id="hop-relay-sub">Auto-Selected Relay</span>
+            </div>
+          </div>
+
+          <div class="pipe-segment">
+            <div class="pipe-line" aria-hidden="true"></div>
+            <span class="pipe-tag">Subsea Fiber</span>
+          </div>
+
+          <div class="pipe-node server-step">
+            <div class="pipe-icon-frame">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="22" y1="12" x2="18" y2="12"></line>
+                <line x1="6" y1="12" x2="2" y2="12"></line>
+                <line x1="12" y1="6" x2="12" y2="2"></line>
+                <line x1="12" y1="22" x2="12" y2="18"></line>
+              </svg>
+            </div>
+            <div class="pipe-info">
+              <span class="pipe-label" id="hop-server-target">Game Server</span>
+              <span class="pipe-sub">Direct Cluster Peering</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuration & Telemetry Row -->
+        <div class="cockpit-controls-grid">
+          <div class="control-box">
+            <label class="control-label" for="region-select">Target Game Region</label>
+            <div class="select-wrapper">
+              <select id="region-select" class="custom-select">
+                <option value="">Select Game Region</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="control-box">
+            <label class="control-label" for="relay-select">Acceleration Relay Node</label>
+            <div class="select-with-action">
+              <div class="select-wrapper flex-grow">
+                <select id="relay-select" class="custom-select">
+                  <option value="">Discovering community nodes...</option>
+                </select>
+              </div>
+              <button id="btn-test-relay" class="btn-probe" type="button" title="Probe node latency and jitter">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>Probe</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="telemetry-deck">
+            <div class="stat-card">
+              <span class="stat-name">P50 / P95 Jitter</span>
+              <div class="stat-value-group">
+                <span class="stat-value tabular-num" id="metric-jitter">&plusmn;1.4 ms</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-name">Packet Loss</span>
+              <div class="stat-value-group">
+                <span class="stat-value highlight-green tabular-num" id="metric-loss">0.0%</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-name">Throughput</span>
+              <div class="stat-value-group">
+                <span class="stat-value tabular-num" id="metric-rates">0 / 0 <span class="unit-text">KB/s</span></span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-name">Active Routes</span>
+              <div class="stat-value-group">
+                <span class="stat-value tabular-num" id="metric-routes">0 <span class="unit-text">subnets</span></span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <span class="stat-name">Process State</span>
+              <div class="stat-value-group">
+                <span class="stat-value status-monitoring" id="metric-gamestate">Monitoring</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Supported Games Section -->
+    <section class="library-stage" aria-labelledby="library-heading">
+      <div class="library-header-row">
+        <div class="library-heading-group">
+          <h2 id="library-heading" class="library-title">Supported Game Profiles</h2>
+          <p class="library-description">Hardware-accelerated CIDR routing for major competitive titles</p>
+        </div>
+
+        <div class="library-toolbar">
+          <div class="search-field">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="game-search-input" placeholder="Search by game title or publisher..." aria-label="Search games">
+          </div>
+          <button id="btn-open-custom-game" class="btn-add-game" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Custom Game</span>
           </button>
         </div>
       </div>
 
-      <!-- Live Network Hop Path Visualizer -->
-      <div class="route-hop-strip">
-        <div class="hop-node client-node">
-          <div class="hop-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          </div>
-          <div class="hop-details">
-            <span class="hop-role">LOCAL PC</span>
-            <span class="hop-sub">0.8 ms (Kernel)</span>
-          </div>
-        </div>
-
-        <div class="hop-arrow">
-          <div class="hop-line"></div>
-          <span class="hop-tag active">Optimized UDP Tunnel</span>
-        </div>
-
-        <div class="hop-node relay-node">
-          <div class="hop-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-          </div>
-          <div class="hop-details">
-            <span class="hop-role">RELAY NODE</span>
-            <span class="hop-sub" id="hop-relay-sub">Singapore (<span id="metric-ping">28 ms</span>)</span>
-          </div>
-        </div>
-
-        <div class="hop-arrow">
-          <div class="hop-line"></div>
-          <span class="hop-tag local">&lt; 1 ms Direct Fiber</span>
-        </div>
-
-        <div class="hop-node target-node">
-          <div class="hop-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
-          </div>
-          <div class="hop-details">
-            <span class="hop-role" id="hop-server-target">Game Cloud Server</span>
-            <span class="hop-sub">Riot Direct / AWS SG</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Config & Telemetry Bottom Bar -->
-      <div class="cockpit-bottom-grid">
-        <div class="config-cell">
-          <label class="cell-label" for="relay-select">RELAY SERVER / SQUAD NODE</label>
-          <div class="select-with-btn">
-            <select id="relay-select" class="clean-select">
-              <option value="">Loading community nodes...</option>
-            </select>
-            <button id="btn-test-relay" class="btn-sub-action" title="Probe Ping">Probe</button>
-          </div>
-        </div>
-
-        <div class="config-cell">
-          <label class="cell-label" for="region-select">TARGET SERVER REGION</label>
-          <select id="region-select" class="clean-select">
-            <option value="">Select a game region</option>
-          </select>
-        </div>
-
-        <div class="telemetry-cell">
-          <div class="stat-mini">
-            <span class="stat-mini-lbl">THROUGHPUT</span>
-            <span class="stat-mini-val" id="metric-rates">0 / 0 <small>KB/s</small></span>
-          </div>
-          <div class="stat-mini">
-            <span class="stat-mini-lbl">ROUTES</span>
-            <span class="stat-mini-val" id="metric-routes">0 <small>active</small></span>
-          </div>
-          <div class="stat-mini">
-            <span class="stat-mini-lbl">STATUS</span>
-            <span class="stat-mini-val highlight" id="metric-gamestate">Monitoring</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Game Library Grid -->
-    <section class="library-section">
-      <div class="library-header">
-        <div class="library-title-group">
-          <h2 class="section-heading">Supported Game Library</h2>
-          <p class="section-caption">Precision CIDR route diversion for Valve SDR, Riot Direct, AWS & Azure clusters</p>
-        </div>
-
-        <!-- Search Bar & Controls -->
-        <div class="library-actions">
-          <div class="search-box">
-            <svg class="search-svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="game-search-input" placeholder="Search game by title or publisher...">
-          </div>
-          <button id="btn-open-custom-game" class="btn-outline-action">+ Custom Game</button>
-        </div>
-      </div>
-
       <!-- Category Filter Pills -->
-      <div class="category-filter-bar" id="filter-tabs">
-        <button class="cat-tab active" data-cat="all">All Games</button>
-        <button class="cat-tab" data-cat="Tactical FPS">Tactical FPS</button>
-        <button class="cat-tab" data-cat="Battle Royale">Battle Royale</button>
-        <button class="cat-tab" data-cat="Hero Shooter">Hero Shooter</button>
-        <button class="cat-tab" data-cat="MOBA">MOBA & Strategy</button>
+      <div class="filter-tabs" id="filter-tabs" role="tablist" aria-label="Game categories">
+        <button class="cat-pill active" data-cat="all" role="tab" aria-selected="true">All Games</button>
+        <button class="cat-pill" data-cat="Tactical FPS" role="tab" aria-selected="false">Tactical FPS</button>
+        <button class="cat-pill" data-cat="Battle Royale" role="tab" aria-selected="false">Battle Royale</button>
+        <button class="cat-pill" data-cat="Hero Shooter" role="tab" aria-selected="false">Hero Shooter</button>
+        <button class="cat-pill" data-cat="MOBA" role="tab" aria-selected="false">MOBA &amp; Strategy</button>
       </div>
 
       <!-- Bento Grid of Games -->
-      <div class="games-grid-deck" id="games-grid">
-        <!-- Rendered dynamically by app.js with official vector SVG logos -->
+      <div class="games-grid" id="games-grid" role="region" aria-label="Games list">
+        <!-- Rendered dynamically by app.js with high-fidelity vector logos -->
       </div>
     </section>
   </main>
 
-  <!-- Modal: Join Squad / Paste Link -->
-  <div class="modal-overlay" id="modal-squad">
-    <div class="modal-window">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <div class="modal-badge-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          </div>
-          <h3>Join Squad Tunnel</h3>
+  <!-- Modal: Join Squad -->
+  <div class="modal-backdrop" id="modal-squad" role="dialog" aria-modal="true" aria-labelledby="modal-squad-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <h3 id="modal-squad-title" class="modal-title">Join Squad Tunnel</h3>
         </div>
-        <button class="modal-close" id="close-modal-squad">&times;</button>
+        <button class="modal-close-btn" id="close-modal-squad" type="button" aria-label="Close dialog">&times;</button>
       </div>
-      <div class="modal-content">
-        <p class="modal-text">
-          Paste the <strong>1-Click Squad Share Link</strong> or invite code from your team leader or cyber cafe:
-        </p>
-        <div class="input-field">
-          <label>SQUAD INVITE URL OR CODE</label>
-          <input type="text" id="squad-invite-input" class="clean-input" placeholder="lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz or IP:Port|PSK">
+      <div class="modal-card-body">
+        <p class="modal-lead">Paste a 1-click squad share URL or team invite code:</p>
+        <div class="form-group">
+          <label class="form-label" for="squad-invite-input">Squad Invite Code or Link</label>
+          <input type="text" id="squad-invite-input" class="form-input" placeholder="lagvex://connect?endpoint=123.45.67.89:4433&psk=secret">
         </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn-modal-cancel" id="cancel-squad-modal">Cancel</button>
-        <button class="btn-modal-gold" id="import-squad-modal">Import & Connect</button>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-squad-modal" type="button">Cancel</button>
+        <button class="btn-confirm" id="import-squad-modal" type="button">Connect Squad</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Add Custom Relay -->
-  <div class="modal-overlay" id="modal-relay">
-    <div class="modal-window">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <div class="modal-badge-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
-          </div>
-          <h3>Add Custom Relay Server</h3>
+  <div class="modal-backdrop" id="modal-relay" role="dialog" aria-modal="true" aria-labelledby="modal-relay-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <h3 id="modal-relay-title" class="modal-title">Add Custom Relay Server</h3>
         </div>
-        <button class="modal-close" id="close-modal-relay">&times;</button>
+        <button class="modal-close-btn" id="close-modal-relay" type="button" aria-label="Close dialog">&times;</button>
       </div>
-      <div class="modal-content">
-        <div class="input-field">
-          <label>RELAY NAME</label>
-          <input type="text" id="custom-relay-name" class="clean-input" placeholder="e.g. My Private Singapore VPS">
+      <div class="modal-card-body">
+        <div class="form-group">
+          <label class="form-label" for="custom-relay-name">Relay Label</label>
+          <input type="text" id="custom-relay-name" class="form-input" placeholder="e.g. My Private Tokyo VPS">
         </div>
-        <div class="input-field">
-          <label>ENDPOINT (IP:PORT)</label>
-          <input type="text" id="custom-relay-endpoint" class="clean-input" placeholder="e.g. 128.199.200.10:4433">
+        <div class="form-group">
+          <label class="form-label" for="custom-relay-endpoint">Relay Endpoint (IP:Port)</label>
+          <input type="text" id="custom-relay-endpoint" class="form-input" placeholder="e.g. 139.162.115.10:4433">
         </div>
-        <div class="input-field">
-          <label>PRE-SHARED KEY (PSK)</label>
-          <input type="password" id="custom-relay-psk" class="clean-input" placeholder="32-character secret key">
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-modal-cancel" id="cancel-relay-modal">Cancel</button>
-        <button class="btn-modal-primary" id="save-relay-modal">Save Relay</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Add Custom Game -->
-  <div class="modal-overlay" id="modal-game">
-    <div class="modal-window">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <div class="modal-badge-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-          </div>
-          <h3>Add Custom Game Profile</h3>
-        </div>
-        <button class="modal-close" id="close-modal-game">&times;</button>
-      </div>
-      <div class="modal-content">
-        <div class="input-field">
-          <label>GAME NAME</label>
-          <input type="text" id="custom-game-name" class="clean-input" placeholder="e.g. Marvel Rivals">
-        </div>
-        <div class="input-field">
-          <label>EXE PROCESS NAMES (comma separated)</label>
-          <input type="text" id="custom-game-exe" class="clean-input" placeholder="e.g. Marvel-Win64-Shipping.exe">
-        </div>
-        <div class="input-field">
-          <label>REGION NAME</label>
-          <input type="text" id="custom-game-region-name" class="clean-input" placeholder="e.g. Singapore Server">
-        </div>
-        <div class="input-field">
-          <label>CIDR SUBNETS (comma or newline separated)</label>
-          <textarea id="custom-game-cidrs" class="clean-textarea" rows="3" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
+        <div class="form-group">
+          <label class="form-label" for="custom-relay-psk">Pre-Shared Key (PSK)</label>
+          <input type="password" id="custom-relay-psk" class="form-input" placeholder="32-character authentication key">
         </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn-modal-cancel" id="cancel-game-modal">Cancel</button>
-        <button class="btn-modal-primary" id="save-game-modal">Save Game</button>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-relay-modal" type="button">Cancel</button>
+        <button class="btn-confirm" id="save-relay-modal" type="button">Save Relay</button>
       </div>
     </div>
   </div>
 
-  <!-- Legal & Trademark Disclaimer -->
-  <div class="legal-disclaimer-strip">
-    <div class="disclaimer-content">
+  <!-- Modal: Add Custom Game Profile -->
+  <div class="modal-backdrop" id="modal-game" role="dialog" aria-modal="true" aria-labelledby="modal-game-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <div class="modal-title-group">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="modal-icon" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          <h3 id="modal-game-title" class="modal-title">Add Custom Game Profile</h3>
+        </div>
+        <button class="modal-close-btn" id="close-modal-game" type="button" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-card-body">
+        <div class="form-group">
+          <label class="form-label" for="custom-game-name">Game Title</label>
+          <input type="text" id="custom-game-name" class="form-input" placeholder="e.g. Marvel Rivals">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-exe">Process Executables (comma separated)</label>
+          <input type="text" id="custom-game-exe" class="form-input" placeholder="e.g. Marvel-Win64-Shipping.exe">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-region-name">Region Name</label>
+          <input type="text" id="custom-game-region-name" class="form-input" placeholder="e.g. Singapore Server">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="custom-game-cidrs">CIDR IP Subnets</label>
+          <textarea id="custom-game-cidrs" class="form-textarea" rows="3" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
+        </div>
+      </div>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-game-modal" type="button">Cancel</button>
+        <button class="btn-confirm" id="save-game-modal" type="button">Save Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legal & Trademark Notice -->
+  <aside class="legal-notice-strip" aria-label="Trademark Notice">
+    <div class="legal-notice-inner">
       <p>
-        <strong>Legal &amp; Trademark Notice:</strong> All game titles, publisher names, and associated brand insignia (Valve, Riot Games, Electronic Arts, Krafton, Activision, Ubisoft, TiMi Studio Group) are trademarks or registered trademarks of their respective copyright holders. Lagvex is an independent, non-profit academic research tool and kernel latency accelerator, and is not affiliated with, endorsed by, or sponsored by any game publisher. Vector logos are reproduced strictly under <em>Nominative Fair Use</em> solely for user process routing identification.
+        <strong>Legal &amp; Trademark Notice:</strong> All game titles, publisher names, and associated brand insignia (Valve, Riot Games, Electronic Arts, Krafton, Activision, Ubisoft, TiMi Studio Group) are trademarks of their respective copyright holders. Lagvex is an independent, non-profit academic research tool and kernel latency accelerator, and is not affiliated with or endorsed by any game publisher. Vector logos are reproduced strictly under Nominative Fair Use solely for user process routing identification.
       </p>
     </div>
-  </div>
+  </aside>
 
-  <!-- Footer -->
+  <!-- Application Footer -->
   <footer class="app-footer">
-    <div class="footer-container">
-      <span class="footer-item">Lagvex Pro &bull; Open-Source Game Latency Accelerator</span>
-      <span class="footer-item">Academic Research &bull; Zero DLL Injection &bull; 100% Kernel Split-Tunneling</span>
-      <span class="footer-item">MIT License &bull; <a href="https://github.com/ThanhNguyxnOrg/lagvex" target="_blank" rel="noopener">GitHub</a></span>
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">LAGVEX PRO</span>
+        <span class="footer-sep">&bull;</span>
+        <span>Layer-3 Wire-Speed Game Tunnel</span>
+      </div>
+      <div class="footer-right">
+        <span>Zero DLL Injection</span>
+        <span class="footer-sep">&bull;</span>
+        <span>100% Kernel Split-Tunneling</span>
+        <span class="footer-sep">&bull;</span>
+        <a href="https://github.com/ThanhNguyxnOrg/lagvex" target="_blank" rel="noopener" class="footer-link">GitHub Repository</a>
+      </div>
     </div>
   </footer>
 
-  <!-- Floating Toast Notifications Container -->
-  <div id="app-toast-container" class="toast-container"></div>
+  <!-- Toast Notification Container -->
+  <div id="app-toast-container" class="toast-shelf" aria-live="polite" aria-atomic="true"></div>
 
   <script src="app.js"></script>
 </body>
