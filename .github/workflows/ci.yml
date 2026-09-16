@@ -17,7 +17,7 @@ jobs:
       - name: 🐹 Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: 'stable'
           cache: true
 
       - name: 🔍 Run Go Vet
@@ -26,8 +26,8 @@ jobs:
       - name: ⚡ Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.59
-          args: --timeout=3m
+          version: latest
+          args: --timeout=5m
 
       - name: 🧪 Run Unit Tests
         run: go test -v -race ./...
@@ -59,7 +59,7 @@ jobs:
       - name: 🐹 Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: 'stable'
           cache: true
 
       - name: 🛠️ Build ${{ matrix.os }}/${{ matrix.arch }}
