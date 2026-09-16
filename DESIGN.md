@@ -1,85 +1,80 @@
-# Design System & Visual Specification
+# Lagvex Pro — Design System & Visual Specification
 
 <!-- impeccable:design-schema 1 -->
 
-## Direction
+## Direction & Architecture
 
-Calm-dark esports engineering cockpit. Razor-sharp, high-contrast, distraction-free visual environment designed to run alongside fullscreen competitive multiplayer games without causing ambient glare or visual fatigue. Built upon the official Lagvex crystal-cut emblem and oscilloscope wave identity.
+A calm-dark, esports engineering cockpit adhering directly to the custom Figma desktop layout (`Lagvex UI Design.zip`). Built upon the official Lagvex crystal-cut emblem and oscilloscope identity, the layout features a 2-column desktop window (1280px max width) engineered to sit cleanly alongside competitive gameplay without visual distraction or ocular fatigue.
 
 ## Visual Anchor
 
-- **Primary Brand Mark**: `assets/logo.png` — An angular crystal-cut "L" monogram embedded with a high-voltage lightning bolt and telemetry pulse wave, rendered in electric cyan (`#00F0FF`) and electric violet (`#8B5CF6`).
-- **Brand Wordmark**: `LAGVEX` set in `Outfit` Heavy 800 with letter-spacing `0.04em` paired with a high-contrast `PRO` micro-badge.
+- **Primary Brand Mark**: `assets/logo.png` — An angular crystal-cut "L" monogram embedded with a lightning-fast telemetry pulse wave, rendered in electric cyan (`#00F0FF`) and electric violet (`#8B5CF6`).
+- **Brand Wordmark**: `LAGVEX` set in `Outfit` 800 with letter-spacing `0.04em`, paired with a high-contrast `PRO` micro-badge.
 
 ## Color Tokens
 
 ### Surfaces
-- `bg-canvas`: `#090B10` — Pure deep matte obsidian canvas; prevents ocular fatigue in dim esports environments.
-- `bg-card`: `#111520` — Baseline card container elevation with crisp structural delineation.
-- `bg-card-elevated`: `#161C2A` — Hover and focused container surface.
-- `bg-input`: `#131722` — Deep neutral well for select boxes and text fields.
-- `bg-input-hover`: `#192030` — Interactive input highlight.
-
-### Borders
-- `border-subtle`: `rgba(255, 255, 255, 0.08)` — Hairline structural separation.
-- `border-card`: `#1F2738` — Defined card container edge.
-- `border-interactive`: `#2A344C` — Unfocused interactive element outline.
-- `border-hover`: `rgba(0, 240, 255, 0.40)` — High-clarity hover feedback.
-- `border-active`: `#00F0FF` — Focused and active element border.
+- `--color-base`: `#0B0E14` — Deep obsidian canvas.
+- `--color-base-elev`: `#0E131C` — Elevated window background.
+- `--color-surface`: `#121722` — Deep card surface.
+- `--color-surface-2`: `#161D2A` — Hover surface and elevated card highlight.
+- `--color-line`: `#232B3B` — Defined container edges and dividers.
+- `--color-line-soft`: `#1B2230` — Subtle interior separators.
 
 ### Brand Accents
-- `accent-cyan`: `#00F0FF` — Primary action, primary focus states, live telemetry metrics.
-- `accent-cyan-subtle`: `rgba(0, 240, 255, 0.12)` — Badge wells and selected state backgrounds.
-- `accent-violet`: `#8B5CF6` — Secondary brand facet derived from the logo's crystal geometry.
-- `accent-green`: `#00E599` — Low-latency RTT indicator, active tunnel engagement, and differential gain.
-- `accent-amber`: `#F59E0B` — Network jitter warning and prober timeouts.
-- `accent-red`: `#EF4444` — Driver disconnect or unreachable relay alert.
+- `--color-cyan`: `#00F0FF` — Primary action, focus borders, active hero boost button.
+- `--color-cyan-glow`: `rgba(0, 240, 255, 0.15)` — Active button halo and focus indicators.
+- `--color-emerald`: `#00E599` — Differential latency improvement badge (`-Xms IMPROVED`), active tunnel status, and packet loss indicators.
+- `--color-amber`: `#FFB020` — Jitter warnings and relay discovery hints.
+- `--color-rose`: `#FF5D73` — Error states and critical packet loss.
 
-### Text Contrast
-- `text-primary`: `#F8FAFC` — Primary copy and metric numbers (Contrast Ratio $\approx 16:1$).
-- `text-secondary`: `#CBD5E1` — Subtitles, process names, and input labels (Contrast Ratio $\approx 10:1$, passes WCAG AAA).
-- `text-muted`: `#94A3B8` — Secondary notes and measurement units (Contrast Ratio $\approx 6.5:1$, passes WCAG AA).
-- `text-on-accent`: `#090B10` — High-contrast black text on electric cyan button surfaces.
+### Typography Contrast
+- `--color-ink`: `#EEF2F8` — Primary copy, game headings, and large metric numerals (Contrast Ratio $\approx 15:1$).
+- `--color-ink-dim`: `#CBD5E1` — Subtitles, publisher notes, and dropdown options (Passes WCAG AAA).
+- `--color-ink-faint`: `#94A3B8` — Micro-labels, units, and secondary hints (Passes WCAG AA).
 
-## Typography Ramp
+## Typography Scale
 
-- **Brand & Headings**: `Outfit`, sans-serif (`font-weight: 700 / 800`).
-  - Hero Title: `1.625rem` (26px), line-height `1.2`.
-  - Section Headings: `1.375rem` (22px), line-height `1.3`.
-  - Modal Titles: `1.125rem` (18px), line-height `1.3`.
+- **Brand & Headings**: `Outfit`, sans-serif (`font-weight: 700 / 800 / 900`).
+  - Hero Game Title: `2.375rem` (38px), bold, tight letter-spacing.
+  - Section Headings: `1.25rem` (20px), semi-bold.
+  - Window Wordmark: `1.125rem` (18px), heavy 800.
 - **UI Body & Functional Text**: `Sora`, sans-serif (`font-weight: 400 / 500 / 600`).
-  - Base UI text: `0.9375rem` (15px), line-height `1.5`.
-  - Input labels: `0.8125rem` (13px), font-weight `600`.
-  - Secondary meta: `0.75rem` (12px), line-height `1.35`.
-  - Floor rule: strictly $\ge 11$px for functional text.
-- **Telemetry & Numerals**: `JetBrains Mono`, monospace (`font-variant-numeric: tabular-nums`).
-  - Differential latency values: `2.0rem` (32px), bold, tabular numerals to prevent layout shift during live polling.
-  - Telemetry counters: `0.875rem` (14px), font-weight `600`.
+  - Base UI text: `0.875rem` (14px).
+  - Field labels & hints: `0.75rem` (12px), uppercase / bold.
+  - Floor rule: strictly $\ge 12$px for all body copy and interactive labels.
+- **Telemetry Numerals**: `JetBrains Mono`, monospace (`font-variant-numeric: tabular-nums`).
+  - Large ping numbers: `2.0rem` (32px), bold, tabular digits to prevent layout shift.
+  - Telemetry metrics & units: `0.875rem` to `1.0rem` (14px – 16px).
 
-## Key Component Patterns
+## 2-Column Layout Components
 
-### 1. Header Navigation
-A sticky, high-performance banner featuring:
-- Official brand avatar (`assets/logo.png`, 36x36px with 1px border).
-- Global tunnel engine status chip (`Standby` / `Accelerating`) with semantic status dot.
-- Probed RTT counter with cyan tabular numerals.
-- Action triggers: "Join Squad" and "Add Custom VPS".
+### 1. Window Header
+- Crystal-cut "L" logo badge (`assets/logo.png`, 32x32px) + `LAGVEX PRO`.
+- Global engine status pill (`Standby` / `Accelerating`) with glowing green beacon.
+- Header actions: `Squad` tunnel sharing and `+ Custom VPS` modal triggers.
 
-### 2. Differential Latency HUD
-A 3-column comparative telemetry grid that makes the accelerator's value immediately obvious:
-- **Direct ISP Ping**: Measured baseline (e.g. `68 ms`) under default public transit.
-- **Accelerated Ping**: Probed RTT (e.g. `24 ms`) via ChaCha20-Poly1305 encrypted relay tunnel.
-- **Net Latency Gain**: Computed differential (e.g. `-44 ms (-64%)`) in high-visibility emerald green.
+### 2. Left Column: Hero Game Stage & Library
+- **Hero Card**:
+  - Full-bleed game backdrop artwork with horizontal and vertical directional scrims.
+  - `Anti-Cheat Safe` shield badge + `SELECTED GAME` micro-label.
+  - 38px bold game title + studio & genre details.
+  - Dropdown selectors for `Target Region` and `Relay Node` with live `Singapore #1 — 18ms • OPTIMAL` star hint.
+  - 176x104px **ACTIVATE BOOST** button transitioning smoothly to emerald green **STOP BOOST**.
+- **Game Library**:
+  - Header with game count pill, search bar, and `+ Custom` profile creator.
+  - Category filter pills (*All Games, Tactical FPS, Battle Royale, MOBA*).
+  - 4-column Aspect 3/4 Poster Card grid featuring cover art, anti-cheat safe badges, titles, and `ACTIVE` state outlines.
 
-### 3. Route Hop Pipeline
-A high-contrast visual trajectory showing the 4 hops:
-`Client Machine (WinTun Kernel)` ➔ `ChaCha20-Poly1305 Tunnel` ➔ `Relay Node (Live RTT)` ➔ `Subsea Fiber` ➔ `Game Cloud Cluster`.
-
-### 4. Game Library Grid
-A Bento grid displaying supported game titles with official vector SVG insignias, publisher details, server cluster counts, and instant filter pills.
+### 3. Right Column: Telemetry Cockpit Sidebar (360px)
+- **Differential Latency Card**: Compares `Direct ISP` baseline (58ms) with `Lagvex Accel.` (18ms–22ms) alongside a vivid emerald green delta badge (`−40ms IMPROVED`).
+- **Stability Card**: Real-time Triplet grid showing `P50` median ping, `P95 Tail` spike guard, and `Loss %`.
+- **Live Throughput**: Real-time Download and Upload traffic with a 12-bar animated cyan equalizer visualizer.
+- **Active Routes & Multi-Path Relay**: Visual indicator of `24 / 24` active subnets with 3 animated multi-path relay pips.
+- **Route Breadcrumb**: Live routing trajectory footer (`Route: Asia-Pacific → Singapore #1`).
 
 ## Craft Floor Verification
 
-- **Anti-patterns**: 0 (audited via `impeccable detect`).
-- **Advisories**: 0 (neutral elevation shadows, clean 1px borders, zero AI glow slop).
-- **Accessibility**: 100% WCAG AA compliant on all interactive text and controls.
+- **Impeccable Detect Audit**: 0 anti-patterns, 0 advisories (`impeccable detect web/index.html web/style.css web/app.js`).
+- **Typography & Contrast**: Compliant with WCAG AA/AAA standards; zero sub-11px text.
+- **Performance & Polish**: Hardware-accelerated CSS transforms, zero layout shifts on telemetry updates, non-elevated preview server via `preview_server.py`.
