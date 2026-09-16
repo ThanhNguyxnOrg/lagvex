@@ -23,8 +23,8 @@ client-linux:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/lagvex-client-linux-amd64 ./cmd/lagvex-client
 
 test:
-	@echo "==> Running Unit Tests..."
-	go test -v ./pkg/protocol
+	@echo "==> Running All Unit Tests..."
+	go test -v ./...
 
 clean:
 	rm -rf bin/lagvex-relay bin/lagvex-relay-arm64 bin/lagvex-client.exe
