@@ -6,356 +6,349 @@
   <title>Lagvex // Pro Gaming Latency Accelerator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="assets/logo.png">
   <link rel="shortcut icon" type="image/png" href="assets/logo.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-viewport">
-    <div class="app-window">
-      <!-- Ambient Glow behind window -->
-      <div class="ambient-glow" id="ambient-glow" aria-hidden="true"></div>
+  <main class="lagvex-shell">
+    <!-- Ambient Radial Glow -->
+    <div class="shell-glow" aria-hidden="true"></div>
 
-      <!-- ==================== HEADER ==================== -->
-      <header class="window-header">
-        <div class="header-brand-group">
-          <div class="brand-avatar">
-            <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img" width="32" height="32">
-          </div>
-          <div class="brand-heading">
-            <span class="brand-name">LAGVEX</span>
-            <span class="brand-badge-pro">PRO</span>
-          </div>
+    <!-- ==================== TOPBAR ==================== -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-avatar">
+          <img src="assets/logo.png" alt="Lagvex Logo" class="brand-logo-img" width="28" height="28">
+        </div>
+        <span class="brand-name">LAGVEX</span>
+        <span class="brand-beta">BETA</span>
+      </div>
+
+      <div class="engine-status" id="engine-status-bar">
+        <span class="status-dot" id="engine-status-dot" aria-hidden="true"></span>
+        <span id="engine-status-label">Engine online</span>
+        <span class="divider" aria-hidden="true"></span>
+        <span class="version-tag">v2.4.1</span>
+      </div>
+
+      <div class="top-actions">
+        <button class="icon-button" id="btn-open-settings" aria-label="Settings" title="Relay & Engine Settings" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line>
+            <line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
+          </svg>
+        </button>
+        <button class="icon-button" id="btn-quick-squad" aria-label="Squad Tunnel" title="Squad 1-Click Connect" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </button>
+        <div class="avatar" title="User Profile: Pro Member">LV</div>
+      </div>
+    </header>
+
+    <!-- ==================== 2-COLUMN WORKSPACE ==================== -->
+    <div class="workspace">
+      <!-- LEFT COLUMN: Performance Center, Hero Card, Live Telemetry -->
+      <section class="main-column">
+        <!-- Eyebrow Breadcrumb -->
+        <div class="eyebrow" id="hero-eyebrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"></path>
+          </svg>
+          <span>PERFORMANCE CENTER</span>
+          <span class="eyebrow-slug" id="eyebrow-slug">/VALORANT</span>
         </div>
 
-        <div class="header-actions-group">
-          <div class="status-pill" id="status-pill">
-            <span class="status-dot" id="pulse-beacon" aria-hidden="true"></span>
-            <span class="status-text" id="engine-status-text">Standby</span>
-          </div>
-          <button id="btn-quick-squad" class="btn-ghost-header" type="button" title="Join team tunnel">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            <span>Squad</span>
-          </button>
-          <button id="btn-quick-relay" class="btn-ghost-header" type="button" title="Add private relay server">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14"></path>
-            </svg>
-            <span>Custom VPS</span>
-          </button>
-        </div>
-      </header>
+        <!-- Hero Card -->
+        <div class="hero-card" id="hero-card">
+          <img id="hero-cover-img" src="assets/games/valorant.png" alt="Game cover artwork" class="hero-image">
+          <div class="hero-overlay" aria-hidden="true"></div>
 
-      <!-- ==================== 2-COLUMN BODY ==================== -->
-      <div class="window-body">
-        <!-- LEFT COLUMN: Hero HUD + Game Library -->
-        <div class="content-column">
-          <!-- Hero Section -->
-          <section class="hero-card" id="hero-card">
-            <div class="hero-bg-media">
-              <img id="hero-cover-img" src="https://images.unsplash.com/flagged/photo-1560177776-55a762c5c000?auto=format&fit=crop&q=80&w=1200&h=600" alt="Game cover artwork" class="hero-cover-img">
-              <div class="hero-scrim-x" aria-hidden="true"></div>
-              <div class="hero-scrim-y" aria-hidden="true"></div>
-            </div>
+          <div class="hero-content">
+            <h1 id="hero-game-title">Valorant</h1>
+            <p id="hero-game-subtitle">Tactical shooter <span>&bull;</span> Competitive profile <span>&bull;</span> <strong id="hero-kicker-text" class="hero-status-tag">Ready to boost</strong></p>
 
-            <div class="hero-content-wrap">
-              <div class="hero-info-pane">
-                <div class="hero-badge-row">
-                  <span class="safe-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M12 3 5 5.5V11c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V5.5L12 3Z"></path>
-                      <path d="m9 12 2 2 4-4.5"></path>
-                    </svg>
-                    <span>Anti-Cheat Safe</span>
-                  </span>
-                  <span class="micro-label">Selected Game</span>
-                </div>
-
-                <h1 class="hero-game-title" id="hud-game-title">Valorant</h1>
-                <p class="hero-game-studio" id="hud-game-pub">Riot Games &bull; Tactical FPS</p>
-
-                <!-- Selectors Grid -->
-                <div class="hero-selectors-grid">
-                  <!-- Region Dropdown -->
-                  <div class="selector-field">
-                    <label class="field-label" for="region-select">Target Region</label>
-                    <div class="dropdown-box">
-                      <select id="region-select" class="native-dropdown">
-                        <option value="">Loading regions...</option>
-                      </select>
-                      <svg class="dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m6 9 6 6 6-6"></path>
-                      </svg>
-                    </div>
-                  </div>
-
-                  <!-- Relay Node Dropdown -->
-                  <div class="selector-field">
-                    <label class="field-label" for="relay-select">Relay Node</label>
-                    <div class="dropdown-box">
-                      <select id="relay-select" class="native-dropdown">
-                        <option value="">Discovering optimal nodes...</option>
-                      </select>
-                      <svg class="dropdown-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m6 9 6 6 6-6"></path>
-                      </svg>
-                    </div>
-                    <div class="optimal-hint" id="optimal-hint">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="m12 3 2.5 5.4 5.9.7-4.4 4 1.2 5.8L12 16.9 6.8 19.9 8 14.1 3.6 10l5.9-.7L12 3Z"></path>
-                      </svg>
-                      <span id="optimal-hint-text">Singapore #1 &mdash; 18ms &bull; OPTIMAL</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Big Boost Button (176px x 104px) -->
-              <button id="btn-toggle-boost" class="hero-boost-btn state-idle" type="button">
-                <span class="btn-sweep" aria-hidden="true"></span>
-                <svg class="btn-bolt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <div class="hero-actions">
+              <button id="btn-toggle-boost" class="boost-button" type="button">
+                <svg class="boost-icon" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
-                <span class="btn-action-text" id="boost-btn-label">ACTIVATE BOOST</span>
+                <span id="boost-button-label">Activate boost</span>
+              </button>
+
+              <button class="ghost-button" id="btn-optimize-profile" type="button" title="Optimize routing parameters">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="22" y1="12" x2="18" y2="12"></line>
+                  <line x1="6" y1="12" x2="2" y2="12"></line>
+                  <line x1="12" y1="6" x2="12" y2="2"></line>
+                  <line x1="12" y1="22" x2="12" y2="18"></line>
+                </svg>
+                <span>Optimize profile</span>
               </button>
             </div>
-          </section>
+          </div>
 
-          <!-- Game Library Section -->
-          <section class="library-deck">
-            <div class="library-header-bar">
-              <div class="library-title-wrap">
-                <h2 class="library-heading">Game Library</h2>
-                <span class="game-counter tabular-num" id="library-count-pill">10</span>
-              </div>
-              <div class="library-controls-wrap">
-                <div class="search-input-shell">
-                  <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-                  <input type="text" id="game-search-input" placeholder="Search games..." aria-label="Search games">
-                </div>
-                <button id="btn-open-custom-game" class="btn-outline-small" type="button">+ Custom</button>
-              </div>
-            </div>
-
-            <!-- Filter Pills -->
-            <div class="filter-pills-row" id="filter-tabs" role="tablist">
-              <button class="filter-pill active" data-cat="all" role="tab" aria-selected="true">All Games</button>
-              <button class="filter-pill" data-cat="Tactical FPS" role="tab" aria-selected="false">Tactical FPS</button>
-              <button class="filter-pill" data-cat="Battle Royale" role="tab" aria-selected="false">Battle Royale</button>
-              <button class="filter-pill" data-cat="MOBA" role="tab" aria-selected="false">MOBA</button>
-            </div>
-
-            <!-- 4-Column Poster Grid -->
-            <div class="games-poster-grid" id="games-grid" role="region" aria-label="Games catalog">
-              <!-- Dynamically populated by app.js -->
-            </div>
-          </section>
-        </div>
-
-        <!-- RIGHT COLUMN: Telemetry Cockpit Sidebar (360px) -->
-        <aside class="telemetry-sidebar">
-          <div class="sidebar-header">
-            <h2 class="sidebar-title">Telemetry</h2>
-            <span class="live-indicator" id="sidebar-live-tag">
-              <span class="live-dot" id="sidebar-live-dot" aria-hidden="true"></span>
-              <span id="sidebar-live-text">IDLE</span>
+          <div class="hero-meta">
+            <span class="meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m12 14 4-4"></path>
+                <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
+              </svg>
+              <span id="hero-meta-ping">18 ms</span>
+            </span>
+            <span class="meta-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path d="m9 12 2 2 4-4"></path>
+              </svg>
+              <span>Protected</span>
+            </span>
+            <span class="meta-item meta-region">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <span id="hero-meta-region">Asia-Pacific (Singapore)</span>
             </span>
           </div>
+        </div>
 
-          <!-- Differential Ping Card -->
-          <div class="telemetry-card">
-            <div class="ping-pair-grid">
-              <div class="ping-sub-box">
-                <span class="metric-tiny-label">Direct ISP</span>
-                <p class="ping-large-val tabular-num" id="direct-isp-ping">58<span class="ms-unit">ms</span></p>
-              </div>
-              <div class="ping-sub-box highlight-box">
-                <span class="metric-tiny-label">Lagvex Accel.</span>
-                <p class="ping-large-val highlight-cyan tabular-num" id="metric-ping">18<span class="ms-unit">ms</span></p>
-              </div>
-            </div>
-            <div class="delta-pill-wrap">
-              <span class="delta-pill tabular-num" id="diff-gain-pill">
-                <span id="diff-gain-val">&minus;40ms</span>
-                <span class="delta-tag" id="diff-gain-status">IMPROVED</span>
+        <!-- Live Telemetry Section -->
+        <div class="telemetry-head">
+          <div>
+            <div class="section-label">LIVE TELEMETRY</div>
+            <h2 class="section-title">Network performance</h2>
+          </div>
+          <div class="telemetry-live" id="telemetry-live-status">
+            <span class="status-dot" id="telemetry-dot" aria-hidden="true"></span>
+            <span id="telemetry-live-label">Monitoring</span>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <!-- Metric 1: Latency -->
+          <div class="metric-card" id="card-metric-latency">
+            <div class="metric-top">
+              <span class="metric-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m12 14 4-4"></path>
+                  <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
+                </svg>
               </span>
+              <span class="metric-trend good" id="metric-trend-latency">&minus; 32%</span>
+            </div>
+            <div class="metric-label">Latency</div>
+            <div class="metric-value"><span id="metric-val-latency">18</span><small>ms</small></div>
+            <div class="mini-chart" id="mini-chart-latency" aria-hidden="true">
+              <span style="height: 35%"></span>
+              <span style="height: 60%"></span>
+              <span style="height: 42%"></span>
+              <span style="height: 78%"></span>
+              <span style="height: 51%"></span>
+              <span style="height: 88%" class="highlight-bar"></span>
+              <span style="height: 73%"></span>
             </div>
           </div>
 
-          <!-- Stability Card (P50, P95, Packet Loss) -->
-          <div class="telemetry-card">
-            <span class="metric-tiny-label">Stability</span>
-            <div class="stability-triplet-grid">
-              <div class="triplet-cell">
-                <span class="triplet-lbl">P50</span>
-                <p class="triplet-val tabular-num" id="stat-p50">&mdash;<span class="triplet-unit">ms</span></p>
-              </div>
-              <div class="triplet-cell">
-                <span class="triplet-lbl">P95 Tail</span>
-                <p class="triplet-val tabular-num" id="stat-p95">&mdash;<span class="triplet-unit">ms</span></p>
-                <span class="triplet-hint">spike guard</span>
-              </div>
-              <div class="triplet-cell">
-                <span class="triplet-lbl">Loss</span>
-                <p class="triplet-val highlight-green tabular-num" id="stat-loss">&mdash;<span class="triplet-unit">%</span></p>
-              </div>
+          <!-- Metric 2: Packet Loss -->
+          <div class="metric-card" id="card-metric-loss">
+            <div class="metric-top">
+              <span class="metric-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+              </span>
+              <span class="metric-trend good" id="metric-trend-loss">Stable</span>
+            </div>
+            <div class="metric-label">Packet loss</div>
+            <div class="metric-value"><span id="metric-val-loss">0.00</span><small>%</small></div>
+            <div class="mini-chart" id="mini-chart-loss" aria-hidden="true">
+              <span style="height: 20%"></span>
+              <span style="height: 15%"></span>
+              <span style="height: 18%"></span>
+              <span style="height: 15%"></span>
+              <span style="height: 15%"></span>
+              <span style="height: 18%" class="highlight-bar"></span>
+              <span style="height: 15%"></span>
             </div>
           </div>
 
-          <!-- Live Throughput Card with Equalizer -->
-          <div class="telemetry-card">
-            <div class="card-meta-header">
-              <span class="metric-tiny-label">Live Throughput</span>
-              <span class="unit-tag">KB/s</span>
+          <!-- Metric 3: Route Quality -->
+          <div class="metric-card" id="card-metric-route">
+            <div class="metric-top">
+              <span class="metric-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+              </span>
+              <span class="metric-trend good" id="metric-trend-route">Excellent</span>
             </div>
-            <div class="throughput-duo-grid">
-              <div class="tp-cell">
-                <div class="tp-dir-label">
-                  <svg class="tp-arrow-down" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 5v14m0 0-5-5m5 5 5-5"></path>
-                  </svg>
-                  <span>Download</span>
-                </div>
-                <p class="tp-number tabular-num" id="throughput-down">0</p>
-              </div>
-              <div class="tp-cell">
-                <div class="tp-dir-label">
-                  <svg class="tp-arrow-up" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 19V5m0 0-5 5m5-5 5 5"></path>
-                  </svg>
-                  <span>Upload</span>
-                </div>
-                <p class="tp-number tabular-num" id="throughput-up">0</p>
-              </div>
-            </div>
-            <!-- Live Animated Equalizer Bars -->
-            <div class="equalizer-strip" id="equalizer-strip" aria-hidden="true">
-              <span class="eq-bar" style="--h: 30%"></span>
-              <span class="eq-bar" style="--h: 55%"></span>
-              <span class="eq-bar" style="--h: 42%"></span>
-              <span class="eq-bar" style="--h: 68%"></span>
-              <span class="eq-bar" style="--h: 50%"></span>
-              <span class="eq-bar" style="--h: 74%"></span>
-              <span class="eq-bar" style="--h: 60%"></span>
-              <span class="eq-bar" style="--h: 82%"></span>
-              <span class="eq-bar" style="--h: 58%"></span>
-              <span class="eq-bar" style="--h: 70%"></span>
-              <span class="eq-bar" style="--h: 48%"></span>
-              <span class="eq-bar" style="--h: 64%"></span>
+            <div class="metric-label">Route quality</div>
+            <div class="metric-value"><span id="metric-val-route">98</span><small>/100</small></div>
+            <div class="mini-chart" id="mini-chart-route" aria-hidden="true">
+              <span style="height: 75%"></span>
+              <span style="height: 80%"></span>
+              <span style="height: 85%"></span>
+              <span style="height: 90%"></span>
+              <span style="height: 92%"></span>
+              <span style="height: 98%" class="highlight-bar"></span>
+              <span style="height: 95%"></span>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- Active Routes Card -->
-          <div class="telemetry-card routes-card">
-            <div>
-              <span class="metric-tiny-label">Active Routes</span>
-              <p class="routes-count tabular-num" id="active-routes-val">0<span class="routes-total"> / 24</span></p>
-            </div>
-            <div class="multipath-group">
-              <span class="multipath-tag">Multi-Path Relay</span>
-              <div class="multipath-dots" id="multipath-dots">
-                <span class="route-pip"></span>
-                <span class="route-pip"></span>
-                <span class="route-pip"></span>
-              </div>
-            </div>
+      <!-- RIGHT COLUMN: Library Panel -->
+      <aside class="library-panel">
+        <div class="library-heading">
+          <div>
+            <div class="section-label">YOUR LIBRARY</div>
+            <h2 class="section-title">Choose a game</h2>
           </div>
+          <span class="game-count" id="library-game-count">14 games</span>
+        </div>
 
-          <!-- Footer Route Breadcrumb -->
-          <div class="sidebar-route-footer">
-            <span id="route-footer-text">Route: Asia-Pacific &rarr; Singapore #1</span>
+        <!-- Search Box -->
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="game-search-input" aria-label="Search games" placeholder="Search library">
+        </div>
+
+        <!-- Filter Buttons -->
+        <div class="filters" id="category-filter-tabs" role="tablist">
+          <button class="filter active-filter" data-cat="all" role="tab" aria-selected="true" type="button">All games</button>
+          <button class="filter" data-cat="FPS" role="tab" aria-selected="false" type="button">FPS</button>
+          <button class="filter" data-cat="MOBA" role="tab" aria-selected="false" type="button">MOBA</button>
+          <button class="filter" data-cat="RPG" role="tab" aria-selected="false" type="button">RPG</button>
+        </div>
+
+        <!-- Game Rows List -->
+        <div class="game-list" id="game-list-container" role="region" aria-label="Games list">
+          <!-- Populated dynamically by app.js -->
+        </div>
+
+        <!-- Routing Region Dropdown -->
+        <div class="region-select">
+          <span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span>Routing region</span>
+          </span>
+          <button id="btn-toggle-region" class="region-trigger-btn" type="button">
+            <span id="current-region-label">Auto region</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Pro Note Banner -->
+        <div class="pro-note">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="m9 12 2 2 4-4"></path>
+          </svg>
+          <div>
+            <strong>Lagvex protection</strong>
+            <span>Secure ChaCha20-Poly1305 routing is active for all games.</span>
           </div>
-        </aside>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer>
+      <span>Lagvex Engine <b>&bull;</b> All systems operational</span>
+      <span class="footer-links">
+        <a href="#privacy" class="footer-link">Privacy</a>
+        <i aria-hidden="true"></i>
+        <a href="#terms" class="footer-link">Terms</a>
+        <i aria-hidden="true"></i>
+        <a href="#support" class="footer-link">Support</a>
+      </span>
+    </footer>
+  </main>
+
+  <!-- ==================== MODAL: SETTINGS & RELAYS ==================== -->
+  <div class="modal-backdrop" id="modal-settings" role="dialog" aria-modal="true" aria-labelledby="modal-settings-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <h2 id="modal-settings-title" class="modal-title">Routing & Relay Settings</h2>
+        <button class="modal-close-btn" id="close-modal-settings" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-card-body">
+        <div class="form-group">
+          <label class="form-label" for="select-preferred-relay">Active Relay Server</label>
+          <select id="select-preferred-relay" class="form-select">
+            <option value="auto">Auto Select Optimal Relay (Lowest RTT)</option>
+            <option value="singapore-1">Singapore #1 (Subsea Tier-1) &mdash; 18ms</option>
+            <option value="tokyo-1">Tokyo #1 (Equinix TY8) &mdash; 32ms</option>
+            <option value="hongkong-1">Hong Kong #1 (Mega-i) &mdash; 28ms</option>
+            <option value="frankfurt-1">Frankfurt #1 (DE-CIX) &mdash; 140ms</option>
+            <option value="us-west-1">US West #1 (San Jose) &mdash; 165ms</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Network Protocol</label>
+          <div class="radio-chip-group">
+            <label class="chip-item">
+              <input type="radio" name="protocol-choice" value="kcp" checked>
+              <span>ChaCha20 + Fast UDP</span>
+            </label>
+            <label class="chip-item">
+              <input type="radio" name="protocol-choice" value="tcp">
+              <span>TCP Multiplex</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-modal-settings" type="button">Close</button>
+        <button class="btn-confirm" id="save-modal-settings" type="button">Save Settings</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Join Squad -->
+  <!-- ==================== MODAL: SQUAD ==================== -->
   <div class="modal-backdrop" id="modal-squad" role="dialog" aria-modal="true" aria-labelledby="modal-squad-title">
     <div class="modal-card">
       <div class="modal-card-header">
-        <h3 id="modal-squad-title" class="modal-title">Join Squad Tunnel</h3>
+        <h2 id="modal-squad-title" class="modal-title">Join Squad Tunnel</h2>
         <button class="modal-close-btn" id="close-modal-squad" type="button" aria-label="Close">&times;</button>
       </div>
       <div class="modal-card-body">
-        <p class="modal-lead">Paste a 1-click squad share link or invite code from your team:</p>
+        <p class="modal-lead">Connect to the same dedicated relay tunnel as your party to synchronize latency:</p>
         <div class="form-group">
-          <label class="form-label" for="squad-invite-input">Squad Invite Code</label>
+          <label class="form-label" for="squad-invite-input">Squad Invite Code or Link</label>
           <input type="text" id="squad-invite-input" class="form-input" placeholder="lagvex://connect?endpoint=128.199.200.10:4433&psk=secret">
         </div>
       </div>
       <div class="modal-card-footer">
-        <button class="btn-cancel" id="cancel-squad-modal" type="button">Cancel</button>
-        <button class="btn-confirm" id="import-squad-modal" type="button">Connect Squad</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Add Custom Relay -->
-  <div class="modal-backdrop" id="modal-relay" role="dialog" aria-modal="true" aria-labelledby="modal-relay-title">
-    <div class="modal-card">
-      <div class="modal-card-header">
-        <h3 id="modal-relay-title" class="modal-title">Add Custom Relay Server</h3>
-        <button class="modal-close-btn" id="close-modal-relay" type="button" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-card-body">
-        <div class="form-group">
-          <label class="form-label" for="custom-relay-name">Relay Label</label>
-          <input type="text" id="custom-relay-name" class="form-input" placeholder="e.g. My Private Tokyo VPS">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="custom-relay-endpoint">Endpoint (IP:Port)</label>
-          <input type="text" id="custom-relay-endpoint" class="form-input" placeholder="e.g. 139.162.115.10:4433">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="custom-relay-psk">Pre-Shared Key (PSK)</label>
-          <input type="password" id="custom-relay-psk" class="form-input" placeholder="32-character encryption key">
-        </div>
-      </div>
-      <div class="modal-card-footer">
-        <button class="btn-cancel" id="cancel-relay-modal" type="button">Cancel</button>
-        <button class="btn-confirm" id="save-relay-modal" type="button">Save Relay</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Add Custom Game Profile -->
-  <div class="modal-backdrop" id="modal-game" role="dialog" aria-modal="true" aria-labelledby="modal-game-title">
-    <div class="modal-card">
-      <div class="modal-card-header">
-        <h3 id="modal-game-title" class="modal-title">Add Custom Game Profile</h3>
-        <button class="modal-close-btn" id="close-modal-game" type="button" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-card-body">
-        <div class="form-group">
-          <label class="form-label" for="custom-game-name">Game Title</label>
-          <input type="text" id="custom-game-name" class="form-input" placeholder="e.g. Marvel Rivals">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="custom-game-exe">Process Names (comma separated)</label>
-          <input type="text" id="custom-game-exe" class="form-input" placeholder="e.g. Marvel-Win64-Shipping.exe">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="custom-game-region-name">Region Name</label>
-          <input type="text" id="custom-game-region-name" class="form-input" placeholder="e.g. Singapore Server">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="custom-game-cidrs">CIDR Subnets (comma separated)</label>
-          <textarea id="custom-game-cidrs" class="form-textarea" rows="2" placeholder="e.g. 103.10.124.0/24, 45.121.184.0/24"></textarea>
-        </div>
-      </div>
-      <div class="modal-card-footer">
-        <button class="btn-cancel" id="cancel-game-modal" type="button">Cancel</button>
-        <button class="btn-confirm" id="save-game-modal" type="button">Save Game</button>
+        <button class="btn-cancel" id="cancel-modal-squad" type="button">Cancel</button>
+        <button class="btn-confirm" id="join-squad-btn" type="button">Connect Squad</button>
       </div>
     </div>
   </div>
