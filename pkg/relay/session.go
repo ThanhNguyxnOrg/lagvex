@@ -1,10 +1,10 @@
 package relay
 
 import (
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 	"net/netip"
 	"sync/atomic"
 	"time"
-	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 )
 
 // Session represents an authenticated connected client.

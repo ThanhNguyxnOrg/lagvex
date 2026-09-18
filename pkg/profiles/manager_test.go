@@ -88,4 +88,3 @@ func TestAllCIDRsValidAndNoBogonCollision(t *testing.T) {
 
 	t.Logf("Validated %d total game CIDRs successfully", totalCIDRs)
 }
-

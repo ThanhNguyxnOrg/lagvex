@@ -260,3 +260,48 @@ func TestProbeAllAndSelectBest(t *testing.T) {
 		t.Fatalf("SelectBest picked %s; want fast-node", best.RelayID)
 	}
 }
+
+func TestCalculateRouteAdvice(t *testing.T) {
+	relay := &ProbeResult{
+		RelayID:     "relay-sg",
+		Name:        "Singapore #1",
+		RTTMedianMs: 32.0,
+		JitterMs:    1.2,
+		PacketLoss:  0.0,
+		Reachable:   true,
+	}
+
+	// 1. Direct path is 15ms (faster by >5ms) and 0% loss -> VerdictDirect
+	advice := CalculateRouteAdvice(15.0, 0.0, relay)
+	if advice.Verdict != VerdictDirect {
+		t.Errorf("expected VerdictDirect for 15ms direct vs 32ms relay, got %s", advice.Verdict)
+	}
+
+	// 2. Direct path is 60ms (slower by >5ms) -> VerdictBoost
+	advice = CalculateRouteAdvice(60.0, 0.0, relay)
+	if advice.Verdict != VerdictBoost {
+		t.Errorf("expected VerdictBoost for 60ms direct vs 32ms relay, got %s", advice.Verdict)
+	}
+	if advice.SavingsMs != 28.0 {
+		t.Errorf("expected 28.0ms savings, got %f", advice.SavingsMs)
+	}
+
+	// 3. Direct path has 5% packet loss -> VerdictBoost
+	advice = CalculateRouteAdvice(32.0, 5.0, relay)
+	if advice.Verdict != VerdictBoost {
+		t.Errorf("expected VerdictBoost when direct has 5%% packet loss, got %s", advice.Verdict)
+	}
+
+	// 4. Comparable paths (33ms direct vs 32ms relay) -> VerdictComparable
+	advice = CalculateRouteAdvice(33.0, 0.0, relay)
+	if advice.Verdict != VerdictComparable {
+		t.Errorf("expected VerdictComparable for 33ms vs 32ms, got %s", advice.Verdict)
+	}
+
+	// 5. Relay unreachable -> VerdictDirect
+	unreachableRelay := &ProbeResult{Reachable: false}
+	advice = CalculateRouteAdvice(40.0, 0.0, unreachableRelay)
+	if advice.Verdict != VerdictDirect {
+		t.Errorf("expected VerdictDirect when relay is unreachable, got %s", advice.Verdict)
+	}
+}

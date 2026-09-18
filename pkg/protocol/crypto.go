@@ -34,8 +34,8 @@ const (
 )
 
 var (
-	ErrReplay          = errors.New("packet counter is duplicated or too old (replay)")
-	ErrCipherClosed    = errors.New("session cipher not established")
+	ErrReplay            = errors.New("packet counter is duplicated or too old (replay)")
+	ErrCipherClosed      = errors.New("session cipher not established")
 	ErrBadControlPayload = errors.New("control message payload malformed")
 )
 
@@ -107,7 +107,7 @@ func newSessionCrypto(psk []byte, nonce, sessionID, clientID uint64, isClient bo
 // incoming packet is checked against a sliding replay window before being
 // accepted.
 type SessionCrypto struct {
-	mu      sync.Mutex
+	mu       sync.Mutex
 	sendAEAD cipher.AEAD
 	recvAEAD cipher.AEAD
 	sendCtr  uint64

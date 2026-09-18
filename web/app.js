@@ -240,6 +240,23 @@
   const engineStatusDot = document.getElementById('engine-status-dot');
   const engineStatusLabel = document.getElementById('engine-status-label');
 
+  // Auto-Failover & Route Advisor Elements
+  const failoverPill = document.getElementById('failover-pill');
+  const btnToggleFailover = document.getElementById('btn-toggle-failover');
+  const settingAutoFailoverCheckbox = document.getElementById('setting-auto-failover-checkbox');
+
+  const routeAdvisorCard = document.getElementById('route-advisor-card');
+  const advisorBadge = document.getElementById('advisor-badge');
+  const advisorIcon = document.getElementById('advisor-icon');
+  const advisorVerdictText = document.getElementById('advisor-verdict-text');
+  const advisorHeadline = document.getElementById('advisor-headline');
+  const advisorSummary = document.getElementById('advisor-summary');
+  const advDirectVal = document.getElementById('adv-direct-val');
+  const advRelayVal = document.getElementById('adv-relay-val');
+
+  let lastFailoverTimestamp = null;
+  let autoFailoverEnabled = true;
+
   // Modals
   const modalSettings = document.getElementById('modal-settings');
   const btnOpenSettings = document.getElementById('btn-open-settings');
@@ -261,7 +278,9 @@
     setupEventListeners();
     startEqualizerAnimation();
     pollEngineStatus();
-    setInterval(pollEngineStatus, 3000);
+    pollRouteAdvisor();
+    setInterval(pollEngineStatus, 2000);
+    setInterval(pollRouteAdvisor, 8000);
   }
 
   // ==================== RENDERING ====================
@@ -321,6 +340,8 @@
         r.classList.remove('selected-game');
       }
     });
+
+    pollRouteAdvisor();
   }
 
   function updateHeroCard(game) {
@@ -435,6 +456,86 @@
     }, 450);
   }
 
+  // ==================== AUTO-FAILOVER CONTROLS ====================
+  async function toggleAutoFailover(explicitState) {
+    try {
+      const payload = typeof explicitState === 'boolean' ? { enabled: explicitState } : {};
+      const res = await fetch('/api/failover/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        updateFailoverUI(data.autoFailover);
+        showToast(
+          `Auto-Failover protection: ${data.autoFailover ? 'ACTIVE' : 'DISABLED'}`,
+          data.autoFailover ? 'success' : 'info'
+        );
+      }
+    } catch (e) {
+      console.warn('Failover toggle error:', e);
+    }
+  }
+
+  function updateFailoverUI(enabled) {
+    autoFailoverEnabled = enabled;
+    if (btnToggleFailover) {
+      if (enabled) {
+        btnToggleFailover.classList.add('active');
+        btnToggleFailover.setAttribute('aria-pressed', 'true');
+        if (failoverPill) failoverPill.classList.add('active');
+      } else {
+        btnToggleFailover.classList.remove('active');
+        btnToggleFailover.setAttribute('aria-pressed', 'false');
+        if (failoverPill) failoverPill.classList.remove('active');
+      }
+    }
+    if (settingAutoFailoverCheckbox) {
+      settingAutoFailoverCheckbox.checked = enabled;
+    }
+  }
+
+  // ==================== SMART ROUTE ADVISOR ====================
+  async function pollRouteAdvisor() {
+    if (!advisorBadge || !selectedGame) return;
+    try {
+      const url = `/api/advisor?gameId=${encodeURIComponent(selectedGame.id)}&regionId=${encodeURIComponent(selectedGame.region || '')}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const advice = await res.json();
+
+      if (advice.verdict) {
+        advisorBadge.className = 'advisor-badge';
+        if (advice.verdict === 'BOOST_RECOMMENDED') {
+          advisorBadge.classList.add('verdict-boost');
+          advisorIcon.textContent = '⚡';
+          advisorVerdictText.textContent = 'BOOST RECOMMENDED';
+        } else if (advice.verdict === 'DIRECT_OPTIMAL') {
+          advisorBadge.classList.add('verdict-direct');
+          advisorIcon.textContent = '🛡️';
+          advisorVerdictText.textContent = 'DIRECT ISP OPTIMAL';
+        } else {
+          advisorBadge.classList.add('verdict-comparable');
+          advisorIcon.textContent = '⚖️';
+          advisorVerdictText.textContent = 'COMPARABLE PATHS';
+        }
+      }
+
+      if (advice.headline) advisorHeadline.textContent = advice.headline;
+      if (advice.summary) advisorSummary.textContent = advice.summary;
+
+      if (advDirectVal && typeof advice.directRTTMs === 'number') {
+        advDirectVal.textContent = `${Math.round(advice.directRTTMs)} ms`;
+      }
+      if (advRelayVal && typeof advice.relayRTTMs === 'number') {
+        advRelayVal.textContent = `${Math.round(advice.relayRTTMs)} ms`;
+      }
+    } catch (e) {
+      // Standalone preview fallback
+    }
+  }
+
   // ==================== ENGINE POLLING ====================
   async function pollEngineStatus() {
     try {
@@ -442,13 +543,33 @@
       if (!res.ok) return;
       const data = await res.json();
 
-      if (data.state === 'accelerating') {
+      // Sync auto-failover toggle
+      if (typeof data.autoFailover === 'boolean' && data.autoFailover !== autoFailoverEnabled) {
+        updateFailoverUI(data.autoFailover);
+      }
+
+      // Check for seamless failover event notifications
+      if (data.lastFailover && data.lastFailover.timestamp) {
+        if (!lastFailoverTimestamp) {
+          lastFailoverTimestamp = data.lastFailover.timestamp;
+        } else if (data.lastFailover.timestamp !== lastFailoverTimestamp) {
+          lastFailoverTimestamp = data.lastFailover.timestamp;
+          showToast(
+            `⚡ Seamless Handover: Switched from ${data.lastFailover.oldRelayName} to ${data.lastFailover.newRelayName} (${Math.round(data.lastFailover.oldPingMs)}ms ➔ ${Math.round(data.lastFailover.newPingMs)}ms)`,
+            'success'
+          );
+        }
+      }
+
+      const isConnected = data.state === 'connected' || data.state === 'accelerating';
+      if (isConnected) {
         if (!isAccelerating) {
           isAccelerating = true;
           btnToggleBoost.classList.add('is-active');
           boostButtonLabel.textContent = 'Acceleration active';
           telemetryLiveLabel.textContent = 'Boosting now';
-          engineStatusLabel.textContent = 'Accelerating';
+          engineStatusLabel.textContent = data.activeRelayName ? `Boosted via ${data.activeRelayName}` : 'Accelerating';
+          engineStatusDot.style.background = 'var(--green)';
           updateHeroCard(selectedGame);
         }
         // Update live stats from real Go engine
@@ -456,13 +577,16 @@
           metricValLatency.textContent = data.pingMs;
           heroMetaPing.textContent = `${data.pingMs} ms`;
         }
-      } else if (data.state === 'standby' && isAccelerating) {
-        isAccelerating = false;
-        btnToggleBoost.classList.remove('is-active');
-        boostButtonLabel.textContent = 'Activate boost';
-        telemetryLiveLabel.textContent = 'Monitoring';
-        engineStatusLabel.textContent = 'Engine online';
-        updateHeroCard(selectedGame);
+      } else if (data.state === 'disconnected' || data.state === 'standby') {
+        if (isAccelerating) {
+          isAccelerating = false;
+          btnToggleBoost.classList.remove('is-active');
+          boostButtonLabel.textContent = 'Activate boost';
+          telemetryLiveLabel.textContent = 'Monitoring';
+          engineStatusLabel.textContent = 'Engine online';
+          engineStatusDot.style.background = '';
+          updateHeroCard(selectedGame);
+        }
       }
     } catch (e) {
       // Offline / standalone preview fallback
@@ -473,6 +597,18 @@
   function setupEventListeners() {
     // Boost Button
     btnToggleBoost.addEventListener('click', toggleBoost);
+
+    // Auto-Failover toggles
+    if (btnToggleFailover) {
+      btnToggleFailover.addEventListener('click', () => {
+        toggleAutoFailover(!autoFailoverEnabled);
+      });
+    }
+    if (settingAutoFailoverCheckbox) {
+      settingAutoFailoverCheckbox.addEventListener('change', (e) => {
+        toggleAutoFailover(e.target.checked);
+      });
+    }
 
     // Search input
     gameSearchInput.addEventListener('input', (e) => {

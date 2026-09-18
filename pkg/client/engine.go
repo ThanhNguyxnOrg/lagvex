@@ -27,20 +27,24 @@ const (
 
 // TunnelStats holds real-time telemetry.
 type TunnelStats struct {
-	State        TunnelState `json:"state"`
-	RelayAddr    string      `json:"relayAddr"`
-	ClientIP     string      `json:"clientIP"`
-	GatewayIP    string      `json:"gatewayIP"`
-	PingMs       int64       `json:"pingMs"`
-	BytesUp      uint64      `json:"bytesUp"`
-	BytesDown    uint64      `json:"bytesDown"`
-	UpRateBps    int64       `json:"upRateBps"`
-	DownRateBps  int64       `json:"downRateBps"`
-	ActiveGame   string      `json:"activeGame"`
-	ActiveRegion string      `json:"activeRegion"`
-	RouteCount   int         `json:"routeCount"`
-	GameRunning  bool        `json:"gameRunning"`
-	LastError    string      `json:"lastError,omitempty"`
+	State           TunnelState    `json:"state"`
+	RelayAddr       string         `json:"relayAddr"`
+	ClientIP        string         `json:"clientIP"`
+	GatewayIP       string         `json:"gatewayIP"`
+	PingMs          int64          `json:"pingMs"`
+	BytesUp         uint64         `json:"bytesUp"`
+	BytesDown       uint64         `json:"bytesDown"`
+	UpRateBps       int64          `json:"upRateBps"`
+	DownRateBps     int64          `json:"downRateBps"`
+	ActiveGame      string         `json:"activeGame"`
+	ActiveRegion    string         `json:"activeRegion"`
+	ActiveRelayID   string         `json:"activeRelayId,omitempty"`
+	ActiveRelayName string         `json:"activeRelayName,omitempty"`
+	AutoFailover    bool           `json:"autoFailover"`
+	LastFailover    *FailoverEvent `json:"lastFailover,omitempty"`
+	RouteCount      int            `json:"routeCount"`
+	GameRunning     bool           `json:"gameRunning"`
+	LastError       string         `json:"lastError,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -53,31 +57,38 @@ type Engine struct {
 	gatewayIP netip.Addr
 	mtu       int
 
-	relayAddr    netip.AddrPort
-	relayIP      netip.Addr
-	psk          []byte
-	udpConn      *net.UDPConn
-	wintun       *WintunAdapter
-	routeManager *RouteManager
-	profileMgr   *profiles.Manager
-	watcher      *ProcessWatcher
-	crypto       *protocol.SessionCrypto
+	relayAddr       netip.AddrPort
+	relayIP         netip.Addr
+	psk             []byte
+	udpConn         *net.UDPConn
+	wintun          *WintunAdapter
+	routeManager    *RouteManager
+	profileMgr      *profiles.Manager
+	watcher         *ProcessWatcher
+	crypto          *protocol.SessionCrypto
+	failoverCtrl    *FailoverController
+	activeRelayID   string
+	activeRelayName string
+	baselinePingMs  float64
 
 	activeGame   string
 	activeRegion string
 	gameCIDRs    []string
 	isGameActive bool
 
+	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
 	wg         sync.WaitGroup
 
-	bytesUp   atomic.Uint64
-	bytesDown atomic.Uint64
-	pingMs    atomic.Int64
-	upRate    atomic.Int64
-	downRate  atomic.Int64
-	lastPong  atomic.Int64 // Unix nanoseconds of the last authenticated Pong
-	lastErr   atomic.Pointer[string]
+	bytesUp             atomic.Uint64
+	bytesDown           atomic.Uint64
+	pingMs              atomic.Int64
+	upRate              atomic.Int64
+	downRate            atomic.Int64
+	lastPong            atomic.Int64 // Unix nanoseconds of the last authenticated Pong
+	lastErr             atomic.Pointer[string]
+	autoFailoverEnabled atomic.Bool
+	lastFailover        atomic.Pointer[FailoverEvent]
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -87,12 +98,15 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 		return nil, err
 	}
 
-	return &Engine{
+	e := &Engine{
 		state:        StateDisconnected,
 		clientID:     clientID,
 		routeManager: NewRouteManager(),
 		profileMgr:   pm,
-	}, nil
+		failoverCtrl: NewFailoverController(DefaultFailoverConfig()),
+	}
+	e.autoFailoverEnabled.Store(true)
+	return e, nil
 }
 
 // Stats returns a snapshot of current telemetry.
@@ -106,20 +120,24 @@ func (e *Engine) Stats() TunnelStats {
 	}
 
 	return TunnelStats{
-		State:        e.state,
-		RelayAddr:    e.relayAddr.String(),
-		ClientIP:     e.clientIP.String(),
-		GatewayIP:    e.gatewayIP.String(),
-		PingMs:       e.pingMs.Load(),
-		BytesUp:      e.bytesUp.Load(),
-		BytesDown:    e.bytesDown.Load(),
-		UpRateBps:    e.upRate.Load(),
-		DownRateBps:  e.downRate.Load(),
-		ActiveGame:   e.activeGame,
-		ActiveRegion: e.activeRegion,
-		RouteCount:   e.routeManager.ActiveRouteCount(),
-		GameRunning:  e.isGameActive,
-		LastError:    lastErrStr,
+		State:           e.state,
+		RelayAddr:       e.relayAddr.String(),
+		ClientIP:        e.clientIP.String(),
+		GatewayIP:       e.gatewayIP.String(),
+		PingMs:          e.pingMs.Load(),
+		BytesUp:         e.bytesUp.Load(),
+		BytesDown:       e.bytesDown.Load(),
+		UpRateBps:       e.upRate.Load(),
+		DownRateBps:     e.downRate.Load(),
+		ActiveGame:      e.activeGame,
+		ActiveRegion:    e.activeRegion,
+		ActiveRelayID:   e.activeRelayID,
+		ActiveRelayName: e.activeRelayName,
+		AutoFailover:    e.autoFailoverEnabled.Load(),
+		LastFailover:    e.lastFailover.Load(),
+		RouteCount:      e.routeManager.ActiveRouteCount(),
+		GameRunning:     e.isGameActive,
+		LastError:       lastErrStr,
 	}
 }
 
@@ -227,6 +245,20 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		}
 	}
 
+	var relayID, relayName string
+	if e.profileMgr != nil {
+		for _, r := range e.profileMgr.Catalog().Relays {
+			if r.Endpoint == relayEndpoint {
+				relayID = r.ID
+				relayName = r.Name
+				break
+			}
+		}
+	}
+	if relayName == "" {
+		relayName = relayEndpoint
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e.mu.Lock()
@@ -243,7 +275,11 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.crypto = clientCrypto
 	e.activeGame = gameID
 	e.activeRegion = regionID
+	e.activeRelayID = relayID
+	e.activeRelayName = relayName
+	e.baselinePingMs = 0
 	e.gameCIDRs = cidrs
+	e.cancelCtx = ctx
 	e.cancelFunc = cancel
 	e.lastPong.Store(time.Now().UnixNano())
 	e.lastErr.Store(nil)
@@ -255,11 +291,12 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 
 	// 8. Start I/O pumps
-	e.wg.Add(4)
+	e.wg.Add(5)
 	go e.pumpWinTunToUDP(ctx)
-	go e.pumpUDPToWinTun(ctx)
+	go e.pumpUDPToWinTun(ctx, conn)
 	go e.loopKeepalive(ctx)
 	go e.loopBitrateMeter(ctx)
+	go e.loopFailoverMonitor(ctx)
 
 	// 9. Start Process Watcher
 	if gameID != "" {
@@ -336,6 +373,8 @@ func (e *Engine) Disconnect() error {
 	e.isGameActive = false
 	e.activeGame = ""
 	e.activeRegion = ""
+	e.activeRelayID = ""
+	e.activeRelayName = ""
 	e.pingMs.Store(0)
 	e.mu.Unlock()
 
@@ -347,7 +386,6 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 	defer e.wg.Done()
 	inBuf := make([]byte, protocol.MaxPacketSize)
 	outBuf := make([]byte, protocol.MaxPacketSize)
-	udpTarget := net.UDPAddrFromAddrPort(e.relayAddr)
 
 	for {
 		select {
@@ -356,7 +394,14 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		default:
 		}
 
-		n, err := e.wintun.ReadPacket(inBuf)
+		e.mu.Lock()
+		wt := e.wintun
+		e.mu.Unlock()
+		if wt == nil {
+			return
+		}
+
+		n, err := wt.ReadPacket(inBuf)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
@@ -368,15 +413,26 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 			continue // Skip non-IPv4
 		}
 
-		pkt := e.crypto.EncodeData(outBuf, e.sessionID, inBuf[:n])
-		_, err = e.udpConn.WriteToUDP(pkt, udpTarget)
+		e.mu.Lock()
+		crypto := e.crypto
+		sessID := e.sessionID
+		conn := e.udpConn
+		rAddr := e.relayAddr
+		e.mu.Unlock()
+
+		if crypto == nil || conn == nil {
+			continue
+		}
+
+		pkt := crypto.EncodeData(outBuf, sessID, inBuf[:n])
+		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
 		}
 	}
 }
 
-func (e *Engine) pumpUDPToWinTun(ctx context.Context) {
+func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 	defer e.wg.Done()
 	inBuf := make([]byte, protocol.MaxPacketSize)
 	outBuf := make([]byte, protocol.MaxPacketSize)
@@ -388,32 +444,39 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context) {
 		default:
 		}
 
-		n, remoteAddr, err := e.udpConn.ReadFromUDP(inBuf)
+		n, remoteAddr, err := conn.ReadFromUDP(inBuf)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
-			continue
+			// Socket closed during handover or disconnect
+			return
 		}
 
 		if n < protocol.SecureHeaderLen+protocol.TagLen {
 			continue
 		}
 
-		// Phase 0.3: Drop packets whose source != configured relay
-		if remoteAddr.AddrPort() != e.relayAddr {
+		e.mu.Lock()
+		activeRelay := e.relayAddr
+		activeCrypto := e.crypto
+		wt := e.wintun
+		e.mu.Unlock()
+
+		// Drop packets whose source != configured relay
+		if remoteAddr.AddrPort() != activeRelay || activeCrypto == nil {
 			continue
 		}
 
-		mtype, payload, err := e.crypto.OpenPacket(outBuf, inBuf[:n])
+		mtype, payload, err := activeCrypto.OpenPacket(outBuf, inBuf[:n])
 		if err != nil {
 			continue // Tag mismatch or replay drop
 		}
 
 		switch mtype {
 		case protocol.TypeData:
-			if len(payload) >= 20 && (payload[0]>>4) == 4 {
-				_ = e.wintun.WritePacket(payload)
+			if len(payload) >= 20 && (payload[0]>>4) == 4 && wt != nil {
+				_ = wt.WritePacket(payload)
 				e.bytesDown.Add(uint64(len(payload)))
 			}
 
@@ -437,7 +500,6 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 	defer e.wg.Done()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	udpTarget := net.UDPAddrFromAddrPort(e.relayAddr)
 	pingBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 
 	for {
@@ -458,8 +520,17 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 				return
 			}
 
-			sealedPing := e.crypto.EncodePing(pingBuf, e.sessionID, uint64(time.Now().UnixNano()))
-			_, _ = e.udpConn.WriteToUDP(sealedPing, udpTarget)
+			e.mu.Lock()
+			crypto := e.crypto
+			sessID := e.sessionID
+			conn := e.udpConn
+			rAddr := e.relayAddr
+			e.mu.Unlock()
+
+			if crypto != nil && conn != nil {
+				sealedPing := crypto.EncodePing(pingBuf, sessID, uint64(time.Now().UnixNano()))
+				_, _ = conn.WriteToUDP(sealedPing, net.UDPAddrFromAddrPort(rAddr))
+			}
 		}
 	}
 }
@@ -489,6 +560,303 @@ func (e *Engine) loopBitrateMeter(ctx context.Context) {
 			lastDown = currDown
 		}
 	}
+}
+
+func (e *Engine) loopFailoverMonitor(ctx context.Context) {
+	defer e.wg.Done()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	prober := NewProber()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !e.autoFailoverEnabled.Load() {
+				continue
+			}
+
+			e.mu.Lock()
+			if e.state != StateConnected {
+				e.mu.Unlock()
+				continue
+			}
+			activeRelayID := e.activeRelayID
+			activeEndpoint := e.relayAddr.String()
+			baselinePing := e.baselinePingMs
+			e.mu.Unlock()
+
+			currentPing := float64(e.pingMs.Load())
+			if currentPing <= 0 {
+				continue
+			}
+
+			// Initialize baseline ping if unset
+			if baselinePing <= 0 {
+				e.mu.Lock()
+				e.baselinePingMs = currentPing
+				baselinePing = currentPing
+				e.mu.Unlock()
+			}
+
+			// Calculate missed pongs and packet loss proxy
+			lastPongTime := time.Unix(0, e.lastPong.Load())
+			timeSincePong := time.Since(lastPongTime)
+			missedPongs := 0
+			if timeSincePong > 3*time.Second {
+				missedPongs = int(timeSincePong / (2 * time.Second))
+			}
+
+			var lossRate float64
+			if missedPongs > 0 {
+				lossRate = float64(missedPongs) * 0.25
+				if lossRate > 1.0 {
+					lossRate = 1.0
+				}
+			}
+
+			lossPct := lossRate * 100.0
+			isDegraded, reason := e.failoverCtrl.IsDegraded(missedPongs, currentPing, baselinePing, lossPct)
+			if !isDegraded {
+				// Smoothly adapt baseline ping during healthy operation
+				if missedPongs == 0 && currentPing < baselinePing*1.2 {
+					e.mu.Lock()
+					e.baselinePingMs = 0.9*e.baselinePingMs + 0.1*currentPing
+					e.mu.Unlock()
+				}
+				continue
+			}
+
+			log.Printf("[Failover] Health degradation detected (%s): current=%.1fms (baseline=%.1fms), missedPongs=%d",
+				reason, currentPing, baselinePing, missedPongs)
+
+			if e.profileMgr == nil {
+				continue
+			}
+
+			allRelays := e.profileMgr.Catalog().Relays
+			if len(allRelays) <= 1 {
+				continue
+			}
+
+			// Determine current relay's continent
+			var currContinent string
+			for _, r := range allRelays {
+				if r.ID == activeRelayID || r.Endpoint == activeEndpoint {
+					currContinent = r.Continent
+					break
+				}
+			}
+
+			var candidates []profiles.RelayEndpoint
+			// Prefer relays in same continent
+			for _, r := range allRelays {
+				if (r.ID != activeRelayID && r.Endpoint != activeEndpoint) && r.Continent == currContinent {
+					candidates = append(candidates, r)
+				}
+			}
+			// Fallback to all other relays if no candidates in same continent
+			if len(candidates) == 0 {
+				for _, r := range allRelays {
+					if r.ID != activeRelayID && r.Endpoint != activeEndpoint {
+						candidates = append(candidates, r)
+					}
+				}
+			}
+			if len(candidates) == 0 {
+				continue
+			}
+
+			probeCtx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+			results := prober.ProbeAll(probeCtx, candidates, 4)
+			cancel()
+
+			if len(results) == 0 || !results[0].Reachable {
+				continue
+			}
+
+			bestCandidate := &results[0]
+			currentScore := currentPing*(1.0+2.0*lossRate) + float64(missedPongs)*50.0
+
+			if shouldSwitch, switchReason := e.failoverCtrl.ShouldSwitch(currentScore, bestCandidate.Score, time.Now()); shouldSwitch {
+				log.Printf("[Failover] Candidate %s qualifies (%s). Initiating seamless handover...",
+					bestCandidate.Name, switchReason)
+				if err := e.ExecuteSeamlessHandover(bestCandidate, reason); err != nil {
+					log.Printf("[Failover] Seamless handover error: %v", err)
+				}
+			}
+		}
+	}
+}
+
+// ExecuteSeamlessHandover executes an in-flight, zero-loss transition to a new relay.
+func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) error {
+	e.mu.Lock()
+	if e.state != StateConnected {
+		e.mu.Unlock()
+		return fmt.Errorf("cannot handover when not connected (state: %s)", e.state)
+	}
+	clientID := e.clientID
+	oldConn := e.udpConn
+	oldCrypto := e.crypto
+	oldSessID := e.sessionID
+	oldRelayAddr := e.relayAddr
+	oldRelayID := e.activeRelayID
+	oldRelayName := e.activeRelayName
+	oldPing := float64(e.pingMs.Load())
+	ctx := e.cancelCtx
+	e.mu.Unlock()
+
+	// 1. Resolve candidate endpoint
+	candUDPAddr, err := net.ResolveUDPAddr("udp4", candidate.Endpoint)
+	if err != nil {
+		return fmt.Errorf("resolve candidate endpoint %s: %w", candidate.Endpoint, err)
+	}
+	candAddrPort := candUDPAddr.AddrPort()
+	candIP := candAddrPort.Addr()
+
+	// 2. Find candidate PSK
+	var candPSK string
+	if e.profileMgr != nil {
+		for _, r := range e.profileMgr.Catalog().Relays {
+			if r.Endpoint == candidate.Endpoint || r.ID == candidate.RelayID {
+				candPSK = r.PSK
+				break
+			}
+		}
+	}
+	pskBytes := []byte(candPSK)
+	if len(pskBytes) == 0 {
+		e.mu.Lock()
+		pskBytes = e.psk
+		e.mu.Unlock()
+	}
+
+	// 3. Open NEW UDP socket
+	newConn, err := net.ListenUDP("udp4", nil)
+	if err != nil {
+		return fmt.Errorf("open new udp socket: %w", err)
+	}
+	_ = newConn.SetReadBuffer(8 * 1024 * 1024)
+	_ = newConn.SetWriteBuffer(8 * 1024 * 1024)
+
+	// 4. Handshake with candidate BEFORE touching active connection
+	nonce, _ := protocol.RandomUint64()
+	req := protocol.HandshakeRequest{
+		Nonce:     nonce,
+		Timestamp: time.Now().Unix(),
+		ClientID:  clientID,
+	}
+	reqBuf := protocol.EncodeHandshakeRequest(pskBytes, req)
+
+	var resp *protocol.HandshakeResponse
+	recvBuf := make([]byte, 256)
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		_, _ = newConn.WriteToUDP(reqBuf, candUDPAddr)
+		_ = newConn.SetReadDeadline(time.Now().Add(1500 * time.Millisecond))
+		n, _, readErr := newConn.ReadFromUDP(recvBuf)
+		if readErr == nil {
+			var decErr error
+			resp, decErr = protocol.DecodeHandshakeResponse(pskBytes, recvBuf[:n], nonce)
+			if decErr == nil && resp.Status == protocol.StatusOK {
+				break
+			}
+		}
+	}
+	_ = newConn.SetReadDeadline(time.Time{})
+
+	if resp == nil || resp.Status != protocol.StatusOK {
+		newConn.Close()
+		return fmt.Errorf("handshake failed with candidate %s (%s)", candidate.Name, candidate.Endpoint)
+	}
+
+	// 5. Initialize session crypto for candidate
+	newCrypto, err := protocol.NewClientCrypto(pskBytes, nonce, resp.SessionID, clientID)
+	if err != nil {
+		newConn.Close()
+		return fmt.Errorf("initialize crypto for candidate: %w", err)
+	}
+
+	// 6. Pin candidate relay IP route via default gateway
+	if err := e.routeManager.PinRelayRoute(candIP); err != nil {
+		log.Printf("[Failover] Warning: pin candidate route: %v", err)
+	}
+
+	// 7. Atomic state swap
+	e.mu.Lock()
+	e.udpConn = newConn
+	e.crypto = newCrypto
+	e.sessionID = resp.SessionID
+	e.relayAddr = candAddrPort
+	e.relayIP = candIP
+	e.activeRelayID = candidate.RelayID
+	e.activeRelayName = candidate.Name
+	e.lastPong.Store(time.Now().UnixNano())
+	candRTT := int64(candidate.RTTMedianMs)
+	e.pingMs.Store(candRTT)
+	e.baselinePingMs = float64(candRTT)
+	e.mu.Unlock()
+
+	// 8. Spawn new receiver goroutine on newConn
+	e.wg.Add(1)
+	go e.pumpUDPToWinTun(ctx, newConn)
+
+	// 9. Record failover event
+	event := FailoverEvent{
+		Timestamp:    time.Now(),
+		OldRelayID:   oldRelayID,
+		OldRelayName: oldRelayName,
+		NewRelayID:   candidate.RelayID,
+		NewRelayName: candidate.Name,
+		OldScore:     oldPing,
+		NewScore:     candidate.Score,
+		OldPingMs:    oldPing,
+		NewPingMs:    candidate.RTTMedianMs,
+		Reason:       reason,
+		HandoverOk:   true,
+	}
+	e.failoverCtrl.RecordSwitch(event)
+	e.lastFailover.Store(&event)
+
+	log.Printf("[Failover] Handover SUCCESSFUL: %s -> %s (RTT: %.1fms -> %.1fms, reason: %s)",
+		oldRelayName, candidate.Name, oldPing, candidate.RTTMedianMs, reason)
+
+	// 10. Gracefully notify old relay and close old connection
+	go func() {
+		if oldConn != nil && oldCrypto != nil {
+			discBuf := make([]byte, protocol.SecureHeaderLen+protocol.TagLen)
+			sealedDisc := oldCrypto.EncodeDisconnect(discBuf, oldSessID)
+			_, _ = oldConn.WriteToUDP(sealedDisc, net.UDPAddrFromAddrPort(oldRelayAddr))
+			time.Sleep(100 * time.Millisecond)
+			_ = oldConn.Close()
+		}
+	}()
+
+	return nil
+}
+
+// SetAutoFailover toggles the automatic failover controller.
+func (e *Engine) SetAutoFailover(enabled bool) {
+	e.autoFailoverEnabled.Store(enabled)
+	log.Printf("[Engine] Auto-failover set to: %v", enabled)
+}
+
+// IsAutoFailoverEnabled reports whether auto-failover is enabled.
+func (e *Engine) IsAutoFailoverEnabled() bool {
+	return e.autoFailoverEnabled.Load()
+}
+
+// FailoverHistory returns recent failover events.
+func (e *Engine) FailoverHistory() []FailoverEvent {
+	return e.failoverCtrl.History()
+}
+
+// FailoverController returns the underlying failover controller.
+func (e *Engine) FailoverController() *FailoverController {
+	return e.failoverCtrl
 }
 
 func (e *Engine) resetState() {

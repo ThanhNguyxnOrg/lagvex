@@ -934,6 +934,258 @@ footer i {
   border-color: rgba(110, 231, 160, 0.4);
 }
 
+/* ==================== FAILOVER PILL (TOPBAR) ==================== */
+.failover-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(17, 24, 33, 0.7);
+  border: 1px solid var(--line);
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-brand);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.failover-pill:hover {
+  border-color: rgba(88, 214, 230, 0.35);
+}
+
+.failover-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+}
+
+.failover-pill.active .failover-icon {
+  animation: spin-soft 12s linear infinite;
+}
+
+@keyframes spin-soft {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.failover-title {
+  user-select: none;
+}
+
+.failover-switch {
+  width: 32px;
+  height: 18px;
+  background: #1c2734;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.failover-switch.active {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.failover-switch.active .switch-knob {
+  transform: translateX(14px);
+}
+
+/* ==================== SMART ROUTE ADVISOR CARD ==================== */
+.route-advisor-card {
+  margin-top: 18px;
+  background: linear-gradient(135deg, rgba(14, 19, 26, 0.95), rgba(17, 24, 33, 0.85));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.route-advisor-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(88, 214, 230, 0.6), transparent);
+}
+
+.advisor-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.advisor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-brand);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.advisor-badge.verdict-boost {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7a0;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+}
+
+.advisor-badge.verdict-direct {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+
+.advisor-badge.verdict-comparable {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: #818cf8;
+}
+
+.advisor-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.advisor-headline {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.advisor-summary {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.advisor-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.adv-stat-box {
+  background: rgba(8, 11, 16, 0.6);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  text-align: center;
+  min-width: 76px;
+}
+
+.adv-stat-box.highlight {
+  border-color: rgba(88, 214, 230, 0.4);
+  background: rgba(88, 214, 230, 0.06);
+}
+
+.adv-stat-title {
+  display: block;
+  font-family: var(--font-brand);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--muted-dark);
+  margin-bottom: 2px;
+}
+
+.adv-stat-box.highlight .adv-stat-title {
+  color: var(--cyan);
+}
+
+.adv-stat-num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.adv-stat-box.highlight .adv-stat-num {
+  color: #6ee7a0;
+}
+
+.adv-stat-divider {
+  font-family: var(--font-brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--muted-dark);
+}
+
+.form-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-dark);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.checkbox-container input[type="checkbox"] {
+  accent-color: #10b981;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 860px) {
   .workspace {

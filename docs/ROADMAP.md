@@ -114,18 +114,25 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ---
 
-## 🌐 Phase P3 — Multi-Relay Schedulers & Hysteresis 🛰️
+## 🌐 Phase P3 — Multi-Relay Schedulers, Hysteresis & Smart Advisor 🛰️ (✅ Completed in v1.2.0)
 
-*Target: Routing Intelligence. Focus: Multi-node path selection without route flapping.*
+*Target: Routing Intelligence & Zero-Disruption Handover. Focus: Multi-node path selection without route flapping.*
 
-### 1. 🏆 Multi-Relay Path Scoring
-- Support concurrent ping probes across multiple deployed relays (e.g., Singapore, Tokyo, Hong Kong).
-- Compute composite health score:
-  $$\text{Score} = w_{\text{rtt}} \cdot \text{RTT}_{\text{median}} + w_{\text{p95}} \cdot \text{RTT}_{\text{p95}} + w_{\text{loss}} \cdot \text{Loss} + w_{\text{jitter}} \cdot \text{Jitter}$$
+### 1. 🏆 Multi-Relay Path Scoring & Smart Route Advisor
+- Support concurrent UDP ping probes across all deployed regional relays.
+- Compute composite health score incorporating median RTT, jitter, and packet loss:
+  $$\text{Score} = \text{RTT}_{\text{median}} + 2 \cdot \text{Jitter} + 50 \cdot \text{Loss}_{\%}$$
+- **Smart Route Advisor**: Probes direct domestic ISP gateway vs. optimal relay path to advise competitive gamers with verdicts (`DIRECT_OPTIMAL`, `BOOST_RECOMMENDED`, or `COMPARABLE`), preventing unnecessary booster routing when domestic ISP is already faster.
 
 ### 2. 🎛️ Hysteresis Cooldown (Anti-Flapping)
-- Require an alternate relay to show a sustained $\ge 15\%$ improvement for at least 5 seconds before initiating a dynamic route handover.
-- Prevent rapid route oscillation during borderline latency periods.
+- Require an alternate relay candidate to achieve $\ge 15\%$ lower composite score for at least 5 seconds before initiating a dynamic route handover:
+  $$\text{Score}_{\text{candidate}} \le \text{Score}_{\text{current}} \cdot (1 - 0.15)$$
+- Suppresses route oscillation and flapping during fluctuating ISP congestion.
+
+### 3. ⚡ In-Flight Zero-Loss Seamless Handover
+- Performs cryptographic handshake with candidate relay on a secondary socket *before* modifying state or routes.
+- Atomically updates host route (`/32`), swaps UDP connection and session cipher under mutex.
+- Gracefully disconnects old relay without interrupting active gameplay sessions.
 
 ---
 

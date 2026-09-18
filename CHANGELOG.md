@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-09-18 🛰️
+### 🔥 Added
+- 🔄 **Hysteresis Auto-Failover Engine (`pkg/client/failover.go`)**:
+  - Continuous health monitoring detecting missed keepalive pongs ($\ge 3$), packet loss surges ($\ge 3\%$), and latency spikes ($\ge 40\%$ over baseline).
+  - Anti-flapping mathematical hysteresis requiring replacement candidate nodes to be $\ge 15\%$ better for at least 5 seconds before switching:
+    $$\text{Score}_{\text{candidate}} \le \text{Score}_{\text{current}} \cdot (1 - 0.15)$$
+  - Cooldown timer suppression preventing route oscillation during unstable ISP jitter.
+- ⚡ **Zero-Loss Seamless Route Handover (`pkg/client/engine.go`)**:
+  - In-flight tunnel transition executing handshake and session key exchange on a secondary UDP socket *before* modifying routing tables or closing existing connections.
+  - Thread-safe atomic pointer swaps for active UDP sockets, ChaCha20-Poly1305 ciphers, session IDs, and host `/32` pinned routes.
+  - Zero dropped frames, zero game lobby disconnection, and graceful background disconnection of degraded relay.
+- 🎯 **Smart Route Advisor (`pkg/client/prober.go`)**:
+  - Measures direct domestic gateway latency ($RTT_{\text{direct}}$) and compares it with relay path ($RTT_{\text{relay}}$).
+  - Emits real-time advice: `DIRECT_OPTIMAL` (when ISP domestic path is faster or booster unnecessary), `BOOST_RECOMMENDED` (when relay reduces ping or eliminates packet loss), and `COMPARABLE`.
+- 🌐 **Cockpit HUD Failover & Advisor Telemetry (`web/`)**:
+  - Topbar cyber pill with animated toggle switch for 1-click Auto-Failover control.
+  - Glassmorphic Smart Route Advisor card displaying dynamic badges (`⚡ BOOST RECOMMENDED`, `🛡️ DIRECT ISP OPTIMAL`), explanations, and side-by-side RTT comparison.
+  - Real-time toast notifications alerting users whenever a background seamless handover occurs.
+- 🔌 **REST API Expansion**:
+  - `GET /api/advisor`: Returns live route analysis and recommendation for current game/region.
+  - `POST /api/failover/toggle`: Dynamically enables/disables auto-failover controller.
+  - `GET /api/failover/history`: Returns audit log of recent failover events with score and latency deltas.
+- 🧪 **Unit Test Suite**:
+  - Comprehensive tests for degradation detection, hysteresis thresholds, cooldown suppression, engine controls, and route advisor calculations with 100% pass rate.
+
+---
+
 ## [1.1.0] - 2026-09-12 🚀
 
 ### 🔥 Added

@@ -375,3 +375,165 @@ func roundTo(val float64, decimals int) float64 {
 	factor := math.Pow(10, float64(decimals))
 	return math.Round(val*factor) / factor
 }
+
+// AdvisorVerdict represents the high-level recommendation for the user's route.
+type AdvisorVerdict string
+
+const (
+	VerdictBoost      AdvisorVerdict = "BOOST_RECOMMENDED"
+	VerdictDirect     AdvisorVerdict = "DIRECT_OPTIMAL"
+	VerdictComparable AdvisorVerdict = "COMPARABLE"
+)
+
+// RouteAdvice encapsulates the comparative telemetry and recommendation between Direct ISP and Relay.
+type RouteAdvice struct {
+	Verdict          AdvisorVerdict `json:"verdict"`
+	DirectRTTMs      float64        `json:"directRttMs"`
+	DirectLossPct    float64        `json:"directLossPct"`
+	RelayRTTMs       float64        `json:"relayRttMs"`
+	RelayJitterMs    float64        `json:"relayJitterMs"`
+	RelayLossPct     float64        `json:"relayLossPct"`
+	OptimalRelayID   string         `json:"optimalRelayId,omitempty"`
+	OptimalRelayName string         `json:"optimalRelayName,omitempty"`
+	SavingsMs        float64        `json:"savingsMs"`
+	Headline         string         `json:"headline"`
+	Summary          string         `json:"summary"`
+	Timestamp        time.Time      `json:"timestamp"`
+}
+
+// CalculateRouteAdvice evaluates direct ISP RTT against the best available relay node.
+func CalculateRouteAdvice(directRTT, directLoss float64, bestRelay *ProbeResult) RouteAdvice {
+	now := time.Now()
+
+	// 1. If best relay is nil or unreachable
+	if bestRelay == nil || !bestRelay.Reachable {
+		return RouteAdvice{
+			Verdict:       VerdictDirect,
+			DirectRTTMs:   roundTo(directRTT, 1),
+			DirectLossPct: roundTo(directLoss, 1),
+			Headline:      "DIRECT ISP ACTIVE",
+			Summary:       "No relay nodes available or selected; direct domestic connection is active.",
+			Timestamp:     now,
+		}
+	}
+
+	relayRTT := bestRelay.RTTMedianMs
+	relayLoss := bestRelay.PacketLoss
+	relayJitter := bestRelay.JitterMs
+
+	// 2. If direct path is unreachable or has high loss
+	if directRTT <= 0 || directLoss >= 15.0 {
+		savings := 0.0
+		if directRTT > 0 {
+			savings = directRTT - relayRTT
+		}
+		return RouteAdvice{
+			Verdict:          VerdictBoost,
+			DirectRTTMs:      roundTo(directRTT, 1),
+			DirectLossPct:    roundTo(directLoss, 1),
+			RelayRTTMs:       roundTo(relayRTT, 1),
+			RelayJitterMs:    roundTo(relayJitter, 1),
+			RelayLossPct:     roundTo(relayLoss, 1),
+			OptimalRelayID:   bestRelay.RelayID,
+			OptimalRelayName: bestRelay.Name,
+			SavingsMs:        roundTo(savings, 1),
+			Headline:         "BOOST STRONGLY RECOMMENDED",
+			Summary:          fmt.Sprintf("Direct path has %.0f%% loss. %s provides a stable tunnel with %.1fms latency.", directLoss, bestRelay.Name, relayRTT),
+			Timestamp:        now,
+		}
+	}
+
+	// 3. Direct path is significantly better (at least 5ms faster with 0% loss)
+	if directRTT <= (relayRTT-5.0) && directLoss <= 0.5 {
+		return RouteAdvice{
+			Verdict:          VerdictDirect,
+			DirectRTTMs:      roundTo(directRTT, 1),
+			DirectLossPct:    roundTo(directLoss, 1),
+			RelayRTTMs:       roundTo(relayRTT, 1),
+			RelayJitterMs:    roundTo(relayJitter, 1),
+			RelayLossPct:     roundTo(relayLoss, 1),
+			OptimalRelayID:   bestRelay.RelayID,
+			OptimalRelayName: bestRelay.Name,
+			SavingsMs:        roundTo(relayRTT-directRTT, 1),
+			Headline:         "DIRECT ISP PATH OPTIMAL",
+			Summary:          fmt.Sprintf("Your direct domestic connection is currently optimal (%.1fms vs %.1fms via %s). Booster recommended: OFF.", directRTT, relayRTT, bestRelay.Name),
+			Timestamp:        now,
+		}
+	}
+
+	// 4. Relay path is significantly better (at least 5ms faster or cuts packet loss)
+	if (relayRTT <= directRTT-5.0) || (directLoss > 2.0 && relayLoss <= 0.5) {
+		savings := directRTT - relayRTT
+		return RouteAdvice{
+			Verdict:          VerdictBoost,
+			DirectRTTMs:      roundTo(directRTT, 1),
+			DirectLossPct:    roundTo(directLoss, 1),
+			RelayRTTMs:       roundTo(relayRTT, 1),
+			RelayJitterMs:    roundTo(relayJitter, 1),
+			RelayLossPct:     roundTo(relayLoss, 1),
+			OptimalRelayID:   bestRelay.RelayID,
+			OptimalRelayName: bestRelay.Name,
+			SavingsMs:        roundTo(savings, 1),
+			Headline:         "BOOST RECOMMENDED",
+			Summary:          fmt.Sprintf("%s accelerates your connection: saving ~%.1fms with %.1fms jitter and 0%% packet loss.", bestRelay.Name, savings, relayJitter),
+			Timestamp:        now,
+		}
+	}
+
+	// 5. Comparable paths (within +/- 5ms)
+	return RouteAdvice{
+		Verdict:          VerdictComparable,
+		DirectRTTMs:      roundTo(directRTT, 1),
+		DirectLossPct:    roundTo(directLoss, 1),
+		RelayRTTMs:       roundTo(relayRTT, 1),
+		RelayJitterMs:    roundTo(relayJitter, 1),
+		RelayLossPct:     roundTo(relayLoss, 1),
+		OptimalRelayID:   bestRelay.RelayID,
+		OptimalRelayName: bestRelay.Name,
+		SavingsMs:        roundTo(directRTT-relayRTT, 1),
+		Headline:         "COMPARABLE LATENCY",
+		Summary:          fmt.Sprintf("Direct path (%.1fms) and %s (%.1fms) provide equivalent speeds. Boost is optional.", directRTT, bestRelay.Name, relayRTT),
+		Timestamp:        now,
+	}
+}
+
+// ProbeDirectGateway measures round-trip time directly to a game server or public gateway without using the relay.
+func (p *Prober) ProbeDirectGateway(ctx context.Context, hostPort string) (float64, float64, error) {
+	if hostPort == "" {
+		return 0, 0, errors.New("empty target host")
+	}
+
+	var rtts []float64
+	attempts := 3
+	lossCount := 0
+
+	for i := 0; i < attempts; i++ {
+		select {
+		case <-ctx.Done():
+			return 0, 0, ctx.Err()
+		default:
+		}
+
+		start := time.Now()
+		d := net.Dialer{Timeout: 600 * time.Millisecond}
+		conn, err := d.DialContext(ctx, "udp", hostPort)
+		if err != nil {
+			lossCount++
+			continue
+		}
+		// Send 1 probe byte
+		_, _ = conn.Write([]byte{0x00})
+		elapsed := float64(time.Since(start).Microseconds()) / 1000.0
+		_ = conn.Close()
+		rtts = append(rtts, elapsed)
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	lossPct := (float64(lossCount) / float64(attempts)) * 100.0
+	if len(rtts) == 0 {
+		return 0, lossPct, errors.New("all direct probes failed")
+	}
+
+	medianRTT := calculateMedian(rtts)
+	return roundTo(medianRTT, 1), roundTo(lossPct, 1), nil
+}

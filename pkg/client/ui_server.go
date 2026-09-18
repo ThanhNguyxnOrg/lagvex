@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
@@ -62,6 +63,9 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("/api/test-relay", u.handleTestRelay)
 	mux.HandleFunc("/api/ping-relay", u.handleTestRelay)
 	mux.HandleFunc("/api/add-game", u.handleAddGame)
+	mux.HandleFunc("/api/advisor", u.handleAdvisor)
+	mux.HandleFunc("/api/failover/toggle", u.handleFailoverToggle)
+	mux.HandleFunc("/api/failover/history", u.handleFailoverHistory)
 
 	// Static Web Assets (disk prioritization with embedded binary fallback)
 	fs := http.FileServer(web.GetFileSystem(u.webDir))
@@ -328,4 +332,112 @@ func (u *UIServer) handleAddGame(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "game": game})
+}
+
+func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	gameID := r.URL.Query().Get("gameId")
+	regionID := r.URL.Query().Get("regionId")
+
+	if gameID == "" || regionID == "" {
+		stats := u.engine.Stats()
+		if gameID == "" {
+			gameID = stats.ActiveGame
+		}
+		if regionID == "" {
+			regionID = stats.ActiveRegion
+		}
+	}
+
+	catalog := u.profileMgr.Catalog()
+	if len(catalog.Relays) == 0 {
+		http.Error(w, `{"error":"no relays configured in catalog"}`, http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	// 1. Probe candidate relays to find optimal relay
+	bestRelay, err := u.prober.SelectBest(ctx, catalog.Relays)
+	if err != nil {
+		for _, rel := range catalog.Relays {
+			res := u.prober.ProbeEndpoint(ctx, rel, 2)
+			if res.Reachable {
+				bestRelay = &res
+				break
+			}
+		}
+	}
+	if bestRelay == nil {
+		bestRelay = &ProbeResult{
+			RelayID:   "none",
+			Name:      "No Relay Reachable",
+			Reachable: false,
+		}
+	}
+
+	// 2. Determine target direct gateway
+	targetHost := "8.8.8.8:53"
+	if gameID != "" {
+		if game, ok := u.profileMgr.FindGameByID(gameID); ok {
+			if len(game.LobbyAddresses) > 0 {
+				targetHost = game.LobbyAddresses[0]
+				if !strings.Contains(targetHost, ":") {
+					targetHost += ":443"
+				}
+			} else {
+				for _, reg := range game.Regions {
+					if (regionID == "" || strings.EqualFold(reg.ID, regionID)) && len(reg.CIDRs) > 0 {
+						prefix := strings.Split(reg.CIDRs[0], "/")[0]
+						targetHost = prefix + ":443"
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// 3. Probe Direct Gateway
+	directRTT, directLoss, err := u.prober.ProbeDirectGateway(ctx, targetHost)
+	if err != nil || directRTT <= 0 {
+		directRTT, directLoss, _ = u.prober.ProbeDirectGateway(ctx, "1.1.1.1:53")
+		if directRTT <= 0 {
+			directRTT = 35.0
+			directLoss = 0.0
+		}
+	}
+
+	advice := CalculateRouteAdvice(directRTT, directLoss, bestRelay)
+	_ = json.NewEncoder(w).Encode(advice)
+}
+
+func (u *UIServer) handleFailoverToggle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Enabled != nil {
+			u.engine.SetAutoFailover(*req.Enabled)
+		} else {
+			current := u.engine.IsAutoFailoverEnabled()
+			u.engine.SetAutoFailover(!current)
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"autoFailover": u.engine.IsAutoFailoverEnabled(),
+	})
+}
+
+func (u *UIServer) handleFailoverHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	history := u.engine.FailoverHistory()
+	if history == nil {
+		history = []FailoverEvent{}
+	}
+	_ = json.NewEncoder(w).Encode(history)
 }

@@ -34,6 +34,19 @@
       </div>
 
       <div class="top-actions">
+        <!-- Auto-Failover Hysteresis Control -->
+        <div class="failover-pill" id="failover-pill" title="Auto-Failover: 15% hysteresis threshold, 5s anti-flapping cooldown">
+          <span class="failover-icon" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </span>
+          <span class="failover-title">AUTO-FAILOVER</span>
+          <button class="failover-switch active" id="btn-toggle-failover" type="button" aria-label="Toggle Auto-Failover" aria-pressed="true">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+
         <button class="icon-button" id="btn-open-settings" aria-label="Settings" title="Relay & Engine Settings" type="button">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="4" y1="21" x2="4" y2="14"></line>
@@ -125,6 +138,31 @@
               </svg>
               <span id="hero-meta-region">Asia-Pacific (Singapore)</span>
             </span>
+          </div>
+        </div>
+
+        <!-- ==================== SMART ROUTE ADVISOR ==================== -->
+        <div class="route-advisor-card" id="route-advisor-card">
+          <div class="advisor-left">
+            <div class="advisor-badge verdict-boost" id="advisor-badge">
+              <span class="advisor-icon" id="advisor-icon" aria-hidden="true">⚡</span>
+              <span class="advisor-verdict-text" id="advisor-verdict-text">BOOST RECOMMENDED</span>
+            </div>
+            <div class="advisor-copy">
+              <div class="advisor-headline" id="advisor-headline">Route Analysis Active</div>
+              <div class="advisor-summary" id="advisor-summary">Measuring direct domestic path vs. subsea Lagvex relay...</div>
+            </div>
+          </div>
+          <div class="advisor-stats">
+            <div class="adv-stat-box">
+              <span class="adv-stat-title">DIRECT ISP</span>
+              <span class="adv-stat-num" id="adv-direct-val">-- ms</span>
+            </div>
+            <span class="adv-stat-divider">VS</span>
+            <div class="adv-stat-box highlight">
+              <span class="adv-stat-title">LAGVEX RELAY</span>
+              <span class="adv-stat-num" id="adv-relay-val">-- ms</span>
+            </div>
           </div>
         </div>
 
@@ -326,6 +364,16 @@
               <span>TCP Multiplex</span>
             </label>
           </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Auto-Failover Protection (Zero-Loss Hysteresis)</label>
+          <div class="toggle-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="setting-auto-failover-checkbox" checked>
+              <span class="toggle-text">Dynamic handover on packet loss surge or RTT spikes</span>
+            </label>
+          </div>
+          <small class="form-hint">Enforces 15% minimum score improvement and 5-second anti-flapping cooldown.</small>
         </div>
       </div>
       <div class="modal-card-footer">
