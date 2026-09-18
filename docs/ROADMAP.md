@@ -62,11 +62,11 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ### 4. 📝 Claim Alignment & Documentation Honesty
 - **Action**: Remove absolute guarantees such as "100% Anti-Cheat Safe" and "Sub-ms GC guarantees zero jitter".
-- **Status**: Completed in v1.0.0; permanently enforced across all future pull requests.
+- **Status**: Implemented; permanently enforced across all code and pull requests.
 
 ---
 
-## ⚙️ Phase P1 — Native OS Routing & State Invariants 🪟
+## ⚙️ Phase P1 — Native OS Routing & State Invariants 🪟 (✅ Completed)
 
 *Target: System Reliability. Focus: Replacing CLI text parsing with native OS APIs and strengthening state lifecycles.*
 
@@ -86,11 +86,11 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ---
 
-## 📊 Phase P2 — True E2E Telemetry & Tail Latency HUD 📈
+## 📊 Phase P2 — True E2E Telemetry & Tail Latency HUD 📈 (✅ Completed)
 
 *Target: Observability & User Trust. Focus: Measuring what actually matters for competitive gameplay.*
 
-### 1. 🎨 Esports Cockpit HUD & Visual Telemetry (✅ Completed in v1.1.0)
+### 1. 🎨 Esports Cockpit HUD & Visual Telemetry
 - **Delivered**:
   - High-performance dark neon cockpit with high-contrast cyber styling (`#0a0e17`, `#00f0ff`, `#00ff88`).
   - Resolution-independent vector SVG insignias for all 11 games.
@@ -114,7 +114,7 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ---
 
-## 🌐 Phase P3 — Multi-Relay Schedulers, Hysteresis & Smart Advisor 🛰️ (✅ Completed in v1.2.0)
+## 🌐 Phase P3 — Multi-Relay Schedulers, Hysteresis & Smart Advisor 🛰️ (✅ Completed)
 
 *Target: Routing Intelligence & Zero-Disruption Handover. Focus: Multi-node path selection without route flapping.*
 
