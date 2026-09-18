@@ -61,6 +61,13 @@ func main() {
 	pm, err := profiles.NewManager(profilePath)
 	if err != nil {
 		log.Printf("[Warning] Failed loading profiles: %v", err)
+	} else {
+		cat := pm.Catalog()
+		modeStr := "custom disk config"
+		if profilePath == "" {
+			modeStr = "embedded zero-config"
+		}
+		log.Printf("[Profiles] Loaded %d game profiles & %d community relays (%s)", len(cat.Games), len(cat.Relays), modeStr)
 	}
 
 	engine, err := client.NewEngine(pm)

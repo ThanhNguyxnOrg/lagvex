@@ -88,3 +88,40 @@ func TestAllCIDRsValidAndNoBogonCollision(t *testing.T) {
 
 	t.Logf("Validated %d total game CIDRs successfully", totalCIDRs)
 }
+
+func TestEmbeddedDefaultsFallback(t *testing.T) {
+	// Call NewManager with empty string and non-existent path to verify embedded fallback
+	mgr, err := NewManager("")
+	if err != nil {
+		t.Fatalf("failed to init manager with embedded fallback: %v", err)
+	}
+
+	catalog := mgr.Catalog()
+	if len(catalog.Games) < 10 {
+		t.Errorf("expected at least 10 embedded games, got %d", len(catalog.Games))
+	}
+	if len(catalog.Relays) < 5 {
+		t.Errorf("expected at least 5 embedded community relays, got %d", len(catalog.Relays))
+	}
+
+	// Verify Valorant exists in embedded
+	val, ok := mgr.FindGameByID("valorant")
+	if !ok || val.Name != "Valorant" {
+		t.Errorf("expected Valorant in embedded catalog, got %+v", val)
+	}
+
+	// Verify Singapore relay exists in embedded
+	foundSG := false
+	for _, r := range catalog.Relays {
+		if r.ID == "asia-sg-1" {
+			foundSG = true
+			if r.PSK == "" {
+				t.Errorf("embedded Singapore relay has empty PSK")
+			}
+			break
+		}
+	}
+	if !foundSG {
+		t.Errorf("expected asia-sg-1 in embedded community relays")
+	}
+}

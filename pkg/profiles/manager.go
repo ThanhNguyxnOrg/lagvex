@@ -1,8 +1,8 @@
 package profiles
 
 import (
+	_ "embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/netip"
 	"os"
@@ -11,6 +11,12 @@ import (
 	"sync"
 )
 
+//go:embed embedded/profiles.json
+var defaultProfilesJSON []byte
+
+//go:embed embedded/relays.json
+var defaultRelaysJSON []byte
+
 // Manager manages game profiles and relay catalogs.
 type Manager struct {
 	mu      sync.RWMutex
@@ -18,30 +24,33 @@ type Manager struct {
 	path    string
 }
 
-// NewManager loads the profile catalog from a file or falls back to an empty catalog.
+// NewManager loads the profile catalog from a file or falls back to the embedded default catalog.
 func NewManager(filePath string) (*Manager, error) {
 	m := &Manager{
 		path: filePath,
 	}
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+	loadedFromDisk := false
+	if filePath != "" {
+		if data, err := os.ReadFile(filePath); err == nil {
+			if err := json.Unmarshal(data, &m.catalog); err == nil {
+				loadedFromDisk = true
+			}
+		}
+	}
+
+	// If not loaded from disk or empty file path, populate with embedded default catalog
+	if !loadedFromDisk {
+		if err := json.Unmarshal(defaultProfilesJSON, &m.catalog); err != nil {
 			m.catalog = ProfileCatalog{
 				SchemaVersion: 1,
 				Games:         []GameDefinition{},
 				Relays:        []RelayEndpoint{},
 			}
-			return m, nil
 		}
-		return nil, fmt.Errorf("read profile %s: %w", filePath, err)
 	}
 
-	if err := json.Unmarshal(data, &m.catalog); err != nil {
-		return nil, fmt.Errorf("parse profile JSON: %w", err)
-	}
-
-	// If catalog has no relays, attempt to load from sibling relays.json
+	// If catalog has no relays, attempt to load from sibling relays.json on disk
 	if len(m.catalog.Relays) == 0 && filePath != "" {
 		relaysPath := filepath.Join(filepath.Dir(filePath), "relays.json")
 		if rData, err := os.ReadFile(relaysPath); err == nil {
@@ -49,6 +58,14 @@ func NewManager(filePath string) (*Manager, error) {
 			if err := json.Unmarshal(rData, &relays); err == nil {
 				m.catalog.Relays = relays
 			}
+		}
+	}
+
+	// If still no relays, populate with embedded default community relays
+	if len(m.catalog.Relays) == 0 && len(defaultRelaysJSON) > 0 {
+		var relays []RelayEndpoint
+		if err := json.Unmarshal(defaultRelaysJSON, &relays); err == nil {
+			m.catalog.Relays = relays
 		}
 	}
 
