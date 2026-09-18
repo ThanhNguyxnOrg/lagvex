@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -27,24 +28,29 @@ const (
 
 // TunnelStats holds real-time telemetry.
 type TunnelStats struct {
-	State           TunnelState    `json:"state"`
-	RelayAddr       string         `json:"relayAddr"`
-	ClientIP        string         `json:"clientIP"`
-	GatewayIP       string         `json:"gatewayIP"`
-	PingMs          int64          `json:"pingMs"`
-	BytesUp         uint64         `json:"bytesUp"`
-	BytesDown       uint64         `json:"bytesDown"`
-	UpRateBps       int64          `json:"upRateBps"`
-	DownRateBps     int64          `json:"downRateBps"`
-	ActiveGame      string         `json:"activeGame"`
-	ActiveRegion    string         `json:"activeRegion"`
-	ActiveRelayID   string         `json:"activeRelayId,omitempty"`
-	ActiveRelayName string         `json:"activeRelayName,omitempty"`
-	AutoFailover    bool           `json:"autoFailover"`
-	LastFailover    *FailoverEvent `json:"lastFailover,omitempty"`
-	RouteCount      int            `json:"routeCount"`
-	GameRunning     bool           `json:"gameRunning"`
-	LastError       string         `json:"lastError,omitempty"`
+	State            TunnelState    `json:"state"`
+	RelayAddr        string         `json:"relayAddr"`
+	ClientIP         string         `json:"clientIP"`
+	GatewayIP        string         `json:"gatewayIP"`
+	PingMs           int64          `json:"pingMs"`
+	BytesUp          uint64         `json:"bytesUp"`
+	BytesDown        uint64         `json:"bytesDown"`
+	UpRateBps        int64          `json:"upRateBps"`
+	DownRateBps      int64          `json:"downRateBps"`
+	ActiveGame       string         `json:"activeGame"`
+	ActiveRegion     string         `json:"activeRegion"`
+	ActiveRelayID    string         `json:"activeRelayId,omitempty"`
+	ActiveRelayName  string         `json:"activeRelayName,omitempty"`
+	AutoFailover     bool           `json:"autoFailover"`
+	LastFailover     *FailoverEvent `json:"lastFailover,omitempty"`
+	RouteCount       int            `json:"routeCount"`
+	GameRunning      bool           `json:"gameRunning"`
+	FECActive        bool           `json:"fecActive"`
+	FECRatio         string         `json:"fecRatio"`
+	PacketsRecovered uint64         `json:"packetsRecovered"`
+	FECParitySent    uint64         `json:"fecParitySent"`
+	FECParityRecv    uint64         `json:"fecParityRecv"`
+	LastError        string         `json:"lastError,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -89,6 +95,14 @@ type Engine struct {
 	lastErr             atomic.Pointer[string]
 	autoFailoverEnabled atomic.Bool
 	lastFailover        atomic.Pointer[FailoverEvent]
+
+	fecEncoder       *protocol.FECEncoder
+	fecDecoder       *protocol.FECDecoder
+	fecController    *protocol.AdaptiveFECController
+	fecEnabled       atomic.Bool
+	packetsRecovered atomic.Uint64
+	fecParitySent    atomic.Uint64
+	fecParityRecv    atomic.Uint64
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -99,13 +113,17 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 	}
 
 	e := &Engine{
-		state:        StateDisconnected,
-		clientID:     clientID,
-		routeManager: NewRouteManager(),
-		profileMgr:   pm,
-		failoverCtrl: NewFailoverController(DefaultFailoverConfig()),
+		state:         StateDisconnected,
+		clientID:      clientID,
+		routeManager:  NewRouteManager(),
+		profileMgr:    pm,
+		failoverCtrl:  NewFailoverController(DefaultFailoverConfig()),
+		fecEncoder:    protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
+		fecDecoder:    protocol.NewFECDecoder(128),
+		fecController: protocol.NewAdaptiveFECController(),
 	}
 	e.autoFailoverEnabled.Store(true)
+	e.fecEnabled.Store(true)
 	return e, nil
 }
 
@@ -119,25 +137,35 @@ func (e *Engine) Stats() TunnelStats {
 		lastErrStr = *ptr
 	}
 
+	var fecRatio string = "Off"
+	if e.fecEnabled.Load() && e.fecEncoder != nil {
+		fecRatio = fmt.Sprintf("%d:1", e.fecEncoder.BlockSize())
+	}
+
 	return TunnelStats{
-		State:           e.state,
-		RelayAddr:       e.relayAddr.String(),
-		ClientIP:        e.clientIP.String(),
-		GatewayIP:       e.gatewayIP.String(),
-		PingMs:          e.pingMs.Load(),
-		BytesUp:         e.bytesUp.Load(),
-		BytesDown:       e.bytesDown.Load(),
-		UpRateBps:       e.upRate.Load(),
-		DownRateBps:     e.downRate.Load(),
-		ActiveGame:      e.activeGame,
-		ActiveRegion:    e.activeRegion,
-		ActiveRelayID:   e.activeRelayID,
-		ActiveRelayName: e.activeRelayName,
-		AutoFailover:    e.autoFailoverEnabled.Load(),
-		LastFailover:    e.lastFailover.Load(),
-		RouteCount:      e.routeManager.ActiveRouteCount(),
-		GameRunning:     e.isGameActive,
-		LastError:       lastErrStr,
+		State:            e.state,
+		RelayAddr:        e.relayAddr.String(),
+		ClientIP:         e.clientIP.String(),
+		GatewayIP:        e.gatewayIP.String(),
+		PingMs:           e.pingMs.Load(),
+		BytesUp:          e.bytesUp.Load(),
+		BytesDown:        e.bytesDown.Load(),
+		UpRateBps:        e.upRate.Load(),
+		DownRateBps:      e.downRate.Load(),
+		ActiveGame:       e.activeGame,
+		ActiveRegion:     e.activeRegion,
+		ActiveRelayID:    e.activeRelayID,
+		ActiveRelayName:  e.activeRelayName,
+		AutoFailover:     e.autoFailoverEnabled.Load(),
+		LastFailover:     e.lastFailover.Load(),
+		RouteCount:       e.routeManager.ActiveRouteCount(),
+		GameRunning:      e.isGameActive,
+		FECActive:        e.fecEnabled.Load(),
+		FECRatio:         fecRatio,
+		PacketsRecovered: e.packetsRecovered.Load(),
+		FECParitySent:    e.fecParitySent.Load(),
+		FECParityRecv:    e.fecParityRecv.Load(),
+		LastError:        lastErrStr,
 	}
 }
 
@@ -283,6 +311,15 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.cancelFunc = cancel
 	e.lastPong.Store(time.Now().UnixNano())
 	e.lastErr.Store(nil)
+	if e.fecEncoder != nil {
+		e.fecEncoder.Reset()
+	}
+	if e.fecDecoder != nil {
+		e.fecDecoder.Reset()
+	}
+	e.packetsRecovered.Store(0)
+	e.fecParitySent.Store(0)
+	e.fecParityRecv.Store(0)
 	e.mu.Unlock()
 
 	// If manual mode, install routes right away
@@ -386,6 +423,7 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 	defer e.wg.Done()
 	inBuf := make([]byte, protocol.MaxPacketSize)
 	outBuf := make([]byte, protocol.MaxPacketSize)
+	fecOutBuf := make([]byte, protocol.MaxPacketSize)
 
 	for {
 		select {
@@ -424,10 +462,23 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 			continue
 		}
 
+		// Immediate systematic delivery (0 RTT latency overhead on game packets)
 		pkt := crypto.EncodeData(outBuf, sessID, inBuf[:n])
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
+		}
+
+		// Systematic FEC: Feed packet and emit XOR parity frame when block boundary reached
+		if e.fecEnabled.Load() && e.fecEncoder != nil {
+			seq := binary.BigEndian.Uint64(pkt[9:17])
+			fecPayloadBytes, hasParity := e.fecEncoder.AddPacket(seq, inBuf[:n])
+			if hasParity {
+				fecPkt := crypto.EncodeFEC(fecOutBuf, sessID, fecPayloadBytes)
+				if _, err := conn.WriteToUDP(fecPkt, net.UDPAddrFromAddrPort(rAddr)); err == nil {
+					e.fecParitySent.Add(1)
+				}
+			}
 		}
 	}
 }
@@ -478,6 +529,24 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			if len(payload) >= 20 && (payload[0]>>4) == 4 && wt != nil {
 				_ = wt.WritePacket(payload)
 				e.bytesDown.Add(uint64(len(payload)))
+				if e.fecEnabled.Load() && e.fecDecoder != nil {
+					seq := binary.BigEndian.Uint64(inBuf[9:17])
+					e.fecDecoder.RecordPacket(seq, payload)
+				}
+			}
+
+		case protocol.TypeFEC:
+			e.fecParityRecv.Add(1)
+			if e.fecEnabled.Load() && e.fecDecoder != nil {
+				fecPayload, err := protocol.DecodeFECPayload(payload)
+				if err == nil {
+					_, recovered, ok := e.fecDecoder.ProcessParity(fecPayload)
+					if ok && len(recovered) >= 20 && (recovered[0]>>4) == 4 && wt != nil {
+						_ = wt.WritePacket(recovered)
+						e.bytesDown.Add(uint64(len(recovered)))
+						e.packetsRecovered.Add(1)
+					}
+				}
 			}
 
 		case protocol.TypePong:
@@ -618,6 +687,16 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 			}
 
 			lossPct := lossRate * 100.0
+
+			// Adaptively adjust FEC block size based on loss telemetry
+			if e.fecEnabled.Load() && e.fecController != nil && e.fecEncoder != nil {
+				newBlockSize, changed := e.fecController.UpdateLoss(lossPct)
+				if changed {
+					e.fecEncoder.SetBlockSize(newBlockSize)
+					log.Printf("[FEC] Adaptive loss controller scaled FEC block size to %d (loss: %.2f%%)", newBlockSize, lossPct)
+				}
+			}
+
 			isDegraded, reason := e.failoverCtrl.IsDegraded(missedPongs, currentPing, baselinePing, lossPct)
 			if !isDegraded {
 				// Smoothly adapt baseline ping during healthy operation
@@ -847,6 +926,17 @@ func (e *Engine) SetAutoFailover(enabled bool) {
 // IsAutoFailoverEnabled reports whether auto-failover is enabled.
 func (e *Engine) IsAutoFailoverEnabled() bool {
 	return e.autoFailoverEnabled.Load()
+}
+
+// SetFECEnabled toggles Forward Error Correction on or off.
+func (e *Engine) SetFECEnabled(enabled bool) {
+	e.fecEnabled.Store(enabled)
+	log.Printf("[Engine] FEC enabled set to: %v", enabled)
+}
+
+// IsFECEnabled reports whether FEC is currently enabled.
+func (e *Engine) IsFECEnabled() bool {
+	return e.fecEnabled.Load()
 }
 
 // FailoverHistory returns recent failover events.

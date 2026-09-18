@@ -257,6 +257,13 @@
   let lastFailoverTimestamp = null;
   let autoFailoverEnabled = true;
 
+  // Zero-RTT FEC Elements
+  const hudFecBadge = document.getElementById('hud-fec-badge');
+  const hudFecStatus = document.getElementById('hud-fec-status');
+  const hudFecRecovered = document.getElementById('hud-fec-recovered');
+  const settingFecCheckbox = document.getElementById('setting-fec-checkbox');
+  let fecEnabled = true;
+
   // Modals
   const modalSettings = document.getElementById('modal-settings');
   const btnOpenSettings = document.getElementById('btn-open-settings');
@@ -496,6 +503,50 @@
     }
   }
 
+  // ==================== ZERO-RTT FEC CONTROLS ====================
+  async function toggleFEC(explicitState) {
+    try {
+      const payload = typeof explicitState === 'boolean' ? { enabled: explicitState } : {};
+      const res = await fetch('/api/fec/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fecEnabled = data.fecEnabled;
+        updateFECUI(data.fecEnabled, data.fecEnabled ? '6:1' : 'Off', 0);
+        showToast(
+          `Zero-RTT FEC Loss Recovery: ${data.fecEnabled ? 'ACTIVE (Systematic XOR)' : 'DISABLED'}`,
+          data.fecEnabled ? 'success' : 'info'
+        );
+      }
+    } catch (e) {
+      console.warn('FEC toggle error:', e);
+    }
+  }
+
+  function updateFECUI(active, ratio, recovered) {
+    fecEnabled = active;
+    if (settingFecCheckbox) {
+      settingFecCheckbox.checked = active;
+    }
+    if (hudFecBadge) {
+      if (active) {
+        hudFecBadge.classList.remove('disabled');
+        hudFecBadge.classList.add('active');
+        if (hudFecStatus) hudFecStatus.textContent = ratio && ratio !== 'Off' ? `ACTIVE (${ratio})` : 'ACTIVE';
+      } else {
+        hudFecBadge.classList.remove('active');
+        hudFecBadge.classList.add('disabled');
+        if (hudFecStatus) hudFecStatus.textContent = 'OFF';
+      }
+    }
+    if (hudFecRecovered) {
+      hudFecRecovered.textContent = `${recovered || 0} rec`;
+    }
+  }
+
   // ==================== SMART ROUTE ADVISOR ====================
   async function pollRouteAdvisor() {
     if (!advisorBadge || !selectedGame) return;
@@ -546,6 +597,11 @@
       // Sync auto-failover toggle
       if (typeof data.autoFailover === 'boolean' && data.autoFailover !== autoFailoverEnabled) {
         updateFailoverUI(data.autoFailover);
+      }
+
+      // Sync Zero-RTT FEC
+      if (typeof data.fecActive === 'boolean') {
+        updateFECUI(data.fecActive, data.fecRatio, data.packetsRecovered || 0);
       }
 
       // Check for seamless failover event notifications
@@ -607,6 +663,18 @@
     if (settingAutoFailoverCheckbox) {
       settingAutoFailoverCheckbox.addEventListener('change', (e) => {
         toggleAutoFailover(e.target.checked);
+      });
+    }
+
+    // Zero-RTT FEC toggles
+    if (settingFecCheckbox) {
+      settingFecCheckbox.addEventListener('change', (e) => {
+        toggleFEC(e.target.checked);
+      });
+    }
+    if (hudFecBadge) {
+      hudFecBadge.addEventListener('click', () => {
+        modalSettings.classList.add('open');
       });
     }
 

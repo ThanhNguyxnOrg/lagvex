@@ -367,6 +367,87 @@ button {
   color: var(--text);
 }
 
+.telemetry-status-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(88, 214, 230, 0.08);
+  border: 1px solid rgba(88, 214, 230, 0.28);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fec-badge:hover {
+  background: rgba(88, 214, 230, 0.16);
+  border-color: var(--cyan);
+  color: var(--text);
+  box-shadow: 0 0 12px rgba(88, 214, 230, 0.2);
+}
+
+.fec-badge.active {
+  background: rgba(110, 231, 160, 0.09);
+  border-color: rgba(110, 231, 160, 0.35);
+}
+
+.fec-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  transition: background 0.2s ease;
+}
+
+.fec-badge.active .fec-dot {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+.fec-badge.disabled .fec-dot {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.fec-label {
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+
+.fec-val {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.fec-badge.active .fec-val {
+  color: var(--green);
+}
+
+.fec-badge.disabled .fec-val {
+  color: var(--muted);
+}
+
+.fec-pill {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text);
+  margin-left: 2px;
+}
+
 .telemetry-live {
   color: var(--green);
   font-size: 12px;

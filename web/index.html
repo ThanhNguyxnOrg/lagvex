@@ -172,9 +172,17 @@
             <div class="section-label">LIVE TELEMETRY</div>
             <h2 class="section-title">Network performance</h2>
           </div>
-          <div class="telemetry-live" id="telemetry-live-status">
-            <span class="status-dot" id="telemetry-dot" aria-hidden="true"></span>
-            <span id="telemetry-live-label">Monitoring</span>
+          <div class="telemetry-status-group">
+            <button class="fec-badge" id="hud-fec-badge" title="Zero-RTT Forward Error Correction (Click to configure)" type="button">
+              <span class="fec-dot" id="fec-pulse-dot" aria-hidden="true"></span>
+              <span class="fec-label">ZERO-RTT FEC:</span>
+              <span class="fec-val" id="hud-fec-status">ACTIVE (6:1)</span>
+              <span class="fec-pill" id="hud-fec-recovered" title="Total packets recovered instantly without ARQ latency">0 rec</span>
+            </button>
+            <div class="telemetry-live" id="telemetry-live-status">
+              <span class="status-dot" id="telemetry-dot" aria-hidden="true"></span>
+              <span id="telemetry-live-label">Monitoring</span>
+            </div>
           </div>
         </div>
 
@@ -374,6 +382,16 @@
             </label>
           </div>
           <small class="form-hint">Enforces 15% minimum score improvement and 5-second anti-flapping cooldown.</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zero-RTT Forward Error Correction (FEC)</label>
+          <div class="toggle-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="setting-fec-checkbox" checked>
+              <span class="toggle-text">Systematic XOR parity loss recovery (0ms retransmission penalty)</span>
+            </label>
+          </div>
+          <small class="form-hint">Eliminates 30-100ms TCP/ARQ retransmission latency by instantly restoring dropped packets using auxiliary parity datagrams.</small>
         </div>
       </div>
       <div class="modal-card-footer">

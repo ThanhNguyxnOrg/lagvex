@@ -136,13 +136,16 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 
 ---
 
-## 🚀 Phase P4 — Loss Recovery & Multipath Bonding 🧪
+## 🚀 Phase P4 — Loss Recovery & Multipath Bonding 🧪 (FEC Engine ✅ Completed)
 
 *Target: Extreme Network Resilience. Focus: Forward Error Correction and dual-link support.*
 
-### 1. 🛡️ Adaptive Forward Error Correction (FEC)
-- Inspired by `UDPspeeder` mechanics: when packet loss on undersea routes exceeds $1.5\%$, dynamically inject XOR or Reed-Solomon parity packets.
-- Enables the receiving end to instantly reconstruct dropped packets without waiting for retransmission.
+### 1. 🛡️ Adaptive Forward Error Correction (FEC) (✅ Completed)
+- **Systematic XOR Parity**: Raw game datagrams (`TypeData`) are transmitted immediately with 0ms buffer delay and zero byte overhead.
+- **Auxiliary Parity Type (`TypeFEC = 0x7`)**: Encrypted with ChaCha20-Poly1305 AEAD, carrying systematic XOR parity blocks and per-packet length tables.
+- **Zero-RTT Single-Loss Recovery**: When a packet drops in transit, the decoder reconstructs the exact original payload in 0ms without waiting for TCP/ARQ retransmission (saving 30-100ms of lag spike).
+- **Dynamic Loss Controller**: Scales block size $K$ from Standby (0%), Light (10:1), Medium (6:1), to Aggressive (4:1) based on real-time loss telemetry.
+- **Bi-Directional Protection**: Integrated into client WinTun engine and Linux relay TUN data plane with live Cockpit HUD badge and `/api/fec/toggle` endpoint.
 
 ### 2. 📱 Multipath Failover (Ethernet + Cellular Backup)
 - Aggregate secondary connections (e.g., Wi-Fi + 4G USB tethering) using packet duplication or fast failover, ensuring that a home internet outage never disconnects an active ranked match.
@@ -157,7 +160,7 @@ Our roadmap strictly adheres to the principle of **Evidence-Based Systems Engine
 | **P1** ⚙️ | OS Robustness | Win32 IP Helper APIs + Session Cleanup Invariants | Rock-solid routing on all Windows language editions |
 | **P2** 📊 | Deep Telemetry | P95/P99 latency histogram + Direct vs. Relay advisor | Transparent, trustworthy gamer HUD |
 | **P3** 🌐 | Multi-Relay Engine | Multi-node scoring + Hysteresis anti-flapping | Automated optimal path selection across Asia/EU |
-| **P4** 🧪 | Loss Resilience | Adaptive FEC + Dual-link WAN failover | 0% packet loss even during undersea cable cuts |
+| **P4** 🧪 | Loss Resilience | Adaptive Zero-RTT FEC (✅) + Dual-link WAN | 0% packet loss even during undersea cable cuts |
 
 ---
 

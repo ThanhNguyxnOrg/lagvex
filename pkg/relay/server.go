@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -153,7 +154,7 @@ func (s *Server) loopUDP(ctx context.Context) {
 		switch mtype {
 		case protocol.TypeHandshakeReq:
 			s.handleHandshake(buf[:n], remoteEndpoint)
-		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect:
+		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC:
 			s.handleSessionPacket(buf[:n], remoteEndpoint)
 		}
 
@@ -276,9 +277,32 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 		}
 
 		sess.BytesUp.Add(uint64(len(payload)))
+		if sess.FECDecoder != nil {
+			seq := binary.BigEndian.Uint64(raw[9:17])
+			sess.FECDecoder.RecordPacket(seq, payload)
+		}
 
 		// Push packet into Linux TUN device
 		_, _ = s.tunDev.Write(payload)
+
+	case protocol.TypeFEC:
+		if sess.FECDecoder == nil {
+			return
+		}
+		fecPayload, err := protocol.DecodeFECPayload(payload)
+		if err != nil {
+			return
+		}
+		_, recovered, ok := sess.FECDecoder.ProcessParity(fecPayload)
+		if ok && len(recovered) >= 20 && (recovered[0]>>4) == 4 {
+			srcIP := netip.AddrFrom4([4]byte{recovered[12], recovered[13], recovered[14], recovered[15]})
+			dstIP := netip.AddrFrom4([4]byte{recovered[16], recovered[17], recovered[18], recovered[19]})
+			if srcIP == sess.InnerIP && !isForbiddenDestination(dstIP) {
+				sess.BytesUp.Add(uint64(len(recovered)))
+				sess.PacketsRecovered.Add(1)
+				_, _ = s.tunDev.Write(recovered)
+			}
+		}
 
 	case protocol.TypePing:
 		ts, err := protocol.DecodeControlPayload(payload)
@@ -305,6 +329,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 // loopTUN reads return packets from the Linux TUN device and sends them to clients.
 func (s *Server) loopTUN(ctx context.Context) {
 	outBuf := make([]byte, protocol.MaxPacketSize)
+	fecBuf := make([]byte, protocol.MaxPacketSize)
 
 	for {
 		select {
@@ -345,6 +370,15 @@ func (s *Server) loopTUN(ctx context.Context) {
 
 				packet := sess.Crypto.EncodeData(outBuf, sess.ID, buf[:n])
 				s.sendUDP(packet, *remote)
+
+				if sess.FECEncoder != nil {
+					seq := binary.BigEndian.Uint64(packet[9:17])
+					fecPayloadBytes, hasParity := sess.FECEncoder.AddPacket(seq, buf[:n])
+					if hasParity {
+						fecPacket := sess.Crypto.EncodeFEC(fecBuf, sess.ID, fecPayloadBytes)
+						s.sendUDP(fecPacket, *remote)
+					}
+				}
 			}
 		}
 

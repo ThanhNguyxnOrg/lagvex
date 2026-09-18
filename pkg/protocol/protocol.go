@@ -28,6 +28,7 @@ const (
 	TypePing          = 0x4
 	TypePong          = 0x5
 	TypeDisconnect    = 0x6
+	TypeFEC           = 0x7
 
 	// Packet lengths in bytes.
 	HandshakeReqLen  = 57
@@ -243,7 +244,62 @@ func TypeString(mtype byte) string {
 		return "Pong"
 	case TypeDisconnect:
 		return "Disconnect"
+	case TypeFEC:
+		return "FECParity"
 	default:
 		return fmt.Sprintf("Unknown(0x%x)", mtype)
 	}
+}
+
+// FECPayload holds structured metadata and XOR parity data for packet recovery.
+type FECPayload struct {
+	BaseSeq uint64
+	Count   uint8
+	Lengths []uint16
+	Parity  []byte
+}
+
+// EncodeFECPayload serializes FEC parity metadata and XOR sum into a binary slice.
+func EncodeFECPayload(baseSeq uint64, count uint8, lengths []uint16, parity []byte) []byte {
+	hdrLen := 10 + 2*int(count)
+	buf := make([]byte, hdrLen+len(parity))
+	binary.BigEndian.PutUint64(buf[0:8], baseSeq)
+	buf[8] = count
+	buf[9] = 0 // reserved
+	for i := 0; i < int(count); i++ {
+		var l uint16
+		if i < len(lengths) {
+			l = lengths[i]
+		}
+		binary.BigEndian.PutUint16(buf[10+i*2:12+i*2], l)
+	}
+	copy(buf[hdrLen:], parity)
+	return buf
+}
+
+// DecodeFECPayload deserializes a binary slice into FECPayload.
+func DecodeFECPayload(buf []byte) (FECPayload, error) {
+	if len(buf) < 10 {
+		return FECPayload{}, ErrPacketTooShort
+	}
+	baseSeq := binary.BigEndian.Uint64(buf[0:8])
+	count := buf[8]
+	if count == 0 {
+		return FECPayload{}, errors.New("fec count cannot be 0")
+	}
+	hdrLen := 10 + 2*int(count)
+	if len(buf) < hdrLen {
+		return FECPayload{}, ErrPacketTooShort
+	}
+	lengths := make([]uint16, count)
+	for i := 0; i < int(count); i++ {
+		lengths[i] = binary.BigEndian.Uint16(buf[10+i*2 : 12+i*2])
+	}
+	parity := buf[hdrLen:]
+	return FECPayload{
+		BaseSeq: baseSeq,
+		Count:   count,
+		Lengths: lengths,
+		Parity:  parity,
+	}, nil
 }

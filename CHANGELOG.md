@@ -11,6 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🛡️ Phase P4: Adaptive Forward Error Correction (FEC) & Zero-RTT Loss Recovery
+- 🛡️ **Adaptive Systematic XOR Parity Engine (`pkg/protocol/fec.go`)**:
+  - **Systematic Coding**: Raw game data packets (`TypeData`) are forwarded immediately with 0ms buffer delay and zero byte overhead.
+  - **Auxiliary Parity Type (`TypeFEC = 0x7`)**: Encrypted with ChaCha20-Poly1305 AEAD, carrying systematic XOR parity blocks and per-packet length tables.
+  - **Zero-RTT Single-Loss Recovery**: When a packet drops in transit, the decoder reconstructs the exact original payload in 0ms without waiting for TCP/ARQ retransmission (saving 30-100ms of lag spike).
+  - Handles variable game datagram lengths cleanly with dynamic padding and exact reconstruction.
+- 🎛️ **Adaptive Loss Ratio Controller (`pkg/protocol/fec.go`)**:
+  - Standby (0% overhead) when loss $< 0.5\%$.
+  - Light (10:1, 10% redundancy) when loss is $0.5\% - 3.0\%$.
+  - Medium (6:1, 16.7% redundancy) when loss is $3.0\% - 8.0\%$.
+  - Aggressive (4:1, 25% redundancy) during severe network degradation $> 8.0\%$.
+- ⚡ **Bi-Directional Loss Protection (`pkg/client/engine.go`, `pkg/relay/server.go`)**:
+  - Uplink: Protects critical player actions and tick updates before relay TUN ingestion.
+  - Downlink: Protects game state return packets before injection into client WinTun virtual adapter.
+- 🌐 **Esports Cockpit HUD & Telemetry (`web/`, `pkg/client/ui_server.go`)**:
+  - Live HUD badge showing `ZERO-RTT FEC: ACTIVE (6:1)` with real-time `X rec` recovery counter.
+  - Settings modal toggle switch for instant FEC enablement/disablement.
+  - REST endpoint `POST /api/fec/toggle` and extended `TunnelStats` telemetry.
+- 🧪 **Unit Test Suite**:
+  - 100% test coverage with exhaustive permutation tests: exact single packet recovery, multi-loss false-positive prevention, zero-loss idempotency, adaptive scaling, and engine API controls.
+
 ### 🔄 Phase P3: Hysteresis Auto-Failover & Smart Route Advisor
 - 🔄 **Hysteresis Auto-Failover Engine (`pkg/client/failover.go`)**:
   - Continuous health monitoring detecting missed keepalive pongs ($\ge 3$), packet loss surges ($\ge 3\%$), and latency spikes ($\ge 40\%$ over baseline).

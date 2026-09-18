@@ -15,21 +15,27 @@ type Session struct {
 	RemoteUDP atomic.Pointer[netip.AddrPort]
 	Crypto    *protocol.SessionCrypto
 
+	FECEncoder *protocol.FECEncoder
+	FECDecoder *protocol.FECDecoder
+
 	lastSeen  atomic.Int64 // Unix nanoseconds
 	createdAt time.Time
 
-	BytesUp   atomic.Uint64
-	BytesDown atomic.Uint64
+	BytesUp          atomic.Uint64
+	BytesDown        atomic.Uint64
+	PacketsRecovered atomic.Uint64
 }
 
 // NewSession initializes a new client session.
 func NewSession(id, clientID uint64, innerIP netip.Addr, remote netip.AddrPort, crypto *protocol.SessionCrypto) *Session {
 	s := &Session{
-		ID:        id,
-		ClientID:  clientID,
-		InnerIP:   innerIP,
-		Crypto:    crypto,
-		createdAt: time.Now(),
+		ID:         id,
+		ClientID:   clientID,
+		InnerIP:    innerIP,
+		Crypto:     crypto,
+		FECEncoder: protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
+		FECDecoder: protocol.NewFECDecoder(128),
+		createdAt:  time.Now(),
 	}
 	s.RemoteUDP.Store(&remote)
 	s.Touch()

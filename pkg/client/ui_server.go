@@ -66,6 +66,7 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("/api/advisor", u.handleAdvisor)
 	mux.HandleFunc("/api/failover/toggle", u.handleFailoverToggle)
 	mux.HandleFunc("/api/failover/history", u.handleFailoverHistory)
+	mux.HandleFunc("/api/fec/toggle", u.handleFECToggle)
 
 	// Static Web Assets (disk prioritization with embedded binary fallback)
 	fs := http.FileServer(web.GetFileSystem(u.webDir))
@@ -440,4 +441,24 @@ func (u *UIServer) handleFailoverHistory(w http.ResponseWriter, r *http.Request)
 		history = []FailoverEvent{}
 	}
 	_ = json.NewEncoder(w).Encode(history)
+}
+
+func (u *UIServer) handleFECToggle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Enabled != nil {
+			u.engine.SetFECEnabled(*req.Enabled)
+		} else {
+			current := u.engine.IsFECEnabled()
+			u.engine.SetFECEnabled(!current)
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"fecEnabled": u.engine.IsFECEnabled(),
+	})
 }

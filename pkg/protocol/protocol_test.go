@@ -222,3 +222,71 @@ func TestSessionCryptoOutOfOrderWithinWindow(t *testing.T) {
 		t.Fatalf("expected ErrReplay for replayed p1, got %v", err)
 	}
 }
+
+func TestFECPayloadSerialization(t *testing.T) {
+	baseSeq := uint64(10050)
+	count := uint8(4)
+	lengths := []uint16{64, 128, 80, 200}
+	parity := make([]byte, 200)
+	for i := range parity {
+		parity[i] = byte(i ^ 0xAA)
+	}
+
+	encoded := EncodeFECPayload(baseSeq, count, lengths, parity)
+	decoded, err := DecodeFECPayload(encoded)
+	if err != nil {
+		t.Fatalf("DecodeFECPayload failed: %v", err)
+	}
+
+	if decoded.BaseSeq != baseSeq {
+		t.Errorf("expected BaseSeq %d, got %d", baseSeq, decoded.BaseSeq)
+	}
+	if decoded.Count != count {
+		t.Errorf("expected Count %d, got %d", count, decoded.Count)
+	}
+	if len(decoded.Lengths) != len(lengths) {
+		t.Fatalf("expected %d lengths, got %d", len(lengths), len(decoded.Lengths))
+	}
+	for i := range lengths {
+		if decoded.Lengths[i] != lengths[i] {
+			t.Errorf("length mismatch at %d: expected %d, got %d", i, lengths[i], decoded.Lengths[i])
+		}
+	}
+	if len(decoded.Parity) != len(parity) {
+		t.Fatalf("expected %d parity bytes, got %d", len(parity), len(decoded.Parity))
+	}
+	for i := range parity {
+		if decoded.Parity[i] != parity[i] {
+			t.Fatalf("parity byte mismatch at index %d", i)
+		}
+	}
+
+	// Short payload error check
+	if _, err := DecodeFECPayload(encoded[:8]); err == nil {
+		t.Errorf("expected error for truncated payload, got nil")
+	}
+}
+
+func TestSessionCryptoFEC(t *testing.T) {
+	psk := []byte("secret-key-for-session-crypto-32b")
+	nonce := uint64(987654321)
+	sessionID := uint64(0x12345678abcdef00)
+	clientID := uint64(5555)
+
+	clientCrypto, _ := NewClientCrypto(psk, nonce, sessionID, clientID)
+	relayCrypto, _ := NewRelayCrypto(psk, nonce, sessionID, clientID)
+
+	fecPayload := []byte("sample-fec-parity-data-payload")
+	sealed := clientCrypto.EncodeFEC(make([]byte, 256), sessionID, fecPayload)
+
+	mtype, opened, err := relayCrypto.OpenPacket(nil, sealed)
+	if err != nil {
+		t.Fatalf("OpenPacket failed on FEC message: %v", err)
+	}
+	if mtype != TypeFEC {
+		t.Fatalf("expected mtype %s, got %s", TypeString(TypeFEC), TypeString(mtype))
+	}
+	if string(opened) != string(fecPayload) {
+		t.Fatalf("payload mismatch: expected %q, got %q", fecPayload, opened)
+	}
+}

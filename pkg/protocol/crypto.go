@@ -191,6 +191,11 @@ func (c *SessionCrypto) EncodeDisconnect(dst []byte, sessionID uint64) []byte {
 	return c.SealPacket(dst, TypeDisconnect, sessionID, nil)
 }
 
+// EncodeFEC seals an XOR parity payload as a TypeFEC message.
+func (c *SessionCrypto) EncodeFEC(dst []byte, sessionID uint64, fecPayload []byte) []byte {
+	return c.SealPacket(dst, TypeFEC, sessionID, fecPayload)
+}
+
 // DecodeControlPayload extracts the 8-byte timestamp carried by Ping/Pong.
 func DecodeControlPayload(payload []byte) (uint64, error) {
 	if len(payload) != 8 {
