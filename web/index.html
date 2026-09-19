@@ -112,6 +112,15 @@
                 </svg>
                 <span>Optimize profile</span>
               </button>
+
+              <button class="server-picker-pill" id="btn-open-server-modal" type="button" title="Choose server route">
+                <span class="server-flag" id="hero-server-badge">[AUTO]</span>
+                <span class="server-title" id="hero-server-name">⚡ Auto (Optimal Latency)</span>
+                <span class="server-latency-tag" id="hero-server-ping">~1ms</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -121,7 +130,7 @@
                 <path d="m12 14 4-4"></path>
                 <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
               </svg>
-              <span id="hero-meta-ping">18 ms</span>
+              <span id="hero-meta-ping">~58 ms (Target)</span>
             </span>
             <span class="meta-item">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -130,7 +139,7 @@
               </svg>
               <span>Protected</span>
             </span>
-            <span class="meta-item meta-region">
+            <span class="meta-item meta-region clickable" id="hero-meta-region-pill" title="Click to change routing server">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="2" y1="12" x2="22" y2="12"></line>
@@ -296,22 +305,13 @@
           <!-- Populated dynamically by app.js -->
         </div>
 
-        <!-- Routing Region Dropdown -->
-        <div class="region-select">
-          <span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-            </svg>
-            <span>Routing region</span>
-          </span>
-          <button id="btn-toggle-region" class="region-trigger-btn" type="button">
-            <span id="current-region-label">Auto region</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+        <!-- Quick Server Node Card -->
+        <div class="server-quick-card" id="server-quick-card" title="Click to change routing node">
+          <div class="sqc-info">
+            <span class="sqc-label">ROUTING NODE</span>
+            <span class="sqc-name" id="current-region-label">⚡ Auto (Optimal Latency)</span>
+          </div>
+          <button id="btn-toggle-region" class="sqc-change-btn" type="button">Change ➔</button>
         </div>
 
         <!-- Pro Note Banner -->
@@ -450,6 +450,102 @@
       <div class="modal-card-footer">
         <button class="btn-cancel" id="cancel-modal-custom-game" type="button">Cancel</button>
         <button class="btn-confirm" id="save-custom-game-btn" type="button">Add Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SERVER & ROUTE SELECTION ==================== -->
+  <div class="modal-backdrop" id="modal-servers" role="dialog" aria-modal="true" aria-labelledby="modal-servers-title">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-card-header">
+        <div>
+          <h2 id="modal-servers-title" class="modal-title">Select Routing Node</h2>
+          <p class="modal-subtitle">Direct edge connection to minimize ping jitter and packet loss</p>
+        </div>
+        <button class="modal-close-btn" id="close-modal-servers" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-card-body">
+        <!-- Search & Quick Probe -->
+        <div class="server-search-row">
+          <div class="search-box server-search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="server-search-input" placeholder="Search servers by city, country or code...">
+          </div>
+          <button class="btn-ghost-small" id="btn-probe-all-servers" type="button">⚡ Test All Latencies</button>
+        </div>
+
+        <!-- Continent Filter Tabs -->
+        <div class="filters server-filters" id="server-continent-tabs">
+          <button class="filter active-filter" data-continent="all" type="button">All Regions</button>
+          <button class="filter" data-continent="smart" type="button">⚡ Smart</button>
+          <button class="filter" data-continent="Local" type="button">💻 Local</button>
+          <button class="filter" data-continent="Asia-Pacific" type="button">🌏 Asia</button>
+          <button class="filter" data-continent="Europe" type="button">🌍 Europe</button>
+          <button class="filter" data-continent="North America" type="button">🌎 Americas</button>
+        </div>
+
+        <!-- Server List Grid -->
+        <div class="server-modal-grid" id="server-modal-list">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+      <div class="modal-card-footer">
+        <button class="btn-cancel" id="cancel-modal-servers" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PROFILE OPTIMIZED ==================== -->
+  <div class="modal-backdrop" id="modal-optimize-profile" role="dialog" aria-modal="true" aria-labelledby="modal-opt-title">
+    <div class="modal-card">
+      <div class="modal-card-header">
+        <div class="opt-header-title">
+          <span class="opt-sparkle-icon">✨</span>
+          <h2 id="modal-opt-title" class="modal-title">Profile Auto-Optimized</h2>
+        </div>
+        <button class="modal-close-btn" id="close-modal-opt" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-card-body">
+        <div class="opt-game-banner">
+          <img id="opt-game-img" src="assets/games/valorant.png" alt="Game icon" class="opt-game-thumb">
+          <div class="opt-game-info">
+            <div class="opt-game-name" id="opt-game-name">Valorant</div>
+            <div class="opt-game-meta" id="opt-game-meta">Competitive Tactical Profile // Auto-Tuned</div>
+          </div>
+        </div>
+
+        <div class="opt-stats-grid">
+          <div class="opt-stat-card">
+            <span class="opt-stat-lbl">PACKET MTU</span>
+            <span class="opt-stat-val" id="opt-val-mtu">1400 B</span>
+            <span class="opt-stat-sub">Zero Fragmentation</span>
+          </div>
+          <div class="opt-stat-card">
+            <span class="opt-stat-lbl">QOS DSCP</span>
+            <span class="opt-stat-val" id="opt-val-dscp">EF-46</span>
+            <span class="opt-stat-sub">Expedited Forwarding</span>
+          </div>
+          <div class="opt-stat-card">
+            <span class="opt-stat-lbl">ZERO-RTT FEC</span>
+            <span class="opt-stat-val" id="opt-val-fec">6:1 Parity</span>
+            <span class="opt-stat-sub">Systematic XOR</span>
+          </div>
+          <div class="opt-stat-card">
+            <span class="opt-stat-lbl">SUBNETS CACHED</span>
+            <span class="opt-stat-val" id="opt-val-subnets">14 CIDRs</span>
+            <span class="opt-stat-sub">Pre-warmed Routes</span>
+          </div>
+        </div>
+
+        <div class="opt-checklist" id="opt-checklist">
+          <!-- Dynamic checklist items -->
+        </div>
+      </div>
+      <div class="modal-card-footer">
+        <button class="btn-confirm" id="btn-opt-done" type="button">Apply & Ready</button>
       </div>
     </div>
   </div>

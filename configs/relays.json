@@ -1,70 +1,25 @@
 [
   {
-    "id": "local-dev-1",
-    "name": "💻 Local Relay Server (127.0.0.1:4433 - Loopback Test)",
+    "id": "auto",
+    "name": "⚡ Auto (Smart Multi-Hop & Optimal Ping)",
+    "continent": "Global",
+    "location": "Global Dynamic Routing",
+    "endpoint": "auto",
+    "psk": "lagvex-community-us-free-public-psk-2026",
+    "tier": "smart"
+  },
+  {
+    "id": "local-accel",
+    "name": "💻 Local Ultra-Low Latency Engine (Zero-VPS)",
     "continent": "Local",
-    "location": "Local Machine",
+    "location": "Local Host (127.0.0.1)",
     "endpoint": "127.0.0.1:4433",
     "psk": "lagvex-community-us-free-public-psk-2026",
-    "tier": "developer"
-  },
-  {
-    "id": "us-east-1",
-    "name": "🇺🇸 North America East (US East - Virginia #1)",
-    "continent": "North America",
-    "location": "Ashburn, VA",
-    "endpoint": "us-east.lagvex.org:4433",
-    "psk": "lagvex-community-us-free-public-psk-2026",
-    "tier": "community"
-  },
-  {
-    "id": "us-central-1",
-    "name": "🇺🇸 North America Central (Dallas / Texas)",
-    "continent": "North America",
-    "location": "Dallas, TX",
-    "endpoint": "us-central.lagvex.org:4433",
-    "psk": "lagvex-community-us-free-public-psk-2026",
-    "tier": "community"
-  },
-  {
-    "id": "us-west-1",
-    "name": "🇺🇸 North America West (Silicon Valley / California)",
-    "continent": "North America",
-    "location": "San Jose, CA",
-    "endpoint": "us-west.lagvex.org:4433",
-    "psk": "lagvex-community-us-free-public-psk-2026",
-    "tier": "community"
-  },
-  {
-    "id": "eu-central-1",
-    "name": "🇩🇪 Europe Central (Frankfurt / Germany #1)",
-    "continent": "Europe",
-    "location": "Frankfurt, Germany",
-    "endpoint": "eu-central.lagvex.org:4433",
-    "psk": "lagvex-community-eu-free-public-psk-2026",
-    "tier": "community"
-  },
-  {
-    "id": "eu-west-1",
-    "name": "🇬🇧 Europe West (London / United Kingdom #1)",
-    "continent": "Europe",
-    "location": "London, UK",
-    "endpoint": "eu-west.lagvex.org:4433",
-    "psk": "lagvex-community-eu-free-public-psk-2026",
-    "tier": "community"
-  },
-  {
-    "id": "eu-north-1",
-    "name": "🇸🇪 Europe North (Stockholm / Sweden #1)",
-    "continent": "Europe",
-    "location": "Stockholm, Sweden",
-    "endpoint": "eu-north.lagvex.org:4433",
-    "psk": "lagvex-community-eu-free-public-psk-2026",
-    "tier": "community"
+    "tier": "engine"
   },
   {
     "id": "asia-sg-1",
-    "name": "🇸🇬 Southeast Asia #1 (Singapore - Equinix SG1)",
+    "name": "[SG] Southeast Asia (Singapore - Equinix SG1)",
     "continent": "Asia-Pacific",
     "location": "Singapore",
     "endpoint": "sg1.lagvex.org:4433",
@@ -73,7 +28,7 @@
   },
   {
     "id": "asia-sg-2",
-    "name": "🇸🇬 Southeast Asia #2 (Singapore - Direct Fiber)",
+    "name": "[SG] Southeast Asia #2 (Singapore - Direct Subsea)",
     "continent": "Asia-Pacific",
     "location": "Singapore",
     "endpoint": "sg2.lagvex.org:4433",
@@ -82,7 +37,7 @@
   },
   {
     "id": "asia-jp-1",
-    "name": "🇯🇵 East Asia (Tokyo / Japan #1)",
+    "name": "[JP] East Asia (Tokyo / Japan - Equinix TY2)",
     "continent": "Asia-Pacific",
     "location": "Tokyo, Japan",
     "endpoint": "jp1.lagvex.org:4433",
@@ -91,7 +46,7 @@
   },
   {
     "id": "asia-kr-1",
-    "name": "🇰🇷 East Asia (Seoul / South Korea #1)",
+    "name": "[KR] East Asia (Seoul / South Korea - Kinx)",
     "continent": "Asia-Pacific",
     "location": "Seoul, South Korea",
     "endpoint": "kr1.lagvex.org:4433",
@@ -100,7 +55,7 @@
   },
   {
     "id": "asia-hk-1",
-    "name": "🇭🇰 East Asia (Hong Kong #1)",
+    "name": "[HK] East Asia (Hong Kong - Mega-i)",
     "continent": "Asia-Pacific",
     "location": "Hong Kong",
     "endpoint": "hk1.lagvex.org:4433",
@@ -108,17 +63,71 @@
     "tier": "community"
   },
   {
-    "id": "oc-syd-1",
-    "name": "🇦🇺 Oceania (Sydney / Australia #1)",
-    "continent": "Oceania",
-    "location": "Sydney, Australia",
-    "endpoint": "syd1.lagvex.org:4433",
-    "psk": "lagvex-community-oc-free-public-psk-2026",
+    "id": "eu-fra-1",
+    "name": "[DE] Europe Central (Frankfurt - Equinix FR5)",
+    "continent": "Europe",
+    "location": "Frankfurt, Germany",
+    "endpoint": "eu-central.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026",
     "tier": "community"
   },
   {
-    "id": "sa-br-1",
-    "name": "🇧🇷 South America (São Paulo / Brazil #1)",
+    "id": "eu-lon-1",
+    "name": "[GB] Europe West (London - Telehouse North)",
+    "continent": "Europe",
+    "location": "London, UK",
+    "endpoint": "eu-west.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "eu-sto-1",
+    "name": "[SE] Europe North (Stockholm - Equinix SK1)",
+    "continent": "Europe",
+    "location": "Stockholm, Sweden",
+    "endpoint": "eu-north.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "eu-par-1",
+    "name": "[FR] Europe West (Paris - Interxion PAR)",
+    "continent": "Europe",
+    "location": "Paris, France",
+    "endpoint": "eu-paris.lagvex.org:4433",
+    "psk": "lagvex-community-eu-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "us-iad-1",
+    "name": "[US] North America East (Virginia - Equinix DC2)",
+    "continent": "North America",
+    "location": "Ashburn, VA",
+    "endpoint": "us-east.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "us-dfw-1",
+    "name": "[US] North America Central (Dallas / Texas - Infomart)",
+    "continent": "North America",
+    "location": "Dallas, TX",
+    "endpoint": "us-central.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "us-sjc-1",
+    "name": "[US] North America West (Silicon Valley - Equinix SV1)",
+    "continent": "North America",
+    "location": "San Jose, CA",
+    "endpoint": "us-west.lagvex.org:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026",
+    "tier": "community"
+  },
+  {
+    "id": "sa-sao-1",
+    "name": "[BR] South America (São Paulo - Equinix SP4)",
     "continent": "South America",
     "location": "São Paulo, Brazil",
     "endpoint": "br1.lagvex.org:4433",
@@ -126,12 +135,12 @@
     "tier": "community"
   },
   {
-    "id": "me-dxb-1",
-    "name": "🇦🇪 Middle East (Dubai / UAE #1)",
-    "continent": "Middle East",
-    "location": "Dubai, UAE",
-    "endpoint": "dxb1.lagvex.org:4433",
-    "psk": "lagvex-community-me-free-public-psk-2026",
+    "id": "oc-syd-1",
+    "name": "[AU] Oceania (Sydney - Equinix SY3)",
+    "continent": "Oceania",
+    "location": "Sydney, Australia",
+    "endpoint": "syd1.lagvex.org:4433",
+    "psk": "lagvex-community-oc-free-public-psk-2026",
     "tier": "community"
   }
 ]

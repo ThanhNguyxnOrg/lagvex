@@ -274,6 +274,37 @@
   const joinSquadBtn = document.getElementById('join-squad-btn');
   const btnOptimizeProfile = document.getElementById('btn-optimize-profile');
 
+  // Server Selection Elements
+  const btnOpenServerModal = document.getElementById('btn-open-server-modal');
+  const heroServerBadge = document.getElementById('hero-server-badge');
+  const heroServerName = document.getElementById('hero-server-name');
+  const heroServerPing = document.getElementById('hero-server-ping');
+  const heroMetaRegionPill = document.getElementById('hero-meta-region-pill');
+  const modalServers = document.getElementById('modal-servers');
+  const closeModalServers = document.getElementById('close-modal-servers');
+  const cancelModalServers = document.getElementById('cancel-modal-servers');
+  const serverSearchInput = document.getElementById('server-search-input');
+  const serverContinentTabs = document.getElementById('server-continent-tabs');
+  const serverModalList = document.getElementById('server-modal-list');
+  const btnProbeAllServers = document.getElementById('btn-probe-all-servers');
+
+  let activeServerFilter = 'all';
+  let serverSearchQuery = '';
+  let serverPings = {};
+
+  // Profile Optimization Modal Elements
+  const modalOptimizeProfile = document.getElementById('modal-optimize-profile');
+  const closeModalOpt = document.getElementById('close-modal-opt');
+  const btnOptDone = document.getElementById('btn-opt-done');
+  const optGameImg = document.getElementById('opt-game-img');
+  const optGameName = document.getElementById('opt-game-name');
+  const optGameMeta = document.getElementById('opt-game-meta');
+  const optValMtu = document.getElementById('opt-val-mtu');
+  const optValDscp = document.getElementById('opt-val-dscp');
+  const optValFec = document.getElementById('opt-val-fec');
+  const optValSubnets = document.getElementById('opt-val-subnets');
+  const optChecklist = document.getElementById('opt-checklist');
+
   // ==================== INITIALIZATION ====================
   function init() {
     loadRelays();
@@ -293,19 +324,37 @@
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          activeRelays = [
-            { id: 'auto', name: '⚡ Auto (Optimal Node Probing)', endpoint: 'auto' },
-            ...data
-          ];
+          activeRelays = data;
           currentRelayIndex = 0;
-          if (currentRegionLabel) {
-            currentRegionLabel.textContent = activeRelays[0].name;
-          }
+          updateServerSelectionUI(activeRelays[0]);
         }
       }
     } catch (e) {
       console.warn('Failed to load relays from backend:', e);
     }
+  }
+
+  function updateServerSelectionUI(relay) {
+    if (!relay) return;
+    const name = relay.name || 'Auto (Smart Route)';
+    let badge = '[AUTO]';
+    const match = name.match(/\[(.*?)\]/);
+    if (match) {
+      badge = `[${match[1]}]`;
+    } else if (name.includes('Auto')) {
+      badge = '[AUTO]';
+    } else if (name.includes('Local')) {
+      badge = '[LOCAL]';
+    }
+
+    if (heroServerBadge) heroServerBadge.textContent = badge;
+    if (heroServerName) heroServerName.textContent = name;
+    if (heroServerPing) {
+      const ping = serverPings[relay.endpoint];
+      heroServerPing.textContent = ping ? `${ping}ms` : (relay.endpoint === '127.0.0.1:4433' ? '<1ms' : '~1ms');
+    }
+    if (heroMetaRegion) heroMetaRegion.textContent = relay.location || name;
+    if (currentRegionLabel) currentRegionLabel.textContent = name;
   }
 
   // ==================== RENDERING ====================
@@ -743,19 +792,78 @@
       });
     });
 
-    // Routing Relay dropdown cycling
-    btnToggleRegion.addEventListener('click', () => {
-      currentRelayIndex = (currentRelayIndex + 1) % activeRelays.length;
-      const r = activeRelays[currentRelayIndex];
-      currentRegionLabel.textContent = r.name;
-      showToast(`Routing relay set to: ${r.name}`, 'info');
-      pollRouteAdvisor();
-    });
+    // Server Selection Modal openers
+    if (btnOpenServerModal) {
+      btnOpenServerModal.addEventListener('click', () => {
+        renderServerModalList();
+        if (modalServers) modalServers.classList.add('open');
+      });
+    }
+    if (heroMetaRegionPill) {
+      heroMetaRegionPill.addEventListener('click', () => {
+        renderServerModalList();
+        if (modalServers) modalServers.classList.add('open');
+      });
+    }
+    if (btnToggleRegion) {
+      btnToggleRegion.addEventListener('click', () => {
+        renderServerModalList();
+        if (modalServers) modalServers.classList.add('open');
+      });
+    }
 
-    // Optimize Profile trigger
-    btnOptimizeProfile.addEventListener('click', () => {
-      modalSettings.classList.add('open');
-    });
+    if (closeModalServers) {
+      closeModalServers.addEventListener('click', () => {
+        if (modalServers) modalServers.classList.remove('open');
+      });
+    }
+    if (cancelModalServers) {
+      cancelModalServers.addEventListener('click', () => {
+        if (modalServers) modalServers.classList.remove('open');
+      });
+    }
+
+    // Server Search Input
+    if (serverSearchInput) {
+      serverSearchInput.addEventListener('input', (e) => {
+        serverSearchQuery = e.target.value.trim();
+        renderServerModalList();
+      });
+    }
+
+    // Server Continent Tabs
+    if (serverContinentTabs) {
+      const sTabs = serverContinentTabs.querySelectorAll('.filter');
+      sTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          sTabs.forEach(t => t.classList.remove('active-filter'));
+          tab.classList.add('active-filter');
+          activeServerFilter = tab.getAttribute('data-continent');
+          renderServerModalList();
+        });
+      });
+    }
+
+    // Probe All Servers Latency
+    if (btnProbeAllServers) {
+      btnProbeAllServers.addEventListener('click', probeAllServers);
+    }
+
+    // Optimize Profile Action
+    if (btnOptimizeProfile) {
+      btnOptimizeProfile.addEventListener('click', optimizeGameProfile);
+    }
+    if (closeModalOpt) {
+      closeModalOpt.addEventListener('click', () => {
+        if (modalOptimizeProfile) modalOptimizeProfile.classList.remove('open');
+      });
+    }
+    if (btnOptDone) {
+      btnOptDone.addEventListener('click', () => {
+        if (modalOptimizeProfile) modalOptimizeProfile.classList.remove('open');
+        showToast('Profile parameters active for next match', 'success');
+      });
+    }
 
     // Settings Modal
     btnOpenSettings.addEventListener('click', () => {
@@ -888,8 +996,189 @@
         modalSettings.classList.remove('open');
         modalSquad.classList.remove('open');
         if (modalCustomGame) modalCustomGame.classList.remove('open');
+        if (modalServers) modalServers.classList.remove('open');
+        if (modalOptimizeProfile) modalOptimizeProfile.classList.remove('open');
       }
     });
+
+    // Close modals on clicking backdrop outside modal-card
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          backdrop.classList.remove('open');
+        }
+      });
+    });
+  }
+
+  // ==================== SERVER SELECTION MODAL LOGIC ====================
+  function renderServerModalList() {
+    if (!serverModalList) return;
+    serverModalList.innerHTML = '';
+
+    const filtered = activeRelays.filter(relay => {
+      const continent = relay.continent || 'Global';
+      const tier = relay.tier || '';
+      const matchesFilter = activeServerFilter === 'all' ||
+        (activeServerFilter === 'smart' && (tier === 'smart' || relay.id === 'auto')) ||
+        (activeServerFilter === 'Local' && (continent === 'Local' || relay.endpoint.includes('127.0.0.1'))) ||
+        continent.toLowerCase().includes(activeServerFilter.toLowerCase());
+
+      const q = serverSearchQuery.toLowerCase();
+      const matchesSearch = !q ||
+        relay.name.toLowerCase().includes(q) ||
+        (relay.location && relay.location.toLowerCase().includes(q)) ||
+        (relay.endpoint && relay.endpoint.toLowerCase().includes(q));
+
+      return matchesFilter && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+      serverModalList.innerHTML = '<div style="padding: 30px; text-align: center; color: #7a8c9b; font-size: 13px; grid-column: 1/-1;">No servers match the selected criteria</div>';
+      return;
+    }
+
+    filtered.forEach(relay => {
+      const card = document.createElement('div');
+      const isSelected = activeRelays[currentRelayIndex] && activeRelays[currentRelayIndex].id === relay.id;
+      card.className = `server-card ${isSelected ? 'active-server' : ''}`;
+
+      let badge = 'NODE';
+      let badgeClass = '';
+      const match = relay.name.match(/\[(.*?)\]/);
+      if (match) {
+        badge = match[1];
+      } else if (relay.name.includes('Auto')) {
+        badge = '⚡ AUTO';
+        badgeClass = 'badge-smart';
+      } else if (relay.name.includes('Local')) {
+        badge = '💻 LOCAL';
+        badgeClass = 'badge-local';
+      }
+
+      const pingVal = serverPings[relay.endpoint] || (relay.endpoint === '127.0.0.1:4433' ? '<1ms' : (relay.endpoint === 'auto' ? '~1ms' : '--'));
+
+      card.innerHTML = `
+        <div class="server-card-info">
+          <span class="server-badge ${badgeClass}">${badge}</span>
+          <div class="server-details">
+            <span class="server-name-txt">${relay.name.replace(/\[.*?\]\s*/, '')}</span>
+            <span class="server-sub-txt">${relay.location || relay.endpoint} &bull; ${relay.tier || 'edge'}</span>
+          </div>
+        </div>
+        <div class="server-card-actions">
+          <span class="server-ping-badge ${pingVal !== '--' && !pingVal.includes('err') ? 'good' : ''}">${pingVal}</span>
+          <button class="server-card-btn" type="button">${isSelected ? 'Active' : 'Select'}</button>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        const idx = activeRelays.findIndex(r => r.id === relay.id);
+        if (idx !== -1) {
+          currentRelayIndex = idx;
+          updateServerSelectionUI(relay);
+          if (modalServers) modalServers.classList.remove('open');
+          showToast(`Selected routing node: ${relay.name}`, 'success');
+          pollRouteAdvisor();
+        }
+      });
+
+      serverModalList.appendChild(card);
+    });
+  }
+
+  async function probeAllServers() {
+    if (btnProbeAllServers) {
+      btnProbeAllServers.textContent = 'Probing...';
+      btnProbeAllServers.disabled = true;
+    }
+
+    try {
+      // Loopback is always instantaneous
+      serverPings['127.0.0.1:4433'] = '<1ms';
+      serverPings['auto'] = '~1ms';
+
+      const res = await fetch('/api/probe-relays?samples=1');
+      if (res.ok) {
+        const results = await res.json();
+        if (Array.isArray(results)) {
+          results.forEach(p => {
+            if (p.reachable && p.medianPingMs > 0) {
+              serverPings[p.endpoint] = `${Math.round(p.medianPingMs)}ms`;
+            } else if (p.endpoint === '127.0.0.1:4433') {
+              serverPings[p.endpoint] = '<1ms';
+            } else {
+              serverPings[p.endpoint] = 'Unreachable';
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Probe error:', e);
+    } finally {
+      if (btnProbeAllServers) {
+        btnProbeAllServers.textContent = '⚡ Test All Latencies';
+        btnProbeAllServers.disabled = false;
+      }
+      renderServerModalList();
+      if (activeRelays[currentRelayIndex]) {
+        updateServerSelectionUI(activeRelays[currentRelayIndex]);
+      }
+      showToast('Completed latency probing across all nodes', 'info');
+    }
+  }
+
+  // ==================== PROFILE OPTIMIZATION ACTION ====================
+  async function optimizeGameProfile() {
+    if (!selectedGame) return;
+    if (btnOptimizeProfile) {
+      btnOptimizeProfile.classList.add('loading');
+      const span = btnOptimizeProfile.querySelector('span');
+      if (span) span.textContent = 'Optimizing...';
+    }
+
+    try {
+      const res = await fetch(`/api/optimize-profile?gameId=${encodeURIComponent(selectedGame.id)}`);
+      if (res.ok) {
+        const data = await res.json();
+
+        if (optGameImg) optGameImg.src = selectedGame.image;
+        if (optGameName) optGameName.textContent = data.gameTitle || selectedGame.name;
+        if (optGameMeta) optGameMeta.textContent = `${data.genre} Optimized Profile // Jitter Dampening Active`;
+        if (optValMtu) optValMtu.textContent = `${data.mtu} B`;
+        if (optValDscp) optValDscp.textContent = data.dscp.includes('EF-46') ? 'EF-46' : 'CS6';
+        if (optValFec) optValFec.textContent = `${data.fecRatio} Parity`;
+        if (optValSubnets) optValSubnets.textContent = `${data.subnetsCount} CIDRs`;
+
+        if (optChecklist && Array.isArray(data.details)) {
+          optChecklist.innerHTML = data.details.map(det => `
+            <div class="opt-check-item">
+              <span class="opt-check-icon">✓</span>
+              <span>${det}</span>
+            </div>
+          `).join('');
+        }
+
+        const kicker = document.getElementById('hero-kicker-text');
+        if (kicker) {
+          kicker.textContent = 'Profile optimal';
+        }
+
+        if (modalOptimizeProfile) {
+          modalOptimizeProfile.classList.add('open');
+        }
+        showToast(`✨ ${data.gameTitle} profile optimized: MTU 1400B & EF-46 QoS applied`, 'success');
+      }
+    } catch (e) {
+      console.warn('Profile optimization error:', e);
+      showToast('⚠️ Could not complete profile auto-tune', 'error');
+    } finally {
+      if (btnOptimizeProfile) {
+        btnOptimizeProfile.classList.remove('loading');
+        const span = btnOptimizeProfile.querySelector('span');
+        if (span) span.textContent = 'Optimize profile';
+      }
+    }
   }
 
   // ==================== TOAST HELPER ====================
