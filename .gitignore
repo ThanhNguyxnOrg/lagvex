@@ -8,6 +8,7 @@ bin/lagvex-client*
 
 # Keep wintun.dll directory structure if needed, or track wintun.dll if intended
 !bin/amd64/wintun.dll
+!pkg/client/wintun_amd64.dll
 
 # Test artifacts and coverage
 *.test

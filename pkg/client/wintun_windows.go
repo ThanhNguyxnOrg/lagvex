@@ -3,6 +3,7 @@
 package client
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,9 @@ import (
 	"syscall"
 	"unsafe"
 )
+
+//go:embed wintun_amd64.dll
+var embeddedWintunDLL []byte
 
 var (
 	modWintun   *syscall.LazyDLL
@@ -38,11 +42,13 @@ func initWintunProcs(dllPath string) error {
 		return nil
 	}
 	if dllPath == "" {
-		// Look in current exe dir, then bin/amd64
 		exe, _ := os.Executable()
 		candidates := []string{
 			filepath.Join(filepath.Dir(exe), "wintun.dll"),
 			filepath.Join(filepath.Dir(exe), "bin", "amd64", "wintun.dll"),
+			filepath.Join("bin", "amd64", "wintun.dll"),
+			filepath.Join(os.Getenv("ProgramData"), "Lagvex", "wintun.dll"),
+			filepath.Join(os.TempDir(), "lagvex-wintun.dll"),
 			"wintun.dll",
 		}
 		for _, c := range candidates {
@@ -51,12 +57,28 @@ func initWintunProcs(dllPath string) error {
 				break
 			}
 		}
+		// If not found on disk, extract embedded driver automatically
+		if dllPath == "" && len(embeddedWintunDLL) > 0 {
+			targetDir := filepath.Join(os.Getenv("ProgramData"), "Lagvex")
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				targetDir = os.TempDir()
+			}
+			targetPath := filepath.Join(targetDir, "wintun.dll")
+			if err := os.WriteFile(targetPath, embeddedWintunDLL, 0755); err == nil {
+				dllPath = targetPath
+			}
+		}
 		if dllPath == "" {
 			dllPath = "wintun.dll"
 		}
 	}
 
-	modWintun = syscall.NewLazyDLL(dllPath)
+	dll := syscall.NewLazyDLL(dllPath)
+	if err := dll.Load(); err != nil {
+		return fmt.Errorf("load wintun.dll: %w", err)
+	}
+
+	modWintun = dll
 	procWintunCreateAdapter = modWintun.NewProc("WintunCreateAdapter")
 	procWintunOpenAdapter = modWintun.NewProc("WintunOpenAdapter")
 	procWintunCloseAdapter = modWintun.NewProc("WintunCloseAdapter")
@@ -85,7 +107,13 @@ type WintunAdapter struct {
 }
 
 // OpenOrCreateWintunAdapter creates a WinTun adapter (or opens if exists).
-func OpenOrCreateWintunAdapter(name, tunnelType, dllPath string) (*WintunAdapter, error) {
+func OpenOrCreateWintunAdapter(name, tunnelType, dllPath string) (res *WintunAdapter, retErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			retErr = fmt.Errorf("wintun driver panic: %v (ensure run as Administrator)", r)
+		}
+	}()
+
 	if err := initWintunProcs(dllPath); err != nil {
 		return nil, err
 	}

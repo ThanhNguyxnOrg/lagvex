@@ -180,23 +180,29 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	// Auto Node Selection if requested or endpoint is "auto"
 	if req.AutoNode || req.RelayEndpoint == "auto" || req.RelayEndpoint == "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 
 		best, err := u.prober.SelectBest(ctx, catalog.Relays)
-		if err != nil {
-			http.Error(w, "auto node selection failed: "+err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		req.RelayEndpoint = best.Endpoint
-		// Lookup PSK from catalog
-		for _, rel := range catalog.Relays {
-			if rel.Endpoint == best.Endpoint {
-				req.PSK = rel.PSK
-				break
+		if err == nil && best != nil {
+			req.RelayEndpoint = best.Endpoint
+			for _, rel := range catalog.Relays {
+				if rel.Endpoint == best.Endpoint {
+					req.PSK = rel.PSK
+					break
+				}
+			}
+			log.Printf("[Dashboard] Auto-selected optimal relay: %s (%s, score=%.1f)", best.Name, best.Endpoint, best.Score)
+		} else {
+			if len(catalog.Relays) > 0 {
+				req.RelayEndpoint = catalog.Relays[0].Endpoint
+				req.PSK = catalog.Relays[0].PSK
+				log.Printf("[Dashboard] Probing timed out, attempting primary relay: %s (%s)", catalog.Relays[0].Name, req.RelayEndpoint)
+			} else {
+				http.Error(w, "no relays configured in catalog", http.StatusServiceUnavailable)
+				return
 			}
 		}
-		log.Printf("[Dashboard] Auto-selected optimal relay: %s (%s, score=%.1f)", best.Name, best.Endpoint, best.Score)
 	} else if req.PSK == "" {
 		// Lookup PSK from catalog if not explicitly provided
 		for _, rel := range catalog.Relays {

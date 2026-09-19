@@ -194,21 +194,17 @@
     }
   ];
 
-  const REGIONS = [
-    'Auto region',
-    'Singapore #1 (18ms)',
-    'Tokyo #1 (32ms)',
-    'Hong Kong #1 (28ms)',
-    'Frankfurt #1 (140ms)',
-    'US West #1 (165ms)'
+  // Dynamic Relays list from Go backend
+  let activeRelays = [
+    { id: 'auto', name: '⚡ Auto (Optimal Node Probing)', endpoint: 'auto' }
   ];
+  let currentRelayIndex = 0;
 
   // State
   let selectedGame = GAMES_CATALOG[0];
   let activeCategory = 'all';
   let searchQuery = '';
   let isAccelerating = false;
-  let currentRegionIndex = 0;
   let chartInterval = null;
 
   // DOM Elements
@@ -280,6 +276,7 @@
 
   // ==================== INITIALIZATION ====================
   function init() {
+    loadRelays();
     renderGameList();
     updateHeroCard(selectedGame);
     setupEventListeners();
@@ -288,6 +285,27 @@
     pollRouteAdvisor();
     setInterval(pollEngineStatus, 2000);
     setInterval(pollRouteAdvisor, 8000);
+  }
+
+  async function loadRelays() {
+    try {
+      const res = await fetch('/api/relays');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          activeRelays = [
+            { id: 'auto', name: '⚡ Auto (Optimal Node Probing)', endpoint: 'auto' },
+            ...data
+          ];
+          currentRelayIndex = 0;
+          if (currentRegionLabel) {
+            currentRegionLabel.textContent = activeRelays[0].name;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load relays from backend:', e);
+    }
   }
 
   // ==================== RENDERING ====================
@@ -392,22 +410,35 @@
 
       showToast(`Initiating secure tunnel for ${selectedGame.name}...`, 'info');
 
+      const selectedRelay = activeRelays[currentRelayIndex] || { endpoint: 'auto' };
       try {
-        await fetch('/api/connect', {
+        const res = await fetch('/api/connect', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            relayEndpoint: 'auto',
-            autoNode: true,
+            relayEndpoint: selectedRelay.endpoint || 'auto',
+            autoNode: selectedRelay.endpoint === 'auto',
             gameId: selectedGame.id,
             regionId: selectedGame.region || '',
             forceNow: true
           })
         });
+        if (!res.ok) {
+          const errData = await res.text();
+          showToast(`⚠️ Boost failed: ${errData}`, 'error');
+          isAccelerating = false;
+          btnToggleBoost.classList.remove('is-active');
+          boostButtonLabel.textContent = 'Activate boost';
+          telemetryLiveLabel.textContent = 'Standby';
+          engineStatusLabel.textContent = 'Connection failed';
+          engineStatusDot.style.background = 'var(--red, #ef4444)';
+          updateHeroCard(selectedGame);
+        }
       } catch (e) {
         console.warn('Backend connect notice:', e);
+        showToast('⚠️ Could not communicate with Lagvex engine', 'error');
       }
     } else {
       btnToggleBoost.classList.remove('is-active');
@@ -712,12 +743,13 @@
       });
     });
 
-    // Region dropdown cycling
+    // Routing Relay dropdown cycling
     btnToggleRegion.addEventListener('click', () => {
-      currentRegionIndex = (currentRegionIndex + 1) % REGIONS.length;
-      const newRegion = REGIONS[currentRegionIndex];
-      currentRegionLabel.textContent = newRegion;
-      showToast(`Routing region set to: ${newRegion}`, 'info');
+      currentRelayIndex = (currentRelayIndex + 1) % activeRelays.length;
+      const r = activeRelays[currentRelayIndex];
+      currentRegionLabel.textContent = r.name;
+      showToast(`Routing relay set to: ${r.name}`, 'info');
+      pollRouteAdvisor();
     });
 
     // Optimize Profile trigger
