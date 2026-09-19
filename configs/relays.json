@@ -1,5 +1,14 @@
 [
   {
+    "id": "local-dev-1",
+    "name": "💻 Local Relay Server (127.0.0.1:4433 - Loopback Test)",
+    "continent": "Local",
+    "location": "Local Machine",
+    "endpoint": "127.0.0.1:4433",
+    "psk": "lagvex-community-us-free-public-psk-2026",
+    "tier": "developer"
+  },
+  {
     "id": "us-east-1",
     "name": "🇺🇸 North America East (US East - Virginia #1)",
     "continent": "North America",

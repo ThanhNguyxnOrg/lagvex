@@ -171,10 +171,18 @@ func (e *Engine) Stats() TunnelStats {
 
 // Connect initiates connection to the relay and configures adapter & routing.
 func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID string, forceRoutesNow bool) error {
+	recordErr := func(err error) error {
+		if err != nil {
+			errStr := err.Error()
+			e.lastErr.Store(&errStr)
+		}
+		return err
+	}
+
 	e.mu.Lock()
 	if e.state != StateDisconnected && e.state != StateError {
 		e.mu.Unlock()
-		return fmt.Errorf("cannot connect in state %s", e.state)
+		return recordErr(fmt.Errorf("cannot connect in state %s", e.state))
 	}
 	e.state = StateConnecting
 	e.mu.Unlock()
@@ -185,7 +193,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	udpAddr, err := net.ResolveUDPAddr("udp4", relayEndpoint)
 	if err != nil {
 		e.resetState()
-		return fmt.Errorf("resolve relay endpoint %s: %w", relayEndpoint, err)
+		return recordErr(fmt.Errorf("resolve relay endpoint %s: %w", relayEndpoint, err))
 	}
 	relayAddrPort := udpAddr.AddrPort()
 	relayIP := relayAddrPort.Addr()
@@ -194,7 +202,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	conn, err := net.ListenUDP("udp4", nil)
 	if err != nil {
 		e.resetState()
-		return fmt.Errorf("create udp socket: %w", err)
+		return recordErr(fmt.Errorf("create udp socket: %w", err))
 	}
 	_ = conn.SetReadBuffer(8 * 1024 * 1024)
 	_ = conn.SetWriteBuffer(8 * 1024 * 1024)
@@ -214,7 +222,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 
 	for attempt := 1; attempt <= 3; attempt++ {
 		_, _ = conn.WriteToUDP(reqBuf, udpAddr)
-		_ = conn.SetReadDeadline(time.Now().Add(2500 * time.Millisecond))
+		_ = conn.SetReadDeadline(time.Now().Add(1200 * time.Millisecond))
 
 		n, _, readErr := conn.ReadFromUDP(recvBuf)
 		if readErr == nil {
@@ -232,7 +240,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	if resp == nil || resp.Status != protocol.StatusOK {
 		conn.Close()
 		e.resetState()
-		return fmt.Errorf("handshake failed with relay (check PSK or server availability)")
+		return recordErr(fmt.Errorf("handshake failed with relay %s (host unreachable or PSK mismatch)", relayEndpoint))
 	}
 
 	log.Printf("[Engine] Handshake OK: session=%016x assignedIP=%s gw=%s mtu=%d",
@@ -243,7 +251,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	if err != nil {
 		conn.Close()
 		e.resetState()
-		return fmt.Errorf("initialize session crypto: %w", err)
+		return recordErr(fmt.Errorf("initialize session crypto: %w", err))
 	}
 
 	// 4. Create WinTun adapter
@@ -251,7 +259,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	if err != nil {
 		conn.Close()
 		e.resetState()
-		return fmt.Errorf("initialize WinTun adapter: %w (ensure run as Administrator)", err)
+		return recordErr(fmt.Errorf("initialize WinTun adapter: %w (ensure run as Administrator)", err))
 	}
 
 	// 5. Configure Adapter IP & MTU

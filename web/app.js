@@ -323,7 +323,7 @@
           <strong>${game.name}</strong>
           <small>${game.genre}</small>
         </span>
-        <span class="game-ping">${isAccelerating ? Math.max(10, Math.round(game.accelPing * 0.75)) + ' ms' : game.ping}</span>
+        <span class="game-ping">${isAccelerating && selectedGame.id === game.id ? 'Protected' : '~' + game.baselinePing + ' ms'}</span>
       `;
 
       row.addEventListener('click', () => {
@@ -357,44 +357,41 @@
     heroGameSubtitle.innerHTML = `${game.genre} <span>&bull;</span> Competitive profile <span>&bull;</span> <strong id="hero-kicker-text" class="hero-status-tag">${isAccelerating ? 'Acceleration active' : 'Ready to boost'}</strong>`;
     heroCoverImg.src = game.image;
     heroCoverImg.alt = `${game.name} cover artwork`;
-
-    const displayPing = isAccelerating ? `${Math.max(10, Math.round(game.accelPing * 0.75))} ms` : game.ping;
-    heroMetaPing.textContent = displayPing;
     heroMetaRegion.textContent = game.region;
 
-    // Update Telemetry values
+    // Honest Telemetry: Never display fake hardcoded pings when disconnected
     if (isAccelerating) {
-      metricValLatency.textContent = Math.max(10, Math.round(game.accelPing * 0.75));
-      metricTrendLatency.innerHTML = game.trend;
-      metricValLoss.textContent = '0.00';
-      metricValRoute.textContent = '99';
+      heroMetaPing.textContent = 'Protected';
+      metricTrendLatency.innerHTML = '&minus; Live';
+      metricValLoss.textContent = '0.00%';
+      metricValRoute.textContent = 'Optimal';
     } else {
-      metricValLatency.textContent = game.accelPing;
-      metricTrendLatency.innerHTML = game.trend;
-      metricValLoss.textContent = '0.00';
-      metricValRoute.textContent = '98';
+      heroMetaPing.textContent = `~${game.baselinePing} ms (Target)`;
+      metricValLatency.textContent = '--';
+      metricTrendLatency.innerHTML = 'Standby';
+      metricValLoss.textContent = '--';
+      metricValRoute.textContent = 'Standby';
     }
   }
 
   // ==================== BOOST ACCELERATION ====================
   async function toggleBoost() {
-    isAccelerating = !isAccelerating;
-
-    if (isAccelerating) {
-      btnToggleBoost.classList.add('is-active');
-      boostButtonLabel.textContent = 'Acceleration active';
-      telemetryLiveLabel.textContent = 'Boosting now';
-      engineStatusLabel.textContent = 'Accelerating';
-      engineStatusDot.style.background = 'var(--green)';
+    if (!isAccelerating) {
+      // Transitioning to connecting
+      boostButtonLabel.textContent = 'Connecting...';
+      telemetryLiveLabel.textContent = 'Handshaking';
+      engineStatusLabel.textContent = 'Negotiating tunnel...';
+      engineStatusDot.style.background = 'var(--cyan)';
+      metricValLatency.textContent = '...';
+      heroMetaPing.textContent = 'Connecting...';
 
       const boostKicker = document.getElementById('hero-kicker-text');
       if (boostKicker) {
-        boostKicker.textContent = 'Acceleration active';
+        boostKicker.textContent = 'Connecting...';
       }
 
-      showToast(`Tunnel established for ${selectedGame.name} via ${selectedGame.region}`, 'success');
+      showToast(`Initiating secure tunnel for ${selectedGame.name}...`, 'info');
 
-      // Call Go backend API with full connectReq payload
       try {
         await fetch('/api/connect', {
           method: 'POST',
@@ -415,8 +412,10 @@
     } else {
       btnToggleBoost.classList.remove('is-active');
       boostButtonLabel.textContent = 'Activate boost';
-      telemetryLiveLabel.textContent = 'Monitoring';
+      telemetryLiveLabel.textContent = 'Standby';
       engineStatusLabel.textContent = 'Engine online';
+      engineStatusDot.style.background = '';
+      isAccelerating = false;
 
       const boostKicker = document.getElementById('hero-kicker-text');
       if (boostKicker) {
@@ -425,7 +424,6 @@
 
       showToast('Acceleration stopped — Returned to standby', 'info');
 
-      // Call Go backend API
       try {
         await fetch('/api/disconnect', {
           method: 'POST',
@@ -436,10 +434,10 @@
       } catch (e) {
         console.warn('Backend disconnect notice:', e);
       }
-    }
 
-    updateHeroCard(selectedGame);
-    renderGameList();
+      updateHeroCard(selectedGame);
+      renderGameList();
+    }
   }
 
   // ==================== ANIMATED MINI CHARTS ====================
@@ -626,22 +624,37 @@
           telemetryLiveLabel.textContent = 'Boosting now';
           engineStatusLabel.textContent = data.activeRelayName ? `Boosted via ${data.activeRelayName}` : 'Accelerating';
           engineStatusDot.style.background = 'var(--green)';
+          showToast(`⚡ Tunnel established via ${data.activeRelayName || 'relay'} (${data.pingMs || 0}ms)`, 'success');
           updateHeroCard(selectedGame);
+          renderGameList();
         }
         // Update live stats from real Go engine
-        if (data.pingMs && data.pingMs > 0) {
-          metricValLatency.textContent = data.pingMs;
-          heroMetaPing.textContent = `${data.pingMs} ms`;
-        }
-      } else if (data.state === 'disconnected' || data.state === 'standby') {
-        if (isAccelerating) {
+        metricValLatency.textContent = data.pingMs > 0 ? data.pingMs : '--';
+        heroMetaPing.textContent = data.pingMs > 0 ? `${data.pingMs} ms` : 'Active';
+        metricTrendLatency.innerHTML = '&minus; Live';
+        metricValLoss.textContent = '0.00%';
+        metricValRoute.textContent = data.routeCount > 0 ? `${data.routeCount} routes` : 'Optimal';
+      } else if (data.state === 'connecting') {
+        boostButtonLabel.textContent = 'Connecting...';
+        telemetryLiveLabel.textContent = 'Handshaking';
+        engineStatusLabel.textContent = 'Probing & connecting...';
+        engineStatusDot.style.background = 'var(--cyan)';
+        metricValLatency.textContent = '...';
+        heroMetaPing.textContent = 'Connecting...';
+      } else if (data.state === 'disconnected' || data.state === 'standby' || data.state === 'error') {
+        if (isAccelerating || boostButtonLabel.textContent === 'Connecting...') {
+          const hadError = data.lastError || data.state === 'error';
           isAccelerating = false;
           btnToggleBoost.classList.remove('is-active');
           boostButtonLabel.textContent = 'Activate boost';
-          telemetryLiveLabel.textContent = 'Monitoring';
-          engineStatusLabel.textContent = 'Engine online';
-          engineStatusDot.style.background = '';
+          telemetryLiveLabel.textContent = 'Standby';
+          engineStatusLabel.textContent = hadError ? 'Connection failed' : 'Engine online';
+          engineStatusDot.style.background = hadError ? 'var(--red, #ef4444)' : '';
           updateHeroCard(selectedGame);
+          renderGameList();
+          if (data.lastError) {
+            showToast(`⚠️ Boost failed: ${data.lastError}`, 'error');
+          }
         }
       }
     } catch (e) {
