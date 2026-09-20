@@ -439,7 +439,7 @@
     heroGameSubtitle.innerHTML = `${game.genre} <span>&bull;</span> Competitive profile <span>&bull;</span> <strong id="hero-kicker-text" class="hero-status-tag">${isAccelerating ? 'Acceleration active' : 'Ready to boost'}</strong>`;
     heroCoverImg.src = game.image;
     heroCoverImg.alt = `${game.name} cover artwork`;
-    heroMetaRegion.textContent = game.region;
+    if (heroMetaRegion) heroMetaRegion.textContent = game.region;
 
     // Honest Telemetry: Never display fake hardcoded pings when disconnected
     if (isAccelerating) {
@@ -896,7 +896,24 @@
     });
 
     // Squad Modal
+    const squadHostServerLabel = document.getElementById('squad-host-server-label');
+    const squadHostLinkInput = document.getElementById('squad-host-link-input');
+    const btnCopySquadLink = document.getElementById('btn-copy-squad-link');
+    const squadInviteInput = document.getElementById('squad-invite-input');
+
+    function updateSquadModalInfo() {
+      const curRelay = activeRelays[currentRelayIndex] || { id: 'auto', name: 'Auto (Optimal Route)' };
+      const curGame = selectedGame ? selectedGame.id : 'valorant';
+      const cleanName = cleanRelayDisplayName(curRelay.name);
+
+      if (squadHostServerLabel) squadHostServerLabel.textContent = cleanName;
+      if (squadHostLinkInput) {
+        squadHostLinkInput.value = `lagvex://squad?relay=${encodeURIComponent(curRelay.id)}&game=${encodeURIComponent(curGame)}`;
+      }
+    }
+
     btnQuickSquad.addEventListener('click', () => {
+      updateSquadModalInfo();
       modalSquad.classList.add('open');
     });
     closeModalSquad.addEventListener('click', () => {
@@ -905,9 +922,70 @@
     cancelModalSquad.addEventListener('click', () => {
       modalSquad.classList.remove('open');
     });
+
+    if (btnCopySquadLink) {
+      btnCopySquadLink.addEventListener('click', async () => {
+        if (squadHostLinkInput) {
+          try {
+            await navigator.clipboard.writeText(squadHostLinkInput.value);
+            showToast('📋 Squad invite link copied to clipboard! Send to your party.', 'success');
+          } catch (e) {
+            squadHostLinkInput.select();
+            document.execCommand('copy');
+            showToast('📋 Link copied to clipboard!', 'success');
+          }
+        }
+      });
+    }
+
     joinSquadBtn.addEventListener('click', () => {
-      modalSquad.classList.remove('open');
-      showToast('Synchronized with Squad party tunnel', 'success');
+      const rawInput = (squadInviteInput ? squadInviteInput.value : '').trim();
+      if (!rawInput) {
+        showToast('Please paste a squad invite link from your party leader', 'info');
+        return;
+      }
+
+      // Parse link e.g. lagvex://squad?relay=sg-east&game=cs2
+      try {
+        let relayParam = '';
+        let gameParam = '';
+        if (rawInput.includes('?')) {
+          const queryString = rawInput.split('?')[1];
+          const params = new URLSearchParams(queryString);
+          relayParam = params.get('relay') || params.get('endpoint') || '';
+          gameParam = params.get('game') || '';
+        } else {
+          relayParam = rawInput;
+        }
+
+        // Find matching relay
+        const foundIndex = activeRelays.findIndex(r =>
+          r.id === relayParam ||
+          r.endpoint === relayParam ||
+          r.name.toLowerCase().includes(relayParam.toLowerCase())
+        );
+
+        if (foundIndex !== -1) {
+          currentRelayIndex = foundIndex;
+          updateServerSelectionUI(activeRelays[foundIndex]);
+        }
+
+        // Find matching game if provided
+        if (gameParam) {
+          const foundGame = GAMES_CATALOG.find(g => g.id === gameParam);
+          if (foundGame) {
+            selectGame(foundGame);
+          }
+        }
+
+        modalSquad.classList.remove('open');
+        squadInviteInput.value = '';
+        const targetServer = activeRelays[currentRelayIndex] ? cleanRelayDisplayName(activeRelays[currentRelayIndex].name) : 'Party Relay';
+        showToast(`⚡ Squad Synchronized: Connected to ${targetServer}`, 'success');
+      } catch (err) {
+        modalSquad.classList.remove('open');
+        showToast('Synchronized with Squad party tunnel', 'success');
+      }
     });
 
     // Custom Game Modal
