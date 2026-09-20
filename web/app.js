@@ -334,27 +334,42 @@
     }
   }
 
+  function cleanRelayDisplayName(rawName) {
+    if (!rawName) return 'Auto (Optimal Route)';
+    if (rawName.includes('Auto')) {
+      return 'Auto (Optimal Route)';
+    }
+    if (rawName.includes('Local') || rawName.includes('127.0.0.1')) {
+      return 'Local Accelerator';
+    }
+    let cleaned = rawName.replace(/^\[.*?\]\s*/, '').replace(/^[⚡💻🌏🌍🌎]\s*/, '');
+    cleaned = cleaned.replace(/\s*\(\d+\.\d+\.\d+\.\d+.*?\)/, '');
+    return cleaned.trim() || 'Optimal Route';
+  }
+
   function updateServerSelectionUI(relay) {
     if (!relay) return;
-    const name = relay.name || 'Auto (Smart Route)';
-    let badge = '[AUTO]';
-    const match = name.match(/\[(.*?)\]/);
+    const rawName = relay.name || 'Auto (Smart Route)';
+    let badge = 'AUTO';
+    const match = rawName.match(/\[(.*?)\]/);
     if (match) {
-      badge = `[${match[1]}]`;
-    } else if (name.includes('Auto')) {
-      badge = '[AUTO]';
-    } else if (name.includes('Local')) {
-      badge = '[LOCAL]';
+      badge = match[1];
+    } else if (rawName.includes('Auto')) {
+      badge = 'AUTO';
+    } else if (rawName.includes('Local')) {
+      badge = 'LOCAL';
     }
 
+    const displayName = cleanRelayDisplayName(rawName);
+
     if (heroServerBadge) heroServerBadge.textContent = badge;
-    if (heroServerName) heroServerName.textContent = name;
+    if (heroServerName) heroServerName.textContent = displayName;
     if (heroServerPing) {
       const ping = serverPings[relay.endpoint];
       heroServerPing.textContent = ping ? `${ping}ms` : (relay.endpoint === '127.0.0.1:4433' ? '<1ms' : '~1ms');
     }
-    if (heroMetaRegion) heroMetaRegion.textContent = relay.location || name;
-    if (currentRegionLabel) currentRegionLabel.textContent = name;
+    if (heroMetaRegion) heroMetaRegion.textContent = relay.location || displayName;
+    if (currentRegionLabel) currentRegionLabel.textContent = displayName;
   }
 
   // ==================== RENDERING ====================
@@ -1062,7 +1077,7 @@
         <div class="server-card-info">
           <span class="server-badge ${badgeClass}">${badge}</span>
           <div class="server-details">
-            <span class="server-name-txt">${relay.name.replace(/\[.*?\]\s*/, '')}</span>
+            <span class="server-name-txt">${cleanRelayDisplayName(relay.name)}</span>
             <span class="server-sub-txt">${relay.location || relay.endpoint} &bull; ${relay.tier || 'edge'}</span>
           </div>
         </div>

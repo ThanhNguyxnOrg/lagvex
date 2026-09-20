@@ -323,8 +323,9 @@ button {
 
 .hero-meta {
   position: relative;
-  padding: 18px 35px;
+  padding: 16px 35px;
   display: flex;
+  align-items: center;
   gap: 20px;
   color: #a2b0be;
   font-size: 12px;
@@ -1318,34 +1319,58 @@ footer i {
   }
 }
 
-/* ==================== SERVER PICKER PILL (HERO CARD) ==================== */
-.server-picker-pill {
+/* ==================== META ROUTE PILL (HERO META BAR) ==================== */
+.meta-route-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(14, 25, 36, 0.85);
-  border: 1px solid rgba(0, 240, 255, 0.28);
+  background: rgba(13, 24, 37, 0.75);
+  border: 1px solid rgba(0, 240, 255, 0.25);
   border-radius: 999px;
-  padding: 8px 14px;
+  padding: 5px 12px;
   cursor: pointer;
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 12px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(6px);
 }
 
-.server-picker-pill:hover {
+.meta-route-pill:hover {
   background: rgba(18, 35, 52, 0.95);
   border-color: var(--cyan);
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.25);
   transform: translateY(-1px);
+}
+
+.meta-route-pill svg {
+  color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.meta-route-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: #7a8c9b;
+  letter-spacing: 0.8px;
+}
+
+.meta-route-arrow {
+  color: #7a8c9b;
+  transition: transform 0.2s ease, color 0.2s ease;
+  margin-left: 2px;
+}
+
+.meta-route-pill:hover .meta-route-arrow {
+  color: var(--cyan);
+  transform: translateY(1px);
 }
 
 .server-flag {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--cyan);
   background: rgba(0, 240, 255, 0.12);
@@ -1360,6 +1385,7 @@ footer i {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text);
 }
 
 .server-latency-tag {
@@ -1370,16 +1396,6 @@ footer i {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
-}
-
-.hero-meta .meta-item.clickable {
-  cursor: pointer;
-  transition: color 0.15s ease, transform 0.15s ease;
-}
-
-.hero-meta .meta-item.clickable:hover {
-  color: var(--cyan);
-  transform: translateY(-1px);
 }
 
 /* ==================== SERVER QUICK CARD (SIDEBAR) ==================== */
