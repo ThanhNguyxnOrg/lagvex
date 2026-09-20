@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `profiles.json` (11 games, 189 CIDRs) and `relays.json` (12 global community relays across 5 continents) are now directly compiled into the client binary via `//go:embed`.
   - Gamers can download a single `lagvex-client.exe` file and boost immediately without renting a VPS, copying PSKs, or configuring JSON files. External files remain supported as overrides for self-hosters.
 - 🧹 **Repository Cleanliness**:
-  - Pruned 47 legacy web prototype files (`.figma_design/`, `.next_ui_design/`, `preview_server.py`, `lagvex-ui-design.zip`).
+  - Pruned legacy web prototype and temporary design assets.
   - Production binaries compile self-contained and clean with zero lingering assets.
 
 ### 🛡️ Phase P4: Adaptive Forward Error Correction (FEC) & Zero-RTT Loss Recovery

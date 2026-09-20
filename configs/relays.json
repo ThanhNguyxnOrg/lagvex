@@ -1,7 +1,7 @@
 [
   {
     "id": "auto",
-    "name": "⚡ Auto (Smart Multi-Hop & Optimal Ping)",
+    "name": "Auto (Smart Multi-Hop & Optimal Ping)",
     "continent": "Global",
     "location": "Global Dynamic Routing",
     "endpoint": "auto",
@@ -10,7 +10,7 @@
   },
   {
     "id": "local-accel",
-    "name": "💻 Local Ultra-Low Latency Engine (Zero-VPS)",
+    "name": "Local Accelerator (Ultra-Low Latency)",
     "continent": "Local",
     "location": "Local Host (127.0.0.1)",
     "endpoint": "127.0.0.1:4433",

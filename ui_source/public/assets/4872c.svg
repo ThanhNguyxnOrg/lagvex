@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="38.5" height="38.5" viewBox="0 0 38.5 38.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="download">
+<path id="Vector" d="M38 19.5C38 17.0049 37.5086 14.5342 36.5537 12.229C35.5989 9.92383 34.1993 7.82928 32.435 6.06497C30.6707 4.30066 28.5762 2.90113 26.271 1.94629C23.9658 0.991449 21.4951 0.5 19 0.5" stroke="url(#paint0_radial_0_113)"/>
+<g id="Group">
+<path id="Line" d="M18.9165 28.5952V10.5" stroke="#067D71" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M10.9998 20.6786L18.9165 28.5952L26.8332 20.6786" stroke="#067D71" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<defs>
+<radialGradient id="paint0_radial_0_113" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(19) rotate(46.2189) scale(33.2415)">
+<stop stop-color="#067D71"/>
+<stop offset="0.364583" stop-color="#0E8679" stop-opacity="0.854167"/>
+<stop offset="1" stop-color="#3DBDA7" stop-opacity="0"/>
+</radialGradient>
+</defs>
+</svg>

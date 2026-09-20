@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Poppins:Bold';
+  font-style: normal;
+  font-weight: 700;
+  src: url('https://static.figma.com/font/Poppins-Bold_6') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins:Medium';
+  font-style: normal;
+  font-weight: 500;
+  src: url('https://static.figma.com/font/Poppins-Medium_6') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins:Regular';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://static.figma.com/font/Poppins-Regular_6') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins:SemiBold';
+  font-style: normal;
+  font-weight: 600;
+  src: url('https://static.figma.com/font/Poppins-SemiBold_6') format('woff2');
+}

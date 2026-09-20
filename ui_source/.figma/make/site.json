@@ -1,0 +1,10 @@
+{
+  "description": "Optimizes game ping to enhance online gaming performance by reducing latency, providing gamers with smoother and more responsive gameplay.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

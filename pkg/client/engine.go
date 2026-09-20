@@ -346,7 +346,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 	if relayName == "" {
 		if isLocal {
-			relayName = "💻 Local Ultra-Low Latency Engine"
+			relayName = "Local Accelerator"
 		} else {
 			relayName = relayEndpoint
 		}
