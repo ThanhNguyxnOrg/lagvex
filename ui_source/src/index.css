@@ -1,26 +1,49 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@font-face {
-  font-family: 'Poppins:Bold';
-  font-style: normal;
-  font-weight: 700;
-  src: url('https://static.figma.com/font/Poppins-Bold_6') format('woff2');
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #0a0d13;
+    color: #edf2f7;
+    margin: 0;
+    padding: 0;
+  }
 }
-@font-face {
-  font-family: 'Poppins:Medium';
-  font-style: normal;
-  font-weight: 500;
-  src: url('https://static.figma.com/font/Poppins-Medium_6') format('woff2');
+
+/* Typography styles */
+.font-brand {
+  font-family: 'Outfit', sans-serif !important;
 }
-@font-face {
-  font-family: 'Poppins:Regular';
-  font-style: normal;
-  font-weight: 400;
-  src: url('https://static.figma.com/font/Poppins-Regular_6') format('woff2');
+
+.font-mono-tabular {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-variant-numeric: tabular-nums !important;
 }
-@font-face {
-  font-family: 'Poppins:SemiBold';
-  font-style: normal;
-  font-weight: 600;
-  src: url('https://static.figma.com/font/Poppins-SemiBold_6') format('woff2');
+
+/* Custom sleek scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.5);
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.75; transform: scale(0.98); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s infinite ease-in-out;
 }
