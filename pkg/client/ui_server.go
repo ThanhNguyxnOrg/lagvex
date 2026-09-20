@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +70,7 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("/api/failover/history", u.handleFailoverHistory)
 	mux.HandleFunc("/api/fec/toggle", u.handleFECToggle)
 	mux.HandleFunc("/api/optimize-profile", u.handleOptimizeProfile)
+	mux.HandleFunc("/api/system-info", u.handleSystemInfo)
 
 	// Static Web Assets (disk prioritization with embedded binary fallback)
 	fs := http.FileServer(web.GetFileSystem(u.webDir))
@@ -539,5 +541,24 @@ func (u *UIServer) handleOptimizeProfile(w http.ResponseWriter, r *http.Request)
 		},
 	}
 
+	_ = json.NewEncoder(w).Encode(res)
+}
+
+func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	hostname, _ := os.Hostname()
+	username := os.Getenv("USERNAME")
+	if username == "" {
+		username = os.Getenv("USER")
+	}
+	if username == "" {
+		username = "Gamer"
+	}
+	res := map[string]any{
+		"hostname": hostname,
+		"username": username,
+		"os":       runtime.GOOS,
+		"arch":     runtime.GOARCH,
+	}
 	_ = json.NewEncoder(w).Encode(res)
 }
