@@ -226,6 +226,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 	_ = conn.SetReadBuffer(8 * 1024 * 1024)
 	_ = conn.SetWriteBuffer(8 * 1024 * 1024)
+	_ = ApplySocketQoS(conn)
 
 	// 3. Handshake
 	nonce, _ := protocol.RandomUint64()
@@ -533,6 +534,10 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
+			// Multi-Path Packet Hedging: when loss is detected, hedge critical gaming inputs (<=256B)
+			if e.packetsRecovered.Load() > 0 && n <= 256 {
+				_, _ = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
+			}
 		}
 
 		// Systematic FEC: Feed packet and emit XOR parity frame when block boundary reached
