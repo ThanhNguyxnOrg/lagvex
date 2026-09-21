@@ -245,7 +245,7 @@ const OFFICIAL_GAMES: Game[] = [
     artType: "cover-keyart",
     baselinePing: 42,
     accelPing: 12.0,
-    region: "Việt Nam & Southeast Asia",
+    region: "Asia-Pacific (Regional Low-Latency)",
     trend: "48% Faster"
   },
   {
@@ -451,14 +451,14 @@ function cleanNodeDisplayName(rawName: string, loc: string): { title: string; su
   let flag = "🌐";
   if (rawName.includes("Local") || rawName.includes("127.0.0.1")) {
     flag = "⚡";
-    clean = "Local Accelerator (127.0.0.1)";
-  } else if (clean.includes("North America East") || loc.includes("VA")) {
+    clean = "Local Engine (127.0.0.1)";
+  } else if (clean.includes("North America East") || loc.includes("VA") || loc.includes("Ashburn")) {
     flag = "🇺🇸";
-    clean = "US East (N. Virginia)";
+    clean = "US East (Virginia)";
   } else if (clean.includes("North America Central") || loc.includes("Dallas") || loc.includes("TX")) {
     flag = "🇺🇸";
     clean = "US Central (Dallas)";
-  } else if (clean.includes("North America West") || loc.includes("San Jose") || loc.includes("CA")) {
+  } else if (clean.includes("North America West") || loc.includes("San Jose") || loc.includes("Silicon Valley")) {
     flag = "🇺🇸";
     clean = "US West (San Jose)";
   } else if (clean.includes("Singapore") || loc.includes("Singapore")) {
@@ -467,25 +467,54 @@ function cleanNodeDisplayName(rawName: string, loc: string): { title: string; su
   } else if (clean.includes("Tokyo") || clean.includes("Japan") || loc.includes("Japan")) {
     flag = "🇯🇵";
     clean = "Tokyo Low-Latency Route";
-  } else if (clean.includes("Frankfurt") || clean.includes("Europe") || loc.includes("Germany")) {
+  } else if (clean.includes("Seoul") || clean.includes("Korea") || loc.includes("Korea")) {
+    flag = "🇰🇷";
+    clean = "Seoul Direct Core";
+  } else if (clean.includes("Hong Kong") || loc.includes("Hong Kong")) {
+    flag = "🇭🇰";
+    clean = "Hong Kong Mega-i";
+  } else if (clean.includes("Frankfurt") || clean.includes("Europe Central") || loc.includes("Germany")) {
     flag = "🇩🇪";
     clean = "Frankfurt Core AWS";
-  } else if (clean.includes("Vietnam") || loc.includes("Hanoi")) {
-    flag = "🇻🇳";
-    clean = "Vietnam VNPT FastRoute";
+  } else if (clean.includes("London") || loc.includes("London") || loc.includes("UK")) {
+    flag = "🇬🇧";
+    clean = "London Telehouse";
+  } else if (clean.includes("Paris") || loc.includes("Paris") || loc.includes("France")) {
+    flag = "🇫🇷";
+    clean = "Paris Interxion";
+  } else if (clean.includes("Stockholm") || loc.includes("Stockholm") || loc.includes("Sweden")) {
+    flag = "🇸🇪";
+    clean = "Stockholm Equinix";
+  } else if (clean.includes("Sydney") || clean.includes("Oceania") || loc.includes("Australia")) {
+    flag = "🇦🇺";
+    clean = "Sydney Equinix SY3";
+  } else if (clean.includes("São Paulo") || clean.includes("Brazil") || loc.includes("Brazil")) {
+    flag = "🇧🇷";
+    clean = "São Paulo SP4";
   }
 
-  return { title: clean, subtitle: loc || "Tier-1 Edge Datacenter", flag };
+  return { title: clean, subtitle: loc || "Tier-1 Datacenter Edge", flag };
 }
 
 const DEFAULT_COMMUNITY_RELAYS: RelayNode[] = [
+  {
+    id: "auto",
+    name: "Auto Smart Multi-Hop",
+    cleanName: "Auto (Smart Routing)",
+    address: "auto",
+    location: "Global Dynamic Anycast",
+    country: "GLOBAL",
+    flag: "⚡",
+    pingMs: 12,
+    quality: 100
+  },
   {
     id: "sg",
     name: "Singapore SDR Edge Node",
     cleanName: "Singapore SDR Edge",
     address: "sg.relay.lagvex.net:443",
     location: "Equinix SG1, Singapore",
-    country: "SG",
+    country: "ASIA",
     flag: "🇸🇬",
     pingMs: 14,
     quality: 100
@@ -496,21 +525,32 @@ const DEFAULT_COMMUNITY_RELAYS: RelayNode[] = [
     cleanName: "Tokyo Low-Latency Route",
     address: "jp.relay.lagvex.net:443",
     location: "Tokyo TY2, Japan",
-    country: "JP",
+    country: "ASIA",
     flag: "🇯🇵",
     pingMs: 28,
     quality: 99
   },
   {
-    id: "vn",
-    name: "Vietnam VNPT FastRoute",
-    cleanName: "Vietnam VNPT FastRoute",
-    address: "vn.relay.lagvex.net:443",
-    location: "Hanoi IDC, Vietnam",
-    country: "VN",
-    flag: "🇻🇳",
-    pingMs: 8,
-    quality: 100
+    id: "hk",
+    name: "Hong Kong Direct Edge",
+    cleanName: "Hong Kong Mega-i",
+    address: "hk.relay.lagvex.net:443",
+    location: "Mega-i IDC, Hong Kong",
+    country: "ASIA",
+    flag: "🇭🇰",
+    pingMs: 22,
+    quality: 99
+  },
+  {
+    id: "kr",
+    name: "Seoul Direct KINX Core",
+    cleanName: "Seoul Direct Core",
+    address: "kr.relay.lagvex.net:443",
+    location: "KINX Datacenter, Seoul",
+    country: "ASIA",
+    flag: "🇰🇷",
+    pingMs: 34,
+    quality: 98
   },
   {
     id: "us-west",
@@ -518,10 +558,21 @@ const DEFAULT_COMMUNITY_RELAYS: RelayNode[] = [
     cleanName: "US West (San Jose)",
     address: "us-w.relay.lagvex.net:443",
     location: "Silicon Valley, USA",
-    country: "US",
+    country: "NORTH AMERICA",
     flag: "🇺🇸",
     pingMs: 135,
     quality: 97
+  },
+  {
+    id: "us-east",
+    name: "US East (N. Virginia)",
+    cleanName: "US East (Virginia)",
+    address: "us-e.relay.lagvex.net:443",
+    location: "Equinix DC2, Ashburn",
+    country: "NORTH AMERICA",
+    flag: "🇺🇸",
+    pingMs: 165,
+    quality: 96
   },
   {
     id: "de",
@@ -529,10 +580,21 @@ const DEFAULT_COMMUNITY_RELAYS: RelayNode[] = [
     cleanName: "Frankfurt Core AWS",
     address: "de.relay.lagvex.net:443",
     location: "Frankfurt FRA1, Germany",
-    country: "DE",
+    country: "EUROPE",
     flag: "🇩🇪",
     pingMs: 148,
     quality: 96
+  },
+  {
+    id: "au",
+    name: "Sydney Equinix SY3",
+    cleanName: "Sydney Equinix SY3",
+    address: "au.relay.lagvex.net:443",
+    location: "Sydney, Australia",
+    country: "OCEANIA",
+    flag: "🇦🇺",
+    pingMs: 98,
+    quality: 97
   }
 ];
 
@@ -569,6 +631,24 @@ export default function App() {
   // Relays
   const [relays, setRelays] = useState<RelayNode[]>(DEFAULT_COMMUNITY_RELAYS);
   const [selectedRelayIdx, setSelectedRelayIdx] = useState(0);
+
+  // Custom Game & Custom Node Modals State
+  const [isAddingGame, setIsAddingGame] = useState(false);
+  const [newGameName, setNewGameName] = useState("");
+  const [newGameProcess, setNewGameProcess] = useState("");
+  const [newGameCategory, setNewGameCategory] = useState<"FPS" | "MOBA" | "BR" | "RPG">("FPS");
+  const [newGameRegion, setNewGameRegion] = useState("Asia-Pacific");
+
+  const [isAddingNode, setIsAddingNode] = useState(false);
+  const [newNodeName, setNewNodeName] = useState("");
+  const [newNodeEndpoint, setNewNodeEndpoint] = useState("");
+  const [newNodeLocation, setNewNodeLocation] = useState("");
+  const [newNodeContinent, setNewNodeContinent] = useState("ASIA");
+  const [newNodePsk, setNewNodePsk] = useState("lagvex-community-us-free-public-psk-2026");
+
+  // Node Search & Continent Filter
+  const [nodeSearchQuery, setNodeSearchQuery] = useState("");
+  const [selectedNodeContinent, setSelectedNodeContinent] = useState<"ALL" | "ASIA" | "NORTH AMERICA" | "EUROPE" | "OCEANIA" | "GLOBAL">("ALL");
 
   // Real Hardware & Network Socket Telemetry (Zero Fake Numbers)
   const [gameTelemetry, setGameTelemetry] = useState<Record<string, { baselinePing: number; accelPing: number; trend: string; region: string }>>({});
@@ -618,6 +698,120 @@ export default function App() {
       return matchSearch && matchCat;
     });
   }, [searchQuery, selectedCategory]);
+
+  // Filtered Relays for Nodes Explorer
+  const filteredRelays = useMemo(() => {
+    return relays.filter((r) => {
+      const q = nodeSearchQuery.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.cleanName.toLowerCase().includes(q) ||
+        r.location.toLowerCase().includes(q) ||
+        r.country.toLowerCase().includes(q);
+      const matchCont =
+        selectedNodeContinent === "ALL" ||
+        r.country.toUpperCase() === selectedNodeContinent ||
+        (selectedNodeContinent === "ASIA" && (r.country === "SG" || r.country === "JP" || r.country === "HK" || r.country === "KR" || r.country === "ASIA")) ||
+        (selectedNodeContinent === "NORTH AMERICA" && (r.country === "US" || r.country === "NORTH AMERICA")) ||
+        (selectedNodeContinent === "EUROPE" && (r.country === "DE" || r.country === "GB" || r.country === "FR" || r.country === "EUROPE")) ||
+        (selectedNodeContinent === "OCEANIA" && (r.country === "AU" || r.country === "OCEANIA")) ||
+        (selectedNodeContinent === "GLOBAL" && r.country === "GLOBAL");
+      return matchSearch && matchCont;
+    });
+  }, [relays, nodeSearchQuery, selectedNodeContinent]);
+
+  // Add Custom Game Handler
+  const handleCreateCustomGame = async () => {
+    if (!newGameName.trim() || !newGameProcess.trim()) {
+      notify("Please provide Game Name and Executable Process Name!");
+      return;
+    }
+    const id = newGameName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    try {
+      const res = await fetch("/api/add-game", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          name: newGameName.trim(),
+          category: newGameCategory,
+          processNames: [newGameProcess.trim()],
+          regions: [{ id: "global", name: newGameRegion, cidrs: ["1.1.1.0/24"] }]
+        })
+      });
+      if (res.ok) {
+        notify(`✅ Added custom game: ${newGameName}`);
+        setIsAddingGame(false);
+        setNewGameName("");
+        setNewGameProcess("");
+      } else {
+        notify("Failed to add custom game.");
+      }
+    } catch {
+      notify("Failed to connect to backend.");
+    }
+  };
+
+  // Add Custom Node Handler
+  const handleCreateCustomNode = async () => {
+    if (!newNodeName.trim() || !newNodeEndpoint.trim()) {
+      notify("Please provide Node Name and IP:Port Endpoint!");
+      return;
+    }
+    const id = "custom-" + Date.now();
+    try {
+      const res = await fetch("/api/add-relay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          name: newNodeName.trim(),
+          endpoint: newNodeEndpoint.trim(),
+          location: newNodeLocation.trim() || "Dedicated Host",
+          continent: newNodeContinent,
+          psk: newNodePsk.trim() || "lagvex-community-us-free-public-psk-2026",
+          tier: "custom"
+        })
+      });
+      if (res.ok) {
+        notify(`✅ Added custom relay node: ${newNodeName}`);
+        setIsAddingNode(false);
+        setNewNodeName("");
+        setNewNodeEndpoint("");
+        setNewNodeLocation("");
+        // Re-probe relays
+        const pRes = await fetch("/api/probe-relays");
+        if (pRes.ok) {
+          const data = await pRes.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const mapped: RelayNode[] = data.map((item: any) => {
+              const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
+              const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
+                ? Math.round(item.rttMedianMs * 10) / 10
+                : (item.latencyMs || item.pingMs || 0);
+              return {
+                id: item.relayId || item.id || item.endpoint || item.address,
+                name: item.name || item.endpoint || item.address,
+                cleanName: title,
+                address: item.endpoint || item.address,
+                location: item.location || "Datacenter Node",
+                country: item.continent || item.country || "GLOBAL",
+                flag,
+                pingMs: pMs,
+                quality: 99
+              };
+            });
+            setRelays(mapped);
+          }
+        }
+      } else {
+        notify("Failed to add custom relay node.");
+      }
+    } catch {
+      notify("Failed to connect to backend.");
+    }
+  };
 
   const notify = (msg: string) => {
     setToastMessage(msg);
@@ -683,9 +877,12 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (data.hostname) setPcHostname(data.hostname);
-          if (!localStorage.getItem("lagvex_nickname") && data.username) {
-            setGamerNickname(data.username);
-            setTempNickname(data.username);
+          const savedNick = localStorage.getItem("lagvex_nickname");
+          if (!savedNick || savedNick === "Gamer" || savedNick === "Player") {
+            const initialNick = data.suggestedNickname || (data.username ? `${data.username}#${data.discriminator || 1001}` : "Gamer#1337");
+            setGamerNickname(initialNick);
+            setTempNickname(initialNick);
+            localStorage.setItem("lagvex_nickname", initialNick);
           }
         }
       } catch {}
@@ -1012,14 +1209,14 @@ export default function App() {
       notify("Squad Room is full (5/5 players)!");
       return;
     }
-    const fakeNames = ["viet_sniper99", "shadow_aim", "dragon_clutch", "duong_pro"];
-    const name = fakeNames[squadMembers.length - 1] || `Teammate #${squadMembers.length + 1}`;
+    const sampleNames = ["CyberAim#4201", "Vortex_Sniper#8819", "NeonNova#1337", "PhantomClutch#9920"];
+    const name = sampleNames[squadMembers.length - 1] || `Teammate #${squadMembers.length + 1}`;
     setSquadMembers((prev) => [
       ...prev,
       {
         name,
         role: "Member",
-        isp: "VNPT / FPT Fiber",
+        isp: "Fiber Broadband",
         ping: Math.round(livePing + (squadMembers.length * 1.5)),
         game: selectedGame.name,
         status: "Synced ⚡"
@@ -1104,6 +1301,163 @@ export default function App() {
                 className="px-5 py-2.5 rounded-xl text-xs font-brand font-bold bg-[#00F0FF] hover:bg-[#33f3ff] text-black border-none cursor-pointer transition-all shadow-md shadow-[#00F0FF]/20"
               >
                 Save Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOM GAME MODAL ── */}
+      {isAddingGame && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-[460px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Game Profile</h3>
+              <button onClick={() => setIsAddingGame(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
+            </div>
+            <p className="text-xs text-white/50">
+              Register any game executable. Lagvex will apply kernel QoS, MTU boundary clamping, and low-latency tunnel routing automatically.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Game Title</label>
+              <input
+                type="text"
+                value={newGameName}
+                onChange={(e) => setNewGameName(e.target.value)}
+                placeholder="e.g. Cyberpunk 2077, GTA V, Arena Breakout..."
+                className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-bold outline-none focus:border-[#00F0FF]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Executable Process Name (.exe)</label>
+              <input
+                type="text"
+                value={newGameProcess}
+                onChange={(e) => setNewGameProcess(e.target.value)}
+                placeholder="e.g. Cyberpunk2077.exe, GTA5.exe..."
+                className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-mono outline-none focus:border-[#00F0FF]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Genre Category</label>
+                <select
+                  value={newGameCategory}
+                  onChange={(e: any) => setNewGameCategory(e.target.value)}
+                  className="h-[44px] px-3 rounded-xl bg-[#121c2a] border border-[#23354b] text-xs text-white outline-none focus:border-[#00F0FF]"
+                >
+                  <option value="FPS">FPS Shooter</option>
+                  <option value="MOBA">MOBA Strategy</option>
+                  <option value="BR">Battle Royale</option>
+                  <option value="RPG">Action / RPG</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Primary Region</label>
+                <input
+                  type="text"
+                  value={newGameRegion}
+                  onChange={(e) => setNewGameRegion(e.target.value)}
+                  placeholder="e.g. Asia-Pacific, US East"
+                  className="h-[44px] px-3 rounded-xl bg-[#121c2a] border border-[#23354b] text-xs text-white outline-none focus:border-[#00F0FF]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
+              <button
+                onClick={() => setIsAddingGame(false)}
+                className="px-4 py-2 rounded-xl text-xs font-brand font-bold text-white/50 hover:text-white bg-transparent border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCustomGame}
+                className="px-5 py-2.5 rounded-xl text-xs font-brand font-bold bg-[#00F0FF] hover:bg-[#33f3ff] text-black border-none cursor-pointer transition-all shadow-md shadow-[#00F0FF]/20"
+              >
+                + Register Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOM RELAY NODE MODAL ── */}
+      {isAddingNode && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-[480px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Routing Node</h3>
+              <button onClick={() => setIsAddingNode(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
+            </div>
+            <p className="text-xs text-white/50">
+              Hook up your personal VPS, dedicated server, or community relay node to bypass routing congestion.
+            </p>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Node Display Name</label>
+              <input
+                type="text"
+                value={newNodeName}
+                onChange={(e) => setNewNodeName(e.target.value)}
+                placeholder="e.g. My Tokyo FastPath VPS"
+                className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-bold outline-none focus:border-[#00F0FF]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Endpoint (IP:Port or Host:Port)</label>
+              <input
+                type="text"
+                value={newNodeEndpoint}
+                onChange={(e) => setNewNodeEndpoint(e.target.value)}
+                placeholder="e.g. 104.28.19.42:4433"
+                className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-mono outline-none focus:border-[#00F0FF]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Continent / Region</label>
+                <select
+                  value={newNodeContinent}
+                  onChange={(e) => setNewNodeContinent(e.target.value)}
+                  className="h-[44px] px-3 rounded-xl bg-[#121c2a] border border-[#23354b] text-xs text-white outline-none focus:border-[#00F0FF]"
+                >
+                  <option value="ASIA">Asia-Pacific</option>
+                  <option value="NORTH AMERICA">North America</option>
+                  <option value="EUROPE">Europe</option>
+                  <option value="OCEANIA">Oceania</option>
+                  <option value="GLOBAL">Global / Other</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Location Datacenter</label>
+                <input
+                  type="text"
+                  value={newNodeLocation}
+                  onChange={(e) => setNewNodeLocation(e.target.value)}
+                  placeholder="e.g. Equinix TY2, Tokyo"
+                  className="h-[44px] px-3 rounded-xl bg-[#121c2a] border border-[#23354b] text-xs text-white outline-none focus:border-[#00F0FF]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/5">
+              <button
+                onClick={() => setIsAddingNode(false)}
+                className="px-4 py-2 rounded-xl text-xs font-brand font-bold text-white/50 hover:text-white bg-transparent border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCustomNode}
+                className="px-5 py-2.5 rounded-xl text-xs font-brand font-bold bg-[#00F0FF] hover:bg-[#33f3ff] text-black border-none cursor-pointer transition-all shadow-md shadow-[#00F0FF]/20"
+              >
+                + Add Relay Node
               </button>
             </div>
           </div>
@@ -1672,7 +2026,7 @@ export default function App() {
                   />
                 </div>
 
-                {/* Categories */}
+                {/* Categories & Add Custom Game */}
                 <div className="flex items-center gap-2">
                   {(["ALL", "FPS", "MOBA", "BR", "RPG"] as const).map((cat) => (
                     <button
@@ -1687,6 +2041,12 @@ export default function App() {
                       {cat}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setIsAddingGame(true)}
+                    className="px-4 py-2 rounded-xl text-xs font-brand font-bold bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF] border border-[#00F0FF]/30 cursor-pointer transition-all flex items-center gap-1.5"
+                  >
+                    <span>+ Add Custom Game</span>
+                  </button>
                 </div>
               </div>
 
@@ -1761,7 +2121,7 @@ export default function App() {
                     Synchronize Team Latency & Eliminate Desync
                   </h2>
                   <p className="text-xs text-white/60 leading-relaxed">
-                    When playing ranked matches in a party, teammates on different ISPs (VNPT, FPT, Viettel) often suffer from disparate routes, desync, and audio jitter. Squad Sync locks all party members into the same high-speed Lagvex Super-Node, keeping latency delta below 1ms.
+                    When playing ranked matches in a party, teammates on different regional ISPs and carriers often suffer from disparate routes, desync, and audio jitter. Squad Sync locks all party members into the same high-speed Lagvex Super-Node, keeping latency delta below 1ms.
                   </p>
                 </div>
 
@@ -1953,7 +2313,7 @@ export default function App() {
                     {squadMembers.length === 1 && (
                       <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs text-white/50 font-medium">
                         <span>Waiting for teammates to join room <strong className="text-white">{currentSquadRoom}</strong>...</span>
-                        <span className="text-[11px] text-[#00F0FF]">Send Room Code via Discord/Zalo</span>
+                        <span className="text-[11px] text-[#00F0FF]">Share Room Code via Discord / Steam / Party Chat</span>
                       </div>
                     )}
                   </div>
@@ -1974,54 +2334,96 @@ export default function App() {
                     Tier-1 Anycast relay backbone connected directly to Valve SDR, Riot Direct, and AWS Gamelift.
                   </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    notify("⚡ Probing global routing nodes in real-time...");
-                    try {
-                      const res = await fetch("/api/probe-relays");
-                      if (res.ok) {
-                        const data = await res.json();
-                        if (Array.isArray(data) && data.length > 0) {
-                          const mapped: RelayNode[] = data.map((item: any) => {
-                            const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
-                            const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
-                              ? Math.round(item.rttMedianMs * 10) / 10
-                              : (item.latencyMs || item.pingMs || 0);
-                            return {
-                              id: item.relayId || item.id || item.endpoint || item.address,
-                              name: item.name || item.endpoint || item.address,
-                              cleanName: title,
-                              address: item.endpoint || item.address,
-                              location: item.location || "Datacenter Node",
-                              country: item.continent || item.country || "GLOBAL",
-                              flag,
-                              pingMs: pMs,
-                              quality: pMs > 0 && pMs < 160 ? 98 : (pMs > 0 ? 88 : 70)
-                            };
-                          });
-                          setRelays(mapped);
-                          notify("✅ All global node latencies refreshed from active socket probes!");
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsAddingNode(true)}
+                    className="px-4 py-2 rounded-xl bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 text-xs font-brand font-bold text-[#00F0FF] flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <span>+ Add Custom Node</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      notify("⚡ Probing global routing nodes in real-time...");
+                      try {
+                        const res = await fetch("/api/probe-relays");
+                        if (res.ok) {
+                          const data = await res.json();
+                          if (Array.isArray(data) && data.length > 0) {
+                            const mapped: RelayNode[] = data.map((item: any) => {
+                              const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
+                              const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
+                                ? Math.round(item.rttMedianMs * 10) / 10
+                                : (item.latencyMs || item.pingMs || 0);
+                              return {
+                                id: item.relayId || item.id || item.endpoint || item.address,
+                                name: item.name || item.endpoint || item.address,
+                                cleanName: title,
+                                address: item.endpoint || item.address,
+                                location: item.location || "Datacenter Node",
+                                country: item.continent || item.country || "GLOBAL",
+                                flag,
+                                pingMs: pMs,
+                                quality: pMs > 0 && pMs < 160 ? 98 : (pMs > 0 ? 88 : 70)
+                              };
+                            });
+                            setRelays(mapped);
+                            notify("✅ All global node latencies refreshed from active socket probes!");
+                          }
                         }
+                      } catch {
+                        notify("Node probe sweep completed.");
                       }
-                    } catch {
-                      notify("Node probe sweep completed.");
-                    }
-                  }}
-                  className="px-4 py-2 rounded-xl bg-[#101722] hover:bg-[#162130] border border-[#223042] text-xs font-brand font-bold text-white flex items-center gap-2 cursor-pointer transition-all"
-                >
-                  <IconRefresh className="w-4 h-4 text-[#00F0FF]" />
-                  <span>Refresh All Latencies</span>
-                </button>
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#101722] hover:bg-[#162130] border border-[#223042] text-xs font-brand font-bold text-white flex items-center gap-2 cursor-pointer transition-all"
+                  >
+                    <IconRefresh className="w-4 h-4 text-[#00F0FF]" />
+                    <span>Refresh All Latencies</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Node Search and Continent Filter Bar */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 relative h-[44px] max-w-[420px]">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35">
+                    <IconSearch className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={nodeSearchQuery}
+                    onChange={(e) => setNodeSearchQuery(e.target.value)}
+                    placeholder="Search node name, city, or datacenter..."
+                    className="w-full h-full pl-11 pr-4 rounded-2xl bg-[#0f1722] border border-[#1c293a] text-xs text-white outline-none focus:border-[#00F0FF]/60 placeholder:text-white/30"
+                  />
+                </div>
+
+                {/* Continent Chips */}
+                <div className="flex items-center gap-2">
+                  {(["ALL", "ASIA", "NORTH AMERICA", "EUROPE", "OCEANIA", "GLOBAL"] as const).map((cont) => (
+                    <button
+                      key={cont}
+                      onClick={() => setSelectedNodeContinent(cont)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-brand font-bold cursor-pointer border-none transition-all ${
+                        selectedNodeContinent === cont
+                          ? "bg-[#00F0FF] text-black shadow-md shadow-[#00F0FF]/20"
+                          : "bg-[#0f1722] text-white/50 hover:text-white hover:bg-[#162233]"
+                      }`}
+                    >
+                      {cont}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {relays.map((relay, idx) => {
-                  const isSelected = selectedRelayIdx === idx;
+                {filteredRelays.map((relay) => {
+                  const originalIdx = relays.findIndex((r) => r.id === relay.id);
+                  const isSelected = selectedRelayIdx === originalIdx;
                   return (
                     <div
                       key={relay.id}
                       onClick={() => {
-                        setSelectedRelayIdx(idx);
+                        if (originalIdx >= 0) setSelectedRelayIdx(originalIdx);
                         notify(`Switched primary routing node to: ${relay.cleanName}`);
                       }}
                       className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
