@@ -10,6 +10,7 @@ jobs:
   detect:
     name: 🔎 Detect Release Intent
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
@@ -38,8 +39,8 @@ jobs:
             # Check if commit message starts with release pattern
             FIRST_LINE=$(echo "$MSG" | head -n 1)
             echo "Checking commit message: $FIRST_LINE"
-            if [[ "$FIRST_LINE" =~ [Rr]elease:?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]] || \
-               [[ "$FIRST_LINE" =~ chore\(release\):?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]]; then
+            if [[ "$FIRST_LINE" =~ ^[Rr]elease:?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]] || \
+               [[ "$FIRST_LINE" =~ ^chore\(release\):?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]]; then
               VERSION="${BASH_REMATCH[1]}"
               TAG="v${VERSION}"
               SHOULD_RELEASE="true"
