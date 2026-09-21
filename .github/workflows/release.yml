@@ -59,10 +59,18 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: 🤖 Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: 🐹 Set up Go
         uses: actions/setup-go@v5
@@ -73,10 +81,11 @@ jobs:
       - name: 🏷️ Ensure Git Tag Exists
         env:
           TAG: ${{ needs.detect.outputs.tag }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name "ThanhNguyxnAgent[bot]"
+            git config user.email "4125740+thanhnguyxnagent[bot]@users.noreply.github.com"
             git tag -a "$TAG" -m "Release $TAG"
             git push origin "$TAG"
             echo "Created and pushed tag $TAG"
@@ -187,3 +196,5 @@ jobs:
             release-artifacts/checksums.txt
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
