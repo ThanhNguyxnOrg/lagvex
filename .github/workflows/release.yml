@@ -169,21 +169,29 @@ jobs:
 
           # 🐧 Linux Client TAR.GZ
           mkdir -p pack-linux
-          cp dist/lagvex-client-linux-amd64 pack-linux/
+          cp dist/lagvex-client-linux-amd64 pack-linux/lagvex-client
+          chmod +x pack-linux/lagvex-client
+          cp scripts/start-linux.sh pack-linux/start.sh
+          chmod +x pack-linux/start.sh
+          cp scripts/lagvex.desktop pack-linux/
           cp -r configs pack-linux/
           cp README.md LICENSE pack-linux/
           tar -czvf release-artifacts/lagvex-${TAG}-linux-amd64.tar.gz -C pack-linux .
 
           # 🍎 macOS Client TAR.GZ (Apple Silicon)
           mkdir -p pack-darwin-arm64
-          cp dist/lagvex-client-darwin-arm64 pack-darwin-arm64/
+          sh scripts/create-macos-app.sh dist/lagvex-client-darwin-arm64 pack-darwin-arm64 "${TAG#v}"
+          cp dist/lagvex-client-darwin-arm64 pack-darwin-arm64/lagvex-client
+          chmod +x pack-darwin-arm64/lagvex-client
           cp -r configs pack-darwin-arm64/
           cp README.md LICENSE pack-darwin-arm64/
           tar -czvf release-artifacts/lagvex-${TAG}-darwin-arm64.tar.gz -C pack-darwin-arm64 .
 
           # 🍎 macOS Client TAR.GZ (Intel)
           mkdir -p pack-darwin-amd64
-          cp dist/lagvex-client-darwin-amd64 pack-darwin-amd64/
+          sh scripts/create-macos-app.sh dist/lagvex-client-darwin-amd64 pack-darwin-amd64 "${TAG#v}"
+          cp dist/lagvex-client-darwin-amd64 pack-darwin-amd64/lagvex-client
+          chmod +x pack-darwin-amd64/lagvex-client
           cp -r configs pack-darwin-amd64/
           cp README.md LICENSE pack-darwin-amd64/
           tar -czvf release-artifacts/lagvex-${TAG}-darwin-amd64.tar.gz -C pack-darwin-amd64 .

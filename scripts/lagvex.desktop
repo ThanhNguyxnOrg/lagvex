@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Lagvex
+GenericName=Gaming Latency Accelerator
+Comment=High-Performance Gaming Network & Route Optimizer
+Exec=sh -c 'DIR="$(dirname "$1")"; cd "$DIR" && ./lagvex-client' dummy %k
+Icon=network-wireless
+Terminal=false
+Categories=Game;Network;Utility;
+StartupNotify=true

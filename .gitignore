@@ -34,4 +34,6 @@ Thumbs.db
 .agents/
 .agent/
 *.zip
+*.tar.gz
+dist/
 skills-lock.json

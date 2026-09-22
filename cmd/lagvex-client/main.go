@@ -28,6 +28,8 @@ func main() {
 	profileFlag := flag.String("profiles", "", "Path to profiles.json")
 	httpFlag := flag.String("http", "127.0.0.1:18888", "HTTP address for Web UI Dashboard")
 	noBrowserFlag := flag.Bool("no-browser", false, "Do not auto-open browser on startup")
+	daemonFlag := flag.Bool("daemon", false, "Run Lagvex Client in background (detached from terminal)")
+	daemonShortFlag := flag.Bool("d", false, "Run Lagvex Client in background (alias for -daemon)")
 
 	// Direct CLI connection flags
 	connectFlag := flag.Bool("connect", false, "Directly initiate tunnel from CLI")
@@ -42,6 +44,29 @@ func main() {
 
 	if *versionFlag {
 		fmt.Printf("Lagvex Client v%s\n", version)
+		return
+	}
+
+	// Detached background daemon mode
+	if *daemonFlag || *daemonShortFlag {
+		var filteredArgs []string
+		for _, arg := range os.Args[1:] {
+			if arg != "-daemon" && arg != "--daemon" && arg != "-d" && arg != "--d" {
+				filteredArgs = append(filteredArgs, arg)
+			}
+		}
+		exe, err := os.Executable()
+		if err != nil {
+			log.Fatalf("Failed to resolve executable path: %v", err)
+		}
+		cmd := exec.Command(exe, filteredArgs...)
+		cmd.Stdin = nil
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Start(); err != nil {
+			log.Fatalf("Failed to start daemon: %v", err)
+		}
+		fmt.Printf("Lagvex Client started in background (PID: %d)\n", cmd.Process.Pid)
 		return
 	}
 
@@ -181,8 +206,41 @@ func openDesktopWindow(url string) {
 	}
 
 	if runtime.GOOS == "darwin" {
+		// 1. Try Chrome, Edge, Brave standalone App Mode on macOS
+		browserApps := []string{
+			"/Applications/Google Chrome.app",
+			"/Applications/Microsoft Edge.app",
+			"/Applications/Brave Browser.app",
+		}
+		for _, app := range browserApps {
+			if _, err := os.Stat(app); err == nil {
+				cmd := exec.Command("open", "-na", app, "--args", fmt.Sprintf("--app=%s", url), "--window-size=1220,840")
+				if err := cmd.Start(); err == nil {
+					return
+				}
+			}
+		}
+		// 2. Fallback to default browser
 		_ = exec.Command("open", url).Start()
 		return
+	}
+
+	// Linux (Ubuntu, Debian, Fedora, Arch, SteamOS / Steam Deck)
+	linuxBrowsers := []string{
+		"google-chrome",
+		"google-chrome-stable",
+		"chromium",
+		"chromium-browser",
+		"brave-browser",
+		"microsoft-edge",
+	}
+	for _, b := range linuxBrowsers {
+		if path, err := exec.LookPath(b); err == nil {
+			cmd := exec.Command(path, fmt.Sprintf("--app=%s", url), "--window-size=1220,840")
+			if err := cmd.Start(); err == nil {
+				return
+			}
+		}
 	}
 
 	_ = exec.Command("xdg-open", url).Start()
