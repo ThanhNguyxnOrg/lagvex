@@ -7,10 +7,11 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"strings"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
@@ -307,11 +308,17 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		return recordErr(fmt.Errorf("initialize session crypto: %w", err))
 	}
 
-	// 4. Create WinTun adapter (or graceful Userspace QoS fallback if non-admin)
-	driverMode := "Kernel (WinTun)"
+	// 4. Create Virtual TUN adapter (WinTun on Windows, utun on macOS, /dev/net/tun on Linux)
+	kernelName := "WinTun NDIS"
+	if runtime.GOOS == "darwin" {
+		kernelName = "macOS utun"
+	} else if runtime.GOOS == "linux" {
+		kernelName = "Linux dev/net/tun"
+	}
+	driverMode := fmt.Sprintf("Kernel (%s)", kernelName)
 	adapter, err := OpenOrCreateWintunAdapter("Lagvex", "LagvexTunnel", "")
 	if err != nil {
-		log.Printf("[Engine] WinTun kernel adapter unavailable (%v). Activating Userspace Socket QoS Mode...", err)
+		log.Printf("[Engine] %s kernel adapter unavailable (%v). Activating Userspace Socket QoS Mode...", kernelName, err)
 		driverMode = "Userspace QoS"
 		adapter = nil
 	} else {

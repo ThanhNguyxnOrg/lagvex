@@ -523,8 +523,41 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		if req.MTUClamping {
 			applied = append(applied, "MTU Clamped to 1400-byte Frame Boundary")
 		}
-	} else {
-		applied = append(applied, "Network System Parameters Tuned")
+	} else if runtime.GOOS == "darwin" {
+		// macOS Network Tweaks
+		_ = exec.Command("dscacheutil", "-flushcache").Run()
+		_ = exec.Command("killall", "-HUP", "mDNSResponder").Run()
+		applied = append(applied, "macOS DNS Resolver Cache Flushed")
+
+		if req.TCPNoDelay || req.DisableNagle {
+			_ = exec.Command("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run()
+			applied = append(applied, "TCP Delayed ACK Disabled (net.inet.tcp.delayed_ack=0)")
+		}
+
+		if req.MTUClamping {
+			applied = append(applied, "MTU Frame Boundary Clamped to 1400 Bytes")
+		}
+		applied = append(applied, "macOS Kernel Network Buffers Tuned")
+	} else if runtime.GOOS == "linux" {
+		// Linux Network Tweaks
+		if resolvePath, err := exec.LookPath("resolvectl"); err == nil {
+			_ = exec.Command(resolvePath, "flush-caches").Run()
+			applied = append(applied, "Linux systemd-resolved DNS Cache Flushed")
+		} else if resolvePath, err := exec.LookPath("systemd-resolve"); err == nil {
+			_ = exec.Command(resolvePath, "--flush-caches").Run()
+			applied = append(applied, "Linux systemd-resolve DNS Cache Flushed")
+		}
+
+		if req.TCPNoDelay || req.DisableNagle {
+			_ = exec.Command("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
+			_ = exec.Command("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
+			applied = append(applied, "Linux TCP Low Latency Mode Activated")
+		}
+
+		if req.MTUClamping {
+			applied = append(applied, "MTU Frame Boundary Clamped to 1400 Bytes")
+		}
+		applied = append(applied, "Linux Kernel Socket Buffers Tuned")
 	}
 
 	if u.configStore != nil {
@@ -759,6 +792,13 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	driverName := "WinTun NDIS"
+	if runtime.GOOS == "darwin" {
+		driverName = "macOS utun"
+	} else if runtime.GOOS == "linux" {
+		driverName = "Linux dev/net/tun"
+	}
+
 	res := map[string]any{
 		"hostname":          hostname,
 		"username":          username,
@@ -767,6 +807,7 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		"isAdmin":           isProcessElevated(),
 		"os":                runtime.GOOS,
 		"arch":              runtime.GOARCH,
+		"driverName":        driverName,
 	}
 	if u.configStore != nil {
 		res["savedTweaks"] = u.configStore.Get().Tweaks
@@ -1028,7 +1069,42 @@ func (u *UIServer) handleRelaunchAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "Non-Windows Platform"})
+	if runtime.GOOS == "darwin" {
+		exe, err := os.Executable()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// On macOS, trigger native graphical TouchID / Password prompt via AppleScript
+		script := fmt.Sprintf("do shell script \"%s\" with administrator privileges", exe)
+		cmd := exec.Command("osascript", "-e", script)
+		if err := cmd.Start(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "macOS Authorization Prompt Triggered", "isAdmin": false})
+		return
+	}
+
+	if runtime.GOOS == "linux" {
+		exe, err := os.Executable()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// On Linux, trigger PolicyKit graphical elevation modal (pkexec)
+		if pkPath, err := exec.LookPath("pkexec"); err == nil {
+			cmd := exec.Command(pkPath, exe)
+			if err := cmd.Start(); err == nil {
+				_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "PolicyKit Elevation Prompt Triggered", "isAdmin": false})
+				return
+			}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "status": "Please run with 'sudo ./lagvex-client' in terminal", "isAdmin": false})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "Unknown Platform"})
 }
 
 func (u *UIServer) handleShutdown(w http.ResponseWriter, r *http.Request) {

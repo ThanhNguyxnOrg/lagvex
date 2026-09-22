@@ -669,6 +669,7 @@ export default function App() {
 
   // Admin & Bufferbloat Diagnostics State
   const [isAdmin, setIsAdmin] = useState(false);
+  const [driverName, setDriverName] = useState<string>("Kernel Virtual TUN");
   const [isTestingBufferbloat, setIsTestingBufferbloat] = useState(false);
   const [bufferbloatResult, setBufferbloatResult] = useState<{
     baselineMs: number;
@@ -844,18 +845,20 @@ export default function App() {
 
   // Relaunch as Administrator Handler
   const handleRelaunchAdmin = async () => {
-    notify("Requesting Windows Administrator UAC elevation...");
+    notify("Requesting administrator elevation prompt...");
     try {
       const res = await fetch("/api/relaunch-admin", { method: "POST" });
       const data = await res.json();
       if (data.isAdmin) {
         setIsAdmin(true);
         notify("Already running with Administrator privileges!");
+      } else if (data.status) {
+        notify(data.status);
       } else {
-        notify("Please approve the Windows UAC elevation prompt!");
+        notify("Please approve the administrator authorization prompt!");
       }
     } catch {
-      notify("Failed to invoke UAC elevation.");
+      notify("Failed to invoke administrator elevation.");
     }
   };
 
@@ -959,6 +962,7 @@ export default function App() {
           const data = await res.json();
           if (data.hostname) setPcHostname(data.hostname);
           if (data.isAdmin !== undefined) setIsAdmin(data.isAdmin);
+          if (data.driverName) setDriverName(data.driverName);
           const savedNick = localStorage.getItem("lagvex_nickname");
           if (!savedNick || savedNick === "Gamer" || savedNick === "Player") {
             const initialNick = data.suggestedNickname || (data.username ? `${data.username}#${data.discriminator || 1001}` : "Gamer#1337");
@@ -1710,20 +1714,20 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Driver Execution Mode Pill (Kernel WinTun NDIS vs Userspace fallback) */}
+            {/* Driver Execution Mode Pill (Kernel vs Userspace fallback) */}
             {isAdmin ? (
               <div
                 className="h-[38px] px-3.5 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center gap-2 text-xs font-brand font-bold text-[#10b981]"
-                title="Kernel Driver Active: WinTun NDIS virtual adapter operational with Ring-0 packet interception"
+                title={`Kernel Driver Active: ${driverName} virtual adapter operational with Ring-0 packet interception`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]" />
-                <span>Kernel Mode (WinTun NDIS)</span>
+                <span>Kernel Mode ({driverName})</span>
               </div>
             ) : (
               <button
                 onClick={handleRelaunchAdmin}
                 className="h-[38px] px-3.5 rounded-xl bg-[#f59e0b]/15 hover:bg-[#f59e0b]/25 border border-[#f59e0b]/40 flex items-center gap-2 text-xs font-brand font-bold text-[#f59e0b] cursor-pointer transition-all shadow group"
-                title="Click to elevate with Windows Administrator UAC for hardware WinTun NDIS driver acceleration"
+                title={`Click to elevate with Administrator privileges for hardware ${driverName} driver acceleration`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b] animate-pulse" />
                 <span>Userspace Mode &bull; Run as Admin &#x2197;</span>
@@ -2118,7 +2122,7 @@ export default function App() {
                         <IconBolt className="w-5 h-5" />
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">Lagvex Core</span>
-                      <span className="text-[9px] font-mono text-[#10b981]">Kernel Wintun</span>
+                      <span className="text-[9px] font-mono text-[#10b981]">{driverName}</span>
                     </div>
 
                     {/* Connecting Hop 2 -> 3 */}
