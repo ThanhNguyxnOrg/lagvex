@@ -85,7 +85,13 @@ func TestSquadSignalingEndpoints(t *testing.T) {
 	if err := json.NewDecoder(rec4.Body).Decode(&roomRes); err != nil {
 		t.Fatalf("failed to decode query room: %v", err)
 	}
-	if len(roomRes.Members) != 2 || roomRes.Members[1].Ping != 21 {
+	var foundTeammate bool
+	for _, m := range roomRes.Members {
+		if m.Name == "Teammate#2002" && m.Ping == 21 {
+			foundTeammate = true
+		}
+	}
+	if len(roomRes.Members) != 2 || !foundTeammate {
 		t.Fatalf("unexpected room state after heartbeat: %+v", roomRes.Members)
 	}
 

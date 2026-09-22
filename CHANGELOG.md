@@ -9,15 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-09-22
+
+### 🌐 Enterprise Squad Signaling Hub & Cross-Network Sync
+- 📡 **Relay Squad Signaling Hub (`pkg/relay/server.go`)**:
+  - Embedded REST signaling hub on relay servers (`/squad/create`, `/squad/join`, `/squad/room`, `/squad/heartbeat`, `/squad/leave`).
+  - Enables squad party members in different physical locations to synchronize matchmaking, latency, and route selection over the internet.
+  - Automated stale peer pruning with 30-second heartbeat sweeps.
+- 🔄 **Relay Squad Client Proxying (`pkg/client/ui_server.go`)**:
+  - Client automatically routes squad management requests to the active connected relay server.
+  - Graceful fallback to local in-memory party manager when running standalone or disconnected.
+
+### 💾 Persistent User Configuration & Profile Customization
+- ⚙️ **User Config Store (`pkg/client/config_store.go`, `%APPDATA%\Lagvex\user_config.json`)**:
+  - Atomic JSON persistence for gamer nickname, custom game profiles, custom relay endpoints, and Windows network optimization toggles.
+  - Automatically loads and integrates with the active profile catalog on client startup.
+
+### 🪟 Windows TCP MSS Clamping & Network QoS
+- ⚡ **TCP MSS Clamping at 1360 Bytes (`pkg/client/routes_windows.go`)**:
+  - Clamps WinTun adapter MTU to 1400 bytes, enforcing an effective TCP MSS limit of 1360 bytes (`MTU - 40`).
+  - Completely prevents TCP packet fragmentation and eliminates game lobby/matchmaking freeze across fiber and PPPoE networks.
+
+### 🎯 Truthful Game Network Architecture & Zero Struck-Through Numbers
+- 💎 **Authentic Peering Metadata**:
+  - Completely removed hardcoded fake comparison numbers (`~~80.2ms~~ -> 38.7ms`, `52% Faster`) from game cards on Home and Library tabs.
+  - Replaced with genuine server infrastructure routing protocols:
+    - **Valorant**: `Riot Direct` (Direct Riot Games Peering)
+    - **Counter-Strike 2**: `Valve SDR` (Valve Steam Datagram Relay)
+    - **PUBG: BATTLEGROUNDS**: `Steam` (AWS Southeast Asia)
+    - **Apex Legends**: `EA / Steam` (Anycast Core)
+  - Display sleek `⚡ FastPath Ready` when idle, dynamically switching to `🟢 TUNNEL LIVE: [livePing] ms` with real socket telemetry when boosting.
+
+### ✨ Fluid Micro-Interactions & Animation System
+- 🎨 **Natural Spring Easing & Tab Transitions**:
+  - Replaced harsh linear transitions with Apple/Linear spring easing: `cubic-bezier(0.16, 1, 0.3, 1)`.
+  - Butter-smooth tab entrance transitions (`tab-enter`) across all 6 tabs (Dashboard, Booster, Library, Squad, Nodes, Tweaks).
+  - Smooth card hover lift and 700ms eased cover art zoom (`card-smooth`).
+  - Backdrop blur fade (`modal-backdrop-animate`) and scale pop-in (`modal-pop-animate`) for all dialogs.
+  - Calm glowing state indicators replacing jarring continuous spins and harsh ping blinks.
 
 ### 🎮 Zero-Config Standalone Client & Repository Cleanliness
 - 🚀 **Embedded Game Profiles & Community Relays (`pkg/profiles/embedded/`)**:
-  - `profiles.json` (11 games, 189 CIDRs) and `relays.json` (12 global community relays across 5 continents) are now directly compiled into the client binary via `//go:embed`.
-  - Gamers can download a single `lagvex-client.exe` file and boost immediately without renting a VPS, copying PSKs, or configuring JSON files. External files remain supported as overrides for self-hosters.
+  - `profiles.json` (11 games, 189 CIDRs) and `relays.json` (15 global community relays across 5 continents) compiled directly into the binary via `//go:embed`.
+  - Gamers can download a single `lagvex-client.exe` file and boost immediately without configuration files.
 - 🧹 **Repository Cleanliness**:
   - Pruned legacy web prototype and temporary design assets.
-  - Production binaries compile self-contained and clean with zero lingering assets.
+  - Self-contained production build.
 
 ### 🛡️ Phase P4: Adaptive Forward Error Correction (FEC) & Zero-RTT Loss Recovery
 - 🛡️ **Adaptive Systematic XOR Parity Engine (`pkg/protocol/fec.go`)**:

@@ -33,15 +33,20 @@ func TestRelaySquadSignaling(t *testing.T) {
 		_ = server.Start(ctx)
 	}()
 
-	// Wait for server to bind HTTP
-	time.Sleep(150 * time.Millisecond)
-
 	baseURL := "http://127.0.0.1:44991"
 
-	// 1. Health check
-	resp, err := http.Get(baseURL + "/health")
-	if err != nil {
-		t.Fatalf("health check failed: %v", err)
+	// 1. Health check with resilient retry (wait up to 2 seconds for server to bind)
+	var resp *http.Response
+	var lastErr error
+	for i := 0; i < 40; i++ {
+		resp, lastErr = http.Get(baseURL + "/health")
+		if lastErr == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if lastErr != nil {
+		t.Fatalf("health check failed: %v", lastErr)
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on health check, got %d", resp.StatusCode)
