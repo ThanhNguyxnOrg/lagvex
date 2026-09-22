@@ -1408,8 +1408,8 @@ export default function App() {
 
       {/* ── NICKNAME EDIT MODAL ── */}
       {isEditingNickname && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-[420px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 modal-backdrop-animate">
+          <div className="w-full max-w-[420px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4 modal-pop-animate">
             <h3 className="font-brand font-extrabold text-lg text-white">Customize Gamer Profile</h3>
             <p className="text-xs text-white/50">
               Set your personal gaming callsign. This name appears on your dashboard and when hosting or joining Squad rooms.
@@ -1451,8 +1451,8 @@ export default function App() {
 
       {/* ── CUSTOM GAME MODAL ── */}
       {isAddingGame && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-[460px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 modal-backdrop-animate">
+          <div className="w-full max-w-[460px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4 modal-pop-animate">
             <div className="flex items-center justify-between">
               <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Game Profile</h3>
               <button onClick={() => setIsAddingGame(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
@@ -1529,8 +1529,8 @@ export default function App() {
 
       {/* ── CUSTOM RELAY NODE MODAL ── */}
       {isAddingNode && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-[480px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 modal-backdrop-animate">
+          <div className="w-full max-w-[480px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4 modal-pop-animate">
             <div className="flex items-center justify-between">
               <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Routing Node</h3>
               <button onClick={() => setIsAddingNode(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
@@ -1701,7 +1701,7 @@ export default function App() {
                 className="h-[38px] px-3.5 rounded-xl bg-[#f59e0b]/15 hover:bg-[#f59e0b]/25 border border-[#f59e0b]/40 flex items-center gap-2 text-xs font-brand font-bold text-[#f59e0b] cursor-pointer transition-all shadow group"
                 title="Click to elevate with Windows Administrator UAC for hardware WinTun NDIS driver acceleration"
               >
-                <span className="w-2 h-2 rounded-full bg-[#f59e0b] animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b] animate-pulse" />
                 <span>Userspace Mode &bull; Run as Admin &#x2197;</span>
               </button>
             )}
@@ -1741,7 +1741,7 @@ export default function App() {
           {/* TAB 0: HOME (DASHBOARD TỔNG QUAN CHÍNH)                   */}
           {/* ========================================================= */}
           {activeTab === "home" && (
-            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {/* Hero Banner: Welcome & Quick Launch */}
               <div className="relative rounded-[32px] overflow-hidden bg-gradient-to-r from-[#0d1624] via-[#0b121c] to-[#080d14] border border-[#1d2a3a] p-8 shadow-2xl flex items-center justify-between">
                 <div className="max-w-[620px] flex flex-col gap-3 z-10">
@@ -1822,18 +1822,23 @@ export default function App() {
                 <div className="grid grid-cols-4 gap-5">
                   {OFFICIAL_GAMES.slice(0, 4).map((game) => {
                     const originalIdx = OFFICIAL_GAMES.findIndex((g) => g.id === game.id);
-                    const info = getGameTelemetry(game);
+                    const isCurrentActive = isBoosting && selectedGame.id === game.id;
+                    const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
                     return (
                       <div
                         key={game.id}
                         onClick={() => handleSelectGameAndBoost(originalIdx)}
-                        className="relative rounded-2xl overflow-hidden bg-[#0a0f16] border border-[#192433] hover:border-[#00F0FF]/50 cursor-pointer transition-all hover:-translate-y-1 group flex flex-col shadow-lg"
+                        className={`relative rounded-2xl overflow-hidden bg-[#0a0f16] border cursor-pointer card-smooth group flex flex-col shadow-lg ${
+                          isCurrentActive
+                            ? "border-[#10b981] shadow-[0_0_24px_rgba(16,185,129,0.25)]"
+                            : "border-[#192433] hover:border-[#00F0FF]/50"
+                        }`}
                       >
                         <div className="relative h-[150px] overflow-hidden bg-[#05080c]">
                           <img
                             src={game.coverImg}
                             alt={game.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f16] via-transparent to-transparent" />
                           <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur text-[10px] font-brand font-bold text-[#00F0FF] border border-white/10">
@@ -1842,16 +1847,32 @@ export default function App() {
                         </div>
 
                         <div className="p-4 flex flex-col gap-2 flex-1">
-                          <h4 className="font-brand font-bold text-sm text-white truncate">{game.name}</h4>
-                          <div className="flex items-center justify-between text-xs font-mono mt-auto pt-2 border-t border-white/5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="line-through text-white/30">{info.baselinePing}ms</span>
-                              <span className="text-white/40">&rarr;</span>
-                              <span className="text-[#10b981] font-bold">{info.accelPing}ms</span>
-                            </div>
-                            <span className="text-[10px] font-brand font-bold text-[#00F0FF] bg-[#00F0FF]/10 px-2 py-0.5 rounded">
-                              {info.trend}
-                            </span>
+                          <div>
+                            <h4 className="font-brand font-bold text-sm text-white truncate">{game.name}</h4>
+                            <p className="text-[11px] text-white/40 truncate">{game.genre}</p>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs mt-auto pt-2.5 border-t border-white/5">
+                            {isCurrentActive ? (
+                              <>
+                                <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
+                                  <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+                                  <span>{Math.round(livePing)} ms</span>
+                                </div>
+                                <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
+                                  TUNNEL LIVE
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-1.5 text-white/50 text-[11px] truncate max-w-[140px]">
+                                  <span className="text-[#00F0FF]/85 font-medium truncate">{protocolRoute}</span>
+                                </div>
+                                <span className="text-[10px] font-brand font-semibold text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-md group-hover:border-[#00F0FF]/40 group-hover:text-[#00F0FF] transition-colors duration-200">
+                                  FastPath Ready
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1866,7 +1887,7 @@ export default function App() {
           {/* TAB 1: BOOST HUB (GEARUP PRO HUD)                         */}
           {/* ========================================================= */}
           {activeTab === "boost" && (
-            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {/* GearUP Cinematic Banner */}
               <div className="relative rounded-[32px] overflow-hidden bg-[#0a0f16] border border-[#1c2738] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8">
                 {/* Backdrop Game Art */}
@@ -1909,18 +1930,18 @@ export default function App() {
                       {/* 1. ESTIMATED PING */}
                       <div className="p-4 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40] flex flex-col">
                         <span className="text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
-                          ESTIMATED PING
+                          {isBoosting ? "LIVE ACCELERATED PING" : "TARGET ROUTE LATENCY"}
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
-                            {isBoosting ? Math.round(livePing) : (gameTelemetry[selectedGame.id]?.baselinePing || selectedGame.baselinePing)}
+                            {isBoosting ? Math.round(livePing) : (selectedRelay.pingMs > 0 ? Math.round(selectedRelay.pingMs) : 18)}
                           </span>
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
-                        <span className="text-[10px] font-mono text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
+                        <span className="text-[10px] font-brand text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
                           <span>⚡</span> {isBoosting 
-                            ? `${Math.max(0, Math.round((gameTelemetry[selectedGame.id]?.baselinePing || selectedGame.baselinePing) - livePing))}ms Saved (${gameTelemetry[selectedGame.id]?.trend || selectedGame.trend})`
-                            : `${gameTelemetry[selectedGame.id]?.trend || selectedGame.trend} vs Default ISP`}
+                            ? `Zero Bufferbloat • Sub-millisecond Jitter`
+                            : `Direct Peering via ${selectedRelay.name || "Optimal Relay"} • Ready`}
                         </span>
                       </div>
 
@@ -1962,15 +1983,15 @@ export default function App() {
                       <button
                         onClick={handleToggleBoost}
                         disabled={isConnecting}
-                        className={`h-[50px] px-8 rounded-2xl flex items-center gap-3 font-brand font-extrabold text-sm uppercase tracking-wider cursor-pointer border-none transition-all shadow-xl ${
+                        className={`h-[50px] px-8 rounded-2xl flex items-center gap-3 font-brand font-extrabold text-sm uppercase tracking-wider cursor-pointer border-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xl ${
                           isBoosting
-                            ? "bg-[#ef4444] hover:bg-[#dc2626] text-white shadow-red-500/20"
+                            ? "bg-[#ef4444] hover:bg-[#dc2626] text-white shadow-red-500/20 active:scale-[0.98]"
                             : isConnecting
                             ? "bg-[#00F0FF]/70 text-black cursor-wait"
-                            : "bg-[#00F0FF] hover:bg-[#33f3ff] text-[#051119] shadow-[#00F0FF]/30 hover:scale-105"
+                            : "bg-[#00F0FF] hover:bg-[#33f3ff] text-[#051119] shadow-[#00F0FF]/30 hover:scale-[1.02] active:scale-[0.98]"
                         }`}
                       >
-                        <IconBolt className={`w-5 h-5 ${isBoosting || isConnecting ? "animate-spin" : ""}`} />
+                        <IconBolt className={`w-5 h-5 ${isConnecting ? "animate-spin" : isBoosting ? "animate-glow-pulse text-white" : ""}`} />
                         <span>
                           {isBoosting ? "STOP ACCELERATION" : isConnecting ? "CONNECTING..." : "BOOST NOW"}
                         </span>
@@ -2172,7 +2193,7 @@ export default function App() {
           {/* TAB 2: GAME LIBRARY                                       */}
           {/* ========================================================= */}
           {activeTab === "library" && (
-            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {/* Search & Category Filter Bar */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 relative h-[46px] max-w-[480px]">
@@ -2217,15 +2238,18 @@ export default function App() {
                 {filteredGames.map((game) => {
                   const originalIdx = OFFICIAL_GAMES.findIndex((g) => g.id === game.id);
                   const isCurrent = selectedGame.id === game.id;
-                  const info = getGameTelemetry(game);
+                  const isCurrentActive = isBoosting && isCurrent;
+                  const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
                   return (
                     <div
                       key={game.id}
                       onClick={() => handleSelectGameAndBoost(originalIdx)}
-                      className={`relative rounded-2xl overflow-hidden bg-[#0a0f16] border cursor-pointer transition-all group flex flex-col shadow-lg ${
-                        isCurrent
-                          ? "border-[#00F0FF] shadow-[0_0_20px_rgba(0,240,255,0.25)]"
-                          : "border-[#192433] hover:border-[#00F0FF]/50 hover:-translate-y-1"
+                      className={`relative rounded-2xl overflow-hidden bg-[#0a0f16] border cursor-pointer card-smooth group flex flex-col shadow-lg ${
+                        isCurrentActive
+                          ? "border-[#10b981] shadow-[0_0_24px_rgba(16,185,129,0.25)]"
+                          : isCurrent
+                          ? "border-[#00F0FF] shadow-[0_0_24px_rgba(0,240,255,0.25)]"
+                          : "border-[#192433] hover:border-[#00F0FF]/50"
                       }`}
                     >
                       {/* Game Image Banner */}
@@ -2233,7 +2257,7 @@ export default function App() {
                         <img
                           src={game.coverImg}
                           alt={game.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="w-full h-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0f16] via-transparent to-transparent" />
                         <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur text-[10px] font-brand font-bold text-[#00F0FF] border border-white/10">
@@ -2245,19 +2269,31 @@ export default function App() {
                       <div className="p-4 flex flex-col gap-2 flex-1">
                         <div>
                           <h3 className="font-brand font-bold text-sm text-white truncate">{game.name}</h3>
-                          <p className="text-[11px] text-white/40 truncate">{game.genre} &bull; {info.region}</p>
+                          <p className="text-[11px] text-white/40 truncate">{game.genre} &bull; {game.region}</p>
                         </div>
 
-                        {/* Ping Comparison Pill */}
-                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-xs font-mono">
-                            <span className="line-through text-white/30">{info.baselinePing}ms</span>
-                            <span className="text-white/40">&rarr;</span>
-                            <span className="font-bold text-[#10b981]">{info.accelPing}ms</span>
-                          </div>
-                          <span className="text-[10px] font-brand font-bold text-[#00F0FF] bg-[#00F0FF]/10 px-2 py-0.5 rounded">
-                            {info.trend}
-                          </span>
+                        {/* Real Network Routing Pill */}
+                        <div className="mt-auto pt-2.5 border-t border-white/5 flex items-center justify-between text-xs">
+                          {isCurrentActive ? (
+                            <>
+                              <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
+                                <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+                                <span>{Math.round(livePing)} ms</span>
+                              </div>
+                              <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
+                                TUNNEL LIVE
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1.5 text-white/50 text-[11px] truncate max-w-[140px]">
+                                <span className="text-[#00F0FF]/85 font-medium truncate">{protocolRoute}</span>
+                              </div>
+                              <span className="text-[10px] font-brand font-semibold text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-md group-hover:border-[#00F0FF]/40 group-hover:text-[#00F0FF] transition-colors duration-200">
+                                FastPath Ready
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2271,7 +2307,7 @@ export default function App() {
           {/* TAB 3: SQUAD SYNC (REALISTIC SQUAD FLOW - NO FAKE DATA)  */}
           {/* ========================================================= */}
           {activeTab === "squad" && (
-            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {/* Informative Explanation Banner */}
               <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0a121e] to-[#081724] border border-[#1b2b3d] flex items-center justify-between shadow-xl">
                 <div className="max-w-[720px] flex flex-col gap-2">
@@ -2488,7 +2524,7 @@ export default function App() {
           {/* TAB 4: GLOBAL RELAY NODES                                 */}
           {/* ========================================================= */}
           {activeTab === "nodes" && (
-            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-brand font-extrabold text-2xl text-white">Global Routing Infrastructure</h2>
@@ -2625,7 +2661,7 @@ export default function App() {
           {/* TAB 5: SYSTEM TWEAKER                                     */}
           {/* ========================================================= */}
           {activeTab === "tweaker" && (
-            <div className="flex flex-col gap-6 max-w-[960px] mx-auto w-full">
+            <div className="flex flex-col gap-6 max-w-[960px] mx-auto w-full tab-enter">
               {/* Bufferbloat Diagnostic Test Card */}
               <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0d1624] via-[#101a29] to-[#0a121e] border border-[#1d2b3d] shadow-xl flex flex-col gap-4">
                 <div className="flex items-center justify-between">

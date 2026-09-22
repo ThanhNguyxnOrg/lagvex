@@ -41,9 +41,75 @@
 
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.75; transform: scale(0.98); }
+  50% { opacity: 0.85; transform: scale(0.99); }
 }
 
 .animate-pulse-subtle {
-  animation: pulse-subtle 2.5s infinite ease-in-out;
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Fluid UI Animation System */
+@keyframes tabEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-enter {
+  animation: tabEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes modalBackdrop {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(8px); }
+}
+
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop-animate {
+  animation: modalBackdrop 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modal-pop-animate {
+  animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Butter-smooth Interactive Cards */
+.card-smooth {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, box-shadow;
+}
+
+.card-smooth:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.7), 0 0 24px rgba(0, 240, 255, 0.12);
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(0, 240, 255, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.75));
+  }
+}
+
+.animate-glow-pulse {
+  animation: subtleGlow 2.8s ease-in-out infinite;
 }
