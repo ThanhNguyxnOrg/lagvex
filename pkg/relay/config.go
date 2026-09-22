@@ -9,6 +9,7 @@ import (
 // Config holds all parameters required by the Relay server.
 type Config struct {
 	ListenAddr  string        // UDP address to bind, e.g. ":51820"
+	HTTPAddr    string        // HTTP address for squad signaling & status, e.g. ":51821"
 	TunName     string        // Linux TUN device name, e.g. "lagvex0"
 	Subnet      netip.Prefix  // Client subnet, e.g. "10.88.0.0/24"
 	PSK         []byte        // Pre-shared key for authentication

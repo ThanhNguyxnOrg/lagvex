@@ -50,10 +50,11 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 		return fmt.Errorf("set adapter address: %w", err)
 	}
 
-	// 2. Set MTU
+	// 2. Set MTU & Clamp Effective TCP MSS (MTU - 40 = 1360 bytes)
 	cmdMTU := fmt.Sprintf("interface ipv4 set subinterface interface=%d mtu=%d store=active",
 		tunIfIndex, mtu)
 	_ = runNetsh(cmdMTU)
+	log.Printf("[RouteManager] Adapter %d MTU clamped to %d bytes (Effective TCP MSS: %d bytes - No packet fragmentation)", tunIfIndex, mtu, mtu-40)
 
 	// 3. Disable Duplicate Address Detection (DAD) transmits
 	cmdDAD := fmt.Sprintf("interface ipv4 set interface interface=%d dadtransmits=0 store=active",

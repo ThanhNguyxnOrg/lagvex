@@ -21,6 +21,7 @@ var (
 
 func main() {
 	listenFlag := flag.String("listen", ":51820", "UDP listen address for client connections")
+	httpFlag := flag.String("http", "", "HTTP address for Squad Signaling & status (defaults to UDP port + 1)")
 	tunFlag := flag.String("tun", "lagvex0", "Linux TUN device name")
 	subnetFlag := flag.String("subnet", "10.88.0.0/24", "IPv4 subnet for connected clients")
 	pskFlag := flag.String("psk", "", "Pre-shared key for authentication")
@@ -60,6 +61,7 @@ func main() {
 
 	cfg := relay.Config{
 		ListenAddr:  *listenFlag,
+		HTTPAddr:    *httpFlag,
 		TunName:     *tunFlag,
 		Subnet:      subnet,
 		PSK:         []byte(psk),

@@ -3,10 +3,14 @@ package relay
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"net/netip"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +19,28 @@ import (
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/tun"
 )
 
-// Server implements the Lagvex Relay data plane on Linux.
+// RelaySquadMember represents a player connected to a Squad room on this relay.
+type RelaySquadMember struct {
+	Name     string    `json:"name"`
+	Role     string    `json:"role"`
+	ISP      string    `json:"isp"`
+	Ping     int       `json:"ping"`
+	Game     string    `json:"game"`
+	Status   string    `json:"status"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
+// RelaySquadRoom stores real-time squad roster synced across all teammates.
+type RelaySquadRoom struct {
+	Code      string                       `json:"code"`
+	Host      string                       `json:"host"`
+	Game      string                       `json:"game"`
+	Members   map[string]*RelaySquadMember `json:"members"`
+	CreatedAt time.Time                    `json:"createdAt"`
+	mu        sync.RWMutex
+}
+
+// Server implements the Lagvex Relay data plane and Squad Signaling Hub.
 type Server struct {
 	cfg    Config
 	pool   *IPPool
@@ -25,6 +50,9 @@ type Server struct {
 	mu           sync.RWMutex
 	sessionsByID map[uint64]*Session
 	sessionsByIP map[netip.Addr]*Session
+
+	squadRoomsMu sync.RWMutex
+	squadRooms   map[string]*RelaySquadRoom
 
 	bufPool sync.Pool
 
@@ -47,6 +75,7 @@ func NewServer(cfg Config) (*Server, error) {
 		pool:         pool,
 		sessionsByID: make(map[uint64]*Session),
 		sessionsByIP: make(map[netip.Addr]*Session),
+		squadRooms:   make(map[string]*RelaySquadRoom),
 		bufPool: sync.Pool{
 			New: func() any {
 				b := make([]byte, protocol.MaxPacketSize)
@@ -92,7 +121,7 @@ func (s *Server) Start(ctx context.Context) error {
 	log.Printf("[Relay] Listening for clients on UDP %s", s.conn.LocalAddr())
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -108,6 +137,8 @@ func (s *Server) Start(ctx context.Context) error {
 		defer wg.Done()
 		s.loopReaper(ctx)
 	}()
+
+	go s.startSignalingHTTP(ctx, &wg)
 
 	<-ctx.Done()
 	log.Printf("[Relay] Shutting down...")
@@ -431,4 +462,330 @@ func isForbiddenDestination(ip netip.Addr) bool {
 		return true
 	}
 	return false
+}
+
+// ── CENTRALIZED SQUAD SIGNALING HUB ──
+
+func (s *Server) startSignalingHTTP(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	httpAddr := s.cfg.HTTPAddr
+	if httpAddr == "" {
+		host, portStr, err := net.SplitHostPort(s.cfg.ListenAddr)
+		if err == nil {
+			if port, pErr := strconv.Atoi(portStr); pErr == nil {
+				httpAddr = net.JoinHostPort(host, strconv.Itoa(port+1))
+			}
+		}
+		if httpAddr == "" {
+			httpAddr = ":51821"
+		}
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/squad/create", s.handleSquadCreate)
+	mux.HandleFunc("/squad/join", s.handleSquadJoin)
+	mux.HandleFunc("/squad/room", s.handleSquadRoom)
+	mux.HandleFunc("/squad/heartbeat", s.handleSquadHeartbeat)
+	mux.HandleFunc("/squad/leave", s.handleSquadLeave)
+
+	srv := &http.Server{
+		Addr:    httpAddr,
+		Handler: mux,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutCtx)
+	}()
+
+	log.Printf("[Relay] Squad Signaling Hub active on HTTP %s", httpAddr)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("[Relay] Warning: signaling HTTP server closed: %v", err)
+	}
+}
+
+func setCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Content-Type", "application/json")
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	s.mu.RLock()
+	active := len(s.sessionsByID)
+	s.mu.RUnlock()
+
+	s.squadRoomsMu.RLock()
+	roomsCount := len(s.squadRooms)
+	s.squadRoomsMu.RUnlock()
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":      "online",
+		"version":     "1.0.0",
+		"activeUsers": active,
+		"squadRooms":  roomsCount,
+		"listen":      s.cfg.ListenAddr,
+	})
+}
+
+func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+		Game string `json:"game"`
+		Ping int    `json:"ping"`
+		ISP  string `json:"isp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	if req.Code == "" {
+		req.Code = fmt.Sprintf("LGVX-%d", time.Now().UnixNano()%9000+1000)
+	}
+	if req.ISP == "" {
+		req.ISP = "Broadband"
+	}
+
+	room := &RelaySquadRoom{
+		Code:      req.Code,
+		Host:      req.Name,
+		Game:      req.Game,
+		Members:   make(map[string]*RelaySquadMember),
+		CreatedAt: time.Now(),
+	}
+	room.Members[req.Name] = &RelaySquadMember{
+		Name:     req.Name,
+		Role:     "Host",
+		ISP:      req.ISP,
+		Ping:     req.Ping,
+		Game:     req.Game,
+		Status:   "Party Host 👑",
+		LastSeen: time.Now(),
+	}
+
+	s.squadRoomsMu.Lock()
+	s.squadRooms[req.Code] = room
+	s.squadRoomsMu.Unlock()
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success": true,
+		"code":    room.Code,
+		"host":    room.Host,
+		"game":    room.Game,
+	})
+}
+
+func (s *Server) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+		Game string `json:"game"`
+		Ping int    `json:"ping"`
+		ISP  string `json:"isp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	s.squadRoomsMu.Lock()
+	room, ok := s.squadRooms[req.Code]
+	if !ok {
+		// Auto-create room if teammate entered non-existent code
+		room = &RelaySquadRoom{
+			Code:      req.Code,
+			Host:      req.Name,
+			Game:      req.Game,
+			Members:   make(map[string]*RelaySquadMember),
+			CreatedAt: time.Now(),
+		}
+		s.squadRooms[req.Code] = room
+	}
+	s.squadRoomsMu.Unlock()
+
+	room.mu.Lock()
+	if len(room.Members) >= 5 && room.Members[req.Name] == nil {
+		room.mu.Unlock()
+		http.Error(w, `{"error":"Squad room is full (5/5 players)"}`, http.StatusConflict)
+		return
+	}
+	role := "Member"
+	if req.Name == room.Host {
+		role = "Host"
+	}
+	if req.ISP == "" {
+		req.ISP = "Broadband"
+	}
+	room.Members[req.Name] = &RelaySquadMember{
+		Name:     req.Name,
+		Role:     role,
+		ISP:      req.ISP,
+		Ping:     req.Ping,
+		Game:     req.Game,
+		Status:   "Synced ⚡",
+		LastSeen: time.Now(),
+	}
+
+	memberList := make([]RelaySquadMember, 0, len(room.Members))
+	for _, m := range room.Members {
+		memberList = append(memberList, *m)
+	}
+	room.mu.Unlock()
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success": true,
+		"code":    room.Code,
+		"members": memberList,
+	})
+}
+
+func (s *Server) handleSquadRoom(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
+	if code == "" {
+		http.Error(w, `{"error":"room code required"}`, http.StatusBadRequest)
+		return
+	}
+
+	s.squadRoomsMu.Lock()
+	room, ok := s.squadRooms[code]
+	s.squadRoomsMu.Unlock()
+
+	if !ok {
+		http.Error(w, `{"error":"room not found"}`, http.StatusNotFound)
+		return
+	}
+
+	room.mu.Lock()
+	now := time.Now()
+	for name, m := range room.Members {
+		if now.Sub(m.LastSeen) > 30*time.Second && m.Role != "Host" {
+			delete(room.Members, name)
+		}
+	}
+	memberList := make([]RelaySquadMember, 0, len(room.Members))
+	for _, m := range room.Members {
+		memberList = append(memberList, *m)
+	}
+	hostName := room.Host
+	gameName := room.Game
+	room.mu.Unlock()
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"code":    code,
+		"host":    hostName,
+		"game":    gameName,
+		"members": memberList,
+		"count":   len(memberList),
+	})
+}
+
+func (s *Server) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code   string `json:"code"`
+		Name   string `json:"name"`
+		Ping   int    `json:"ping"`
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	s.squadRoomsMu.Lock()
+	room, ok := s.squadRooms[req.Code]
+	s.squadRoomsMu.Unlock()
+
+	if ok {
+		room.mu.Lock()
+		if m, exists := room.Members[req.Name]; exists {
+			m.LastSeen = time.Now()
+			if req.Ping > 0 {
+				m.Ping = req.Ping
+			}
+			if req.Status != "" {
+				m.Status = req.Status
+			}
+		}
+		room.mu.Unlock()
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+}
+
+func (s *Server) handleSquadLeave(w http.ResponseWriter, r *http.Request) {
+	setCORS(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	s.squadRoomsMu.Lock()
+	room, ok := s.squadRooms[req.Code]
+	if ok {
+		room.mu.Lock()
+		delete(room.Members, req.Name)
+		empty := len(room.Members) == 0
+		room.mu.Unlock()
+		if empty {
+			delete(s.squadRooms, req.Code)
+		}
+	}
+	s.squadRoomsMu.Unlock()
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
 }

@@ -1,10 +1,12 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
+	"io"
 	"log"
 	"math"
 	"net"
@@ -24,11 +26,12 @@ import (
 
 // UIServer serves the modern Gaming Booster Dashboard and REST API.
 type UIServer struct {
-	engine     *Engine
-	profileMgr *profiles.Manager
-	webDir     string
-	server     *http.Server
-	prober     *Prober
+	engine      *Engine
+	profileMgr  *profiles.Manager
+	webDir      string
+	server      *http.Server
+	prober      *Prober
+	configStore *ConfigStore
 }
 
 // NewUIServer creates a new dashboard UI server.
@@ -47,11 +50,23 @@ func NewUIServer(engine *Engine, pm *profiles.Manager, webDir string) *UIServer 
 		}
 	}
 
+	cs := NewConfigStore("")
+	if pm != nil {
+		cfg := cs.Get()
+		for _, g := range cfg.CustomGames {
+			_ = pm.AddGame(g)
+		}
+		for _, r := range cfg.CustomRelays {
+			_ = pm.AddRelay(r)
+		}
+	}
+
 	return &UIServer{
-		engine:     engine,
-		profileMgr: pm,
-		webDir:     webDir,
-		prober:     NewProber(),
+		engine:      engine,
+		profileMgr:  pm,
+		webDir:      webDir,
+		prober:      NewProber(),
+		configStore: cs,
 	}
 }
 
@@ -416,6 +431,9 @@ func (u *UIServer) handleAddGame(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if u.configStore != nil {
+		u.configStore.AddCustomGame(game)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "game": game})
@@ -450,6 +468,9 @@ func (u *UIServer) handleAddRelay(w http.ResponseWriter, r *http.Request) {
 	if err := u.profileMgr.AddRelay(relay); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if u.configStore != nil {
+		u.configStore.AddCustomRelay(relay)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -503,6 +524,15 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		applied = append(applied, "Network System Parameters Tuned")
+	}
+
+	if u.configStore != nil {
+		u.configStore.SetTweaks(map[string]bool{
+			"tcpNoDelay":    req.TCPNoDelay,
+			"disableNagle":  req.DisableNagle,
+			"mmcssPriority": req.MMCSSPriority,
+			"mtuClamping":   req.MTUClamping,
+		})
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -721,6 +751,13 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if u.configStore != nil {
+		savedNick := u.configStore.Get().Nickname
+		if savedNick != "" && savedNick != "Gamer" && savedNick != "Player" {
+			suggestedNickname = savedNick
+		}
+	}
+
 	res := map[string]any{
 		"hostname":          hostname,
 		"username":          username,
@@ -729,6 +766,9 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		"isAdmin":           isProcessElevated(),
 		"os":                runtime.GOOS,
 		"arch":              runtime.GOARCH,
+	}
+	if u.configStore != nil {
+		res["savedTweaks"] = u.configStore.Get().Tweaks
 	}
 	_ = json.NewEncoder(w).Encode(res)
 }
@@ -1018,6 +1058,57 @@ var (
 	squadRooms   = make(map[string]*SquadRoom)
 )
 
+func (u *UIServer) getRelaySignalingURL() string {
+	if u.engine == nil {
+		return ""
+	}
+	stats := u.engine.Stats()
+	if stats.State != StateConnected || stats.RelayAddr == "" {
+		return ""
+	}
+	host, portStr, err := net.SplitHostPort(stats.RelayAddr)
+	if err != nil {
+		return ""
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%d", host, port+1)
+}
+
+func (u *UIServer) proxyRelaySquad(w http.ResponseWriter, path, method string, body []byte) bool {
+	relayURL := u.getRelaySignalingURL()
+	if relayURL == "" {
+		return false
+	}
+	targetURL := relayURL + path
+	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	var req *http.Request
+	var err error
+	if len(body) > 0 {
+		req, err = http.NewRequest(method, targetURL, bytes.NewReader(body))
+	} else {
+		req, err = http.NewRequest(method, targetURL, nil)
+	}
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil || resp == nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+		return true
+	}
+	return false
+}
+
 func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
@@ -1036,6 +1127,11 @@ func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	bodyBytes, _ := json.Marshal(req)
+	if u.proxyRelaySquad(w, "/squad/create", "POST", bodyBytes) {
 		return
 	}
 
@@ -1095,6 +1191,11 @@ func (u *UIServer) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	bodyBytes, _ := json.Marshal(req)
+	if u.proxyRelaySquad(w, "/squad/join", "POST", bodyBytes) {
 		return
 	}
 
@@ -1159,6 +1260,10 @@ func (u *UIServer) handleSquadRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if u.proxyRelaySquad(w, "/squad/room?code="+code, "GET", nil) {
+		return
+	}
+
 	squadRoomsMu.Lock()
 	room, ok := squadRooms[code]
 	squadRoomsMu.Unlock()
@@ -1212,6 +1317,11 @@ func (u *UIServer) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	bodyBytes, _ := json.Marshal(req)
+	if u.proxyRelaySquad(w, "/squad/heartbeat", "POST", bodyBytes) {
+		return
+	}
+
 	squadRoomsMu.Lock()
 	room, ok := squadRooms[req.Code]
 	squadRoomsMu.Unlock()
@@ -1247,6 +1357,11 @@ func (u *UIServer) handleSquadLeave(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	leaveBytes, _ := json.Marshal(req)
+	if u.proxyRelaySquad(w, "/squad/leave", "POST", leaveBytes) {
+		return
+	}
+
 	squadRoomsMu.Lock()
 	room, ok := squadRooms[req.Code]
 	if ok {
