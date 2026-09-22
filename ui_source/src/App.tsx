@@ -147,6 +147,15 @@ function IconRefresh({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
+function IconPower({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <line x1="12" y1="2" x2="12" y2="12" />
+    </svg>
+  );
+}
+
 // ==================== 100% REAL GAME CATALOG ====================
 export type Game = {
   id: string;
@@ -847,6 +856,21 @@ export default function App() {
       }
     } catch {
       notify("Failed to invoke UAC elevation.");
+    }
+  };
+
+  // Graceful App Shutdown Handler
+  const handleShutdownApp = async () => {
+    if (window.confirm("Thoát hoàn toàn Lagvex? Mọi kết nối tăng tốc game sẽ được ngắt an toàn.")) {
+      notify("Đang đóng ứng dụng Lagvex...");
+      try {
+        await fetch("/api/shutdown", { method: "POST" });
+      } catch {
+        // Ignored
+      }
+      setTimeout(() => {
+        window.close();
+      }, 300);
     }
   };
 
@@ -1732,6 +1756,16 @@ export default function App() {
                 </span>
               </div>
             </div>
+
+            {/* Quit App Button */}
+            <button
+              onClick={handleShutdownApp}
+              className="h-[38px] px-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 flex items-center gap-1.5 text-xs font-brand font-bold text-red-400 hover:text-red-300 cursor-pointer transition-all shadow group"
+              title="Đóng và thoát hoàn toàn ứng dụng Lagvex"
+            >
+              <IconPower className="w-3.5 h-3.5 text-red-400 group-hover:scale-110 transition-transform" />
+              <span>Quit</span>
+            </button>
           </div>
         </header>
 

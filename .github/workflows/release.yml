@@ -138,8 +138,8 @@ jobs:
         run: |
           mkdir -p dist
 
-          # 1. Windows amd64 Client
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client.exe ./cmd/lagvex-client
+          # 1. Windows amd64 Client (Compiled as GUI subsystem to prevent terminal popup on double-click)
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui -X main.version=${VERSION}" -o dist/lagvex-client.exe ./cmd/lagvex-client
           
           # 2. Linux amd64 Client & Relay
           GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o dist/lagvex-client-linux-amd64 ./cmd/lagvex-client

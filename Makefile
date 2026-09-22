@@ -12,7 +12,7 @@ relay-arm64:
 
 client:
 	@echo "==> Building Lagvex Client (Windows amd64)..."
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/lagvex-client.exe ./cmd/lagvex-client
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -H=windowsgui" -o bin/lagvex-client.exe ./cmd/lagvex-client
 
 client-mac:
 	@echo "==> Building Lagvex Client (macOS arm64)..."

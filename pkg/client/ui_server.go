@@ -94,6 +94,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/optimize-profile", u.handleOptimizeProfile)
 	mux.HandleFunc("/api/system-info", u.handleSystemInfo)
 	mux.HandleFunc("/api/relaunch-admin", u.handleRelaunchAdmin)
+	mux.HandleFunc("/api/shutdown", u.handleShutdown)
 	mux.HandleFunc("/api/diagnose-network", u.handleNetworkDiagnostics)
 	mux.HandleFunc("/api/diagnose-bufferbloat", u.handleDiagnoseBufferbloat)
 	mux.HandleFunc("/api/game-telemetry", u.handleGameTelemetry)
@@ -1028,6 +1029,24 @@ func (u *UIServer) handleRelaunchAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "Non-Windows Platform"})
+}
+
+func (u *UIServer) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "Shutting down..."})
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		if u.engine != nil {
+			_ = u.engine.Disconnect()
+		}
+		os.Exit(0)
+	}()
 }
 
 // ── SQUAD ROOM REAL-TIME SIGNALING ──

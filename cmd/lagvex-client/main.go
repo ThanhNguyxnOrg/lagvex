@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -22,6 +23,8 @@ var (
 )
 
 func main() {
+	attachParentConsole()
+
 	profileFlag := flag.String("profiles", "", "Path to profiles.json")
 	httpFlag := flag.String("http", "127.0.0.1:18888", "HTTP address for Web UI Dashboard")
 	noBrowserFlag := flag.Bool("no-browser", false, "Do not auto-open browser on startup")
@@ -40,6 +43,19 @@ func main() {
 	if *versionFlag {
 		fmt.Printf("Lagvex Client v%s\n", version)
 		return
+	}
+
+	// Single instance check: if an instance is already running on httpFlag, open UI and exit
+	if !*connectFlag {
+		checkClient := &http.Client{Timeout: 400 * time.Millisecond}
+		if resp, err := checkClient.Get(fmt.Sprintf("http://%s/api/status", *httpFlag)); err == nil {
+			_ = resp.Body.Close()
+			log.Printf("[Lagvex] Instance already running on http://%s. Opening dashboard...", *httpFlag)
+			if !*noBrowserFlag {
+				openDesktopWindow(fmt.Sprintf("http://%s", *httpFlag))
+			}
+			return
+		}
 	}
 
 	// Locate profiles.json
