@@ -1555,10 +1555,169 @@
     }, 2800);
   }
 
+  // ==================== IN-GAME FLOATING MINI HUD CONTROLLER ====================
+  function initFloatingHUD() {
+    const hudContainer = document.getElementById('lagvex-hud-container');
+    const hudPill = document.getElementById('lagvex-hud-pill');
+    const hudToggleBtn = document.getElementById('lagvex-hud-toggle-btn');
+    const hudCloseBtn = document.getElementById('hud-close-btn');
+    const hudMinBtn = document.getElementById('hud-min-btn');
+    const hudDot = document.getElementById('hud-dot');
+    const hudPing = document.getElementById('hud-ping');
+    const hudLoss = document.getElementById('hud-loss');
+    const hudNode = document.getElementById('hud-node');
+
+    if (!hudContainer || !hudPill) return;
+
+    // Restore visibility preference (default: hidden, optional)
+    const isVisible = localStorage.getItem('lagvex_hud_visible') === 'true';
+    hudContainer.style.display = isVisible ? 'block' : 'none';
+
+    // Restore saved position if valid
+    const savedPos = localStorage.getItem('lagvex_hud_pos');
+    if (savedPos) {
+      try {
+        const { top, left } = JSON.parse(savedPos);
+        if (top >= 0 && left >= 0 && top < window.innerHeight && left < window.innerWidth) {
+          hudContainer.style.top = `${top}px`;
+          hudContainer.style.left = `${left}px`;
+          hudContainer.style.right = 'auto';
+        }
+      } catch (e) {}
+    }
+
+    // Toggle button handler
+    if (hudToggleBtn) {
+      hudToggleBtn.addEventListener('click', () => {
+        const currentlyVisible = hudContainer.style.display !== 'none';
+        if (currentlyVisible) {
+          hudContainer.style.display = 'none';
+          localStorage.setItem('lagvex_hud_visible', 'false');
+          showToast('HUD hidden. Click ⚡ HUD to re-enable anytime.', 'info');
+        } else {
+          hudContainer.style.display = 'block';
+          localStorage.setItem('lagvex_hud_visible', 'true');
+          showToast('In-Game Floating HUD active. Drag to reposition.', 'success');
+        }
+      });
+    }
+
+    // Close button handler
+    if (hudCloseBtn) {
+      hudCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hudContainer.style.display = 'none';
+        localStorage.setItem('lagvex_hud_visible', 'false');
+        showToast('HUD closed. Re-enable via bottom ⚡ button.', 'info');
+      });
+    }
+
+    // Minimize / Expand toggle
+    let isMinimized = false;
+    if (hudMinBtn) {
+      hudMinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isMinimized = !isMinimized;
+        const lossMetric = hudLoss ? hudLoss.closest('.hud-metric') : null;
+        const nodeMetric = hudNode ? hudNode.closest('.hud-metric') : null;
+        const dividers = hudPill.querySelectorAll('.hud-divider');
+
+        if (lossMetric) lossMetric.style.display = isMinimized ? 'none' : 'flex';
+        if (nodeMetric) nodeMetric.style.display = isMinimized ? 'none' : 'flex';
+        dividers.forEach(d => d.style.display = isMinimized ? 'none' : 'block');
+        hudMinBtn.textContent = isMinimized ? '+' : '−';
+      });
+    }
+
+    // Draggable logic
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let initialLeft = 0;
+    let initialTop = 0;
+
+    hudPill.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      const rect = hudContainer.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      hudPill.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaX = e.clientX - dragStartX;
+      const deltaY = e.clientY - dragStartY;
+      const newLeft = Math.max(8, Math.min(window.innerWidth - hudContainer.offsetWidth - 8, initialLeft + deltaX));
+      const newTop = Math.max(8, Math.min(window.innerHeight - hudContainer.offsetHeight - 8, initialTop + deltaY));
+
+      hudContainer.style.left = `${newLeft}px`;
+      hudContainer.style.top = `${newTop}px`;
+      hudContainer.style.right = 'auto';
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        hudPill.style.cursor = 'grab';
+        const rect = hudContainer.getBoundingClientRect();
+        localStorage.setItem('lagvex_hud_pos', JSON.stringify({ top: rect.top, left: rect.left }));
+      }
+    });
+
+    // Real-time telemetry updater
+    async function updateHUDTelemetry() {
+      if (hudContainer.style.display === 'none') return;
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.active || data.state === 'connected') {
+          if (hudDot) hudDot.classList.add('online');
+          const ping = data.pingMs || 0;
+          if (hudPing) {
+            hudPing.textContent = `${ping} ms`;
+            hudPing.className = 'hud-metric-value ' + (ping < 35 ? 'good' : ping < 75 ? 'mid' : 'high');
+          }
+          if (hudLoss) {
+            const loss = data.packetLossPct || 0;
+            hudLoss.textContent = `${loss}%`;
+            hudLoss.className = 'hud-metric-value ' + (loss === 0 ? 'good' : 'high');
+          }
+          if (hudNode) {
+            hudNode.textContent = data.activeRelayName || data.activeRelayId || 'Optimized';
+          }
+        } else {
+          if (hudDot) hudDot.classList.remove('online');
+          if (hudPing) {
+            hudPing.textContent = '-- ms';
+            hudPing.className = 'hud-metric-value';
+          }
+          if (hudNode) {
+            hudNode.textContent = 'Disconnected';
+          }
+        }
+      } catch (err) {}
+    }
+
+    setInterval(updateHUDTelemetry, 1200);
+    updateHUDTelemetry();
+  }
+
   // Run on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
+  function start() {
     init();
+    initFloatingHUD();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();

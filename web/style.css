@@ -1856,3 +1856,161 @@ button {
     display: none;
   }
 }
+
+/* ==========================================================================
+   OPTIONAL IN-GAME FLOATING MINI HUD WIDGET
+   ========================================================================== */
+#lagvex-hud-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 999999;
+  user-select: none;
+  touch-action: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.lagvex-hud-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(0, 240, 255, 0.15);
+  border-radius: 9999px;
+  padding: 8px 14px;
+  color: #f8fafc;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.lagvex-hud-pill:active {
+  cursor: grabbing;
+}
+
+.lagvex-hud-pill:hover {
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 240, 255, 0.3);
+}
+
+.hud-drag-handle {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.hud-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  box-shadow: 0 0 8px #64748b;
+}
+
+.hud-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: hudPulse 2s infinite ease-in-out;
+}
+
+@keyframes hudPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+.hud-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.hud-metric-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.hud-metric-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00f0ff;
+}
+
+.hud-metric-value.good {
+  color: #10b981;
+}
+
+.hud-metric-value.mid {
+  color: #f59e0b;
+}
+
+.hud-metric-value.high {
+  color: #ef4444;
+}
+
+.hud-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hud-ctrls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.hud-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+
+.hud-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Floating Launcher Button */
+#lagvex-hud-toggle-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999998;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  border-radius: 9999px;
+  padding: 8px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+#lagvex-hud-toggle-btn:hover {
+  border-color: #00f0ff;
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.25);
+  transform: translateY(-1px);
+}
