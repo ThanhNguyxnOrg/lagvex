@@ -41,7 +41,7 @@ Lagvex was built from the ground up to solve the latency challenges of online ga
           ▼
    [ ⚡ Lagvex Client Engine (lagvex-client) ]
           │
-          │ Wraps packet with 9-byte binary header (Version, Type, SessionID)
+          │ Authenticates & encrypts packet with ChaCha20-Poly1305 AEAD + replay window (17-byte header + 16-byte tag)
           ▼
    [ 📦 Standard UDP Socket ]
           │
@@ -53,8 +53,9 @@ Lagvex was built from the ground up to solve the latency challenges of online ga
    [ ☁️ Lagvex Relay Server (lagvex-relay on Linux VPS) ]
           │
           │ Receives datagram on port 51820
-          │ Validates Session ID & verifies anti-spoofing inner source IP
-          │ Strips 9-byte header, writes raw IPv4 packet into TUN interface: lagvex0
+          │ Validates Session ID, checks replay window, and decrypts via ChaCha20-Poly1305
+          │ Verifies anti-spoofing inner source IP
+          │ Writes raw IPv4 packet into TUN interface: lagvex0
           ▼
    [ 🐧 Linux Kernel (VPS) ]
           │

@@ -9,8 +9,8 @@
 
 - 📦 **Transport**: Standard UDP (one client socket, one server listening port).
 - 🌐 **Layer-3 Payload**: Transports whole IPv4 packets. Layer-4 protocols (TCP, UDP, ICMP) are handled by the Linux kernel.
-- ⚡ **Minimal Per-Packet Overhead**: Fixed 9-byte header for data packets. No Type-Length-Value (TLV) parsing in the high-speed data path.
-- 🔒 **Security**: Pre-Shared Key (PSK) authentication via HMAC-SHA256 during handshake. Data packets are authenticated by session ID and source IP verification for minimum latency.
+- ⚡ **Minimal Per-Packet Overhead**: Fixed 17-byte secure header + 16-byte Poly1305 tag (33 bytes total overhead) for encrypted data packets.
+- 🔒 **Security**: Pre-Shared Key (PSK) authentication via HMAC-SHA256 during handshake. All post-handshake traffic is secured with ChaCha20-Poly1305 AEAD with anti-replay monotonic counters.
 
 ---
 
@@ -20,17 +20,18 @@ Every packet begins with a 1-byte header:
 
 ```text
 bits 7..4 : Protocol Version (currently 0x1)
-bits 3..0 : Message Type (0x1 .. 0x6)
+bits 3..0 : Message Type (0x1 .. 0x7)
 ```
 
 | Type Code | 🏷️ Message Name | ↔️ Direction | 📏 Packet Size |
 |---|---|---|---|
 | `0x1` | `HandshakeReq` 🤝 | Client -> Relay | 57 bytes |
 | `0x2` | `HandshakeResp` 📨 | Relay -> Client | 60 bytes |
-| `0x3` | `Data` 🚀 | Bidirectional | 9 bytes + Payload |
-| `0x4` | `Ping` 🏓 | Client -> Relay | 17 bytes |
-| `0x5` | `Pong` 🎾 | Relay -> Client | 17 bytes |
-| `0x6` | `Disconnect` 🛑 | Client -> Relay | 9 bytes |
+| `0x3` | `Data` 🚀 | Bidirectional | 33 bytes + Payload (ChaCha20-Poly1305 AEAD) |
+| `0x4` | `Ping` 🏓 | Client -> Relay | 41 bytes (Encrypted timestamp payload) |
+| `0x5` | `Pong` 🎾 | Relay -> Client | 41 bytes (Encrypted timestamp payload) |
+| `0x6` | `Disconnect` 🛑 | Client -> Relay | 33 bytes (Encrypted notification) |
+| `0x7` | `FEC` 🛡️ | Client -> Relay | 33 bytes + Parity Payload |
 
 ---
 
@@ -73,25 +74,28 @@ The client verifies the HMAC before trusting any returned fields.
 
 ---
 
-## 4. 🚀 Data Packet (9-Byte Header + Raw IPv4 Payload)
+## 4. 🚀 Data Packet (33-Byte Secure Overhead + Encrypted IPv4 Payload)
 
-Transports game IP packets between client and relay:
+Transports game IP packets between client and relay using ChaCha20-Poly1305 AEAD:
 
 ```text
 Offset  Length  Field
 0       1       Header (0x13: Version 1, Type 3)
-1       8       SessionID (uint64, big-endian)
-9       N       Raw IPv4 Packet (starts with version nibble 0x4)
+1       8       SessionID (uint64, big-endian, plaintext for routing/demux)
+9       8       Monotonic Counter (uint64, big-endian nonce)
+17      N       Encrypted IPv4 Packet Payload
+17+N    16      Poly1305 Authentication Tag (bytes[0..17) used as AAD)
 ```
 
 ### Data Plane Invariants:
-1. 🛡️ **Anti-Spoofing**: When receiving data from a client, the relay extracts the source IPv4 from the inner packet header (`bytes[12..16]`) and drops the packet if it does not match `session.InnerIP`.
-2. 🔄 **Dynamic Roaming**: If a client switches from Wi-Fi to Ethernet or cellular, their external UDP address and port change. The relay automatically updates `session.RemoteUDP` upon receiving any valid data packet for that session.
+1. 🛡️ **Anti-Spoofing**: When receiving decrypted data from a client, the relay extracts the source IPv4 from the inner packet header (`bytes[12..16]`) and drops the packet if it does not match `session.InnerIP`.
+2. 🔄 **Dynamic Roaming**: If a client switches from Wi-Fi to Ethernet or cellular, their external UDP address and port change. The relay automatically updates `session.RemoteUDP` upon receiving any valid authenticated packet for that session.
 3. 🚫 **Bogon / Private Network Filtering**: The relay drops packets whose inner destination IP belongs to RFC 1918 private subnets, loopback, or cloud instance metadata (`169.254.169.254`).
+4. 🛡️ **Replay Protection**: Packets with duplicate or backwards monotonic counters outside the sliding window are rejected before processing.
 
 ---
 
-## 5. 🏓 Ping & Pong (17 Bytes)
+## 5. 🏓 Ping & Pong (41 Bytes)
 
 Used for keepalive, NAT hole punching, and continuous round-trip time (RTT) latency measurement:
 
@@ -99,17 +103,19 @@ Used for keepalive, NAT hole punching, and continuous round-trip time (RTT) late
 Offset  Length  Field
 0       1       Header (0x14 for Ping, 0x15 for Pong)
 1       8       SessionID (uint64, big-endian)
-9       8       Client Timestamp (uint64 ticks or nanoseconds)
+9       8       Monotonic Counter (uint64, big-endian)
+17      8       Encrypted Client Timestamp (uint64 ticks or nanoseconds)
+25      16      Poly1305 Authentication Tag
 ```
 
 - ⏱️ The client transmits a `Ping` every 2 seconds.
-- 🔁 The relay echoes the timestamp in a `Pong` packet without modification.
+- 🔁 The relay echoes the timestamp in an encrypted `Pong` packet.
 - 📊 The client measures RTT: `ping_latency_ms = (now - timestamp)`.
 - 🧹 If no packet is received for 90 seconds, the relay marks the session as idle and releases its resources.
 
 ---
 
-## 6. 🛑 Disconnect (9 Bytes)
+## 6. 🛑 Disconnect (33 Bytes)
 
 Graceful teardown notification sent by the client when shutting down:
 
@@ -117,6 +123,8 @@ Graceful teardown notification sent by the client when shutting down:
 Offset  Length  Field
 0       1       Header (0x16: Version 1, Type 6)
 1       8       SessionID (uint64, big-endian)
+9       8       Monotonic Counter (uint64, big-endian)
+17      16      Poly1305 Authentication Tag (empty payload)
 ```
 
 The relay immediately cleans up the session table and frees the IP address in the pool.
@@ -129,9 +137,9 @@ The relay immediately cleans up the session table and frees the IP address in th
 Standard Path MTU:               1500 bytes
 - Outer IPv4 Header:             - 20 bytes
 - UDP Header:                    -  8 bytes
-- Lagvex Data Header:            -  9 bytes
+- Lagvex AEAD Overhead:          - 33 bytes (17B header + 16B Poly1305 tag)
 -------------------------------------------
-Maximum Safe Tunnel MTU:         1463 bytes
+Maximum Safe Tunnel MTU:         1439 bytes
 Recommended Safe Default MTU:    1400 bytes
 ```
 
