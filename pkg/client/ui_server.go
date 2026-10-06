@@ -50,6 +50,10 @@ func NewUIServer(engine *Engine, pm *profiles.Manager, webDir string) *UIServer 
 		}
 	}
 
+	if pm == nil {
+		pm, _ = profiles.NewManager("")
+	}
+
 	cs := NewConfigStore("")
 	if pm != nil {
 		cfg := cs.Get()
@@ -128,7 +132,12 @@ func (u *UIServer) Start(addr string) error {
 
 func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	stats := u.engine.Stats()
+	var stats TunnelStats
+	if u.engine != nil {
+		stats = u.engine.Stats()
+	} else {
+		stats = TunnelStats{State: StateDisconnected}
+	}
 
 	resp := map[string]any{
 		"state":            stats.State,
@@ -295,6 +304,11 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		_ = EnsureLocalRelayRunning(req.RelayEndpoint, []byte(req.PSK))
 	}
 
+	if u.engine == nil {
+		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	go func() {
 		if err := u.engine.Connect(req.RelayEndpoint, []byte(req.PSK), req.GameID, req.RegionID, req.ForceNow); err != nil {
 			log.Printf("[Dashboard] Connect error: %v", err)
@@ -315,9 +329,11 @@ func (u *UIServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
-		_ = u.engine.Disconnect()
-	}()
+	if u.engine != nil {
+		go func() {
+			_ = u.engine.Disconnect()
+		}()
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "disconnecting"})
@@ -565,12 +581,14 @@ func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
 	regionID := r.URL.Query().Get("regionId")
 
 	if gameID == "" || regionID == "" {
-		stats := u.engine.Stats()
-		if gameID == "" {
-			gameID = stats.ActiveGame
-		}
-		if regionID == "" {
-			regionID = stats.ActiveRegion
+		if u.engine != nil {
+			stats := u.engine.Stats()
+			if gameID == "" {
+				gameID = stats.ActiveGame
+			}
+			if regionID == "" {
+				regionID = stats.ActiveRegion
+			}
 		}
 	}
 
@@ -640,6 +658,11 @@ func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
 func (u *UIServer) handleFailoverToggle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	if u.engine == nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{"autoFailover": false})
+		return
+	}
+
 	if r.Method == http.MethodPost {
 		var req struct {
 			Enabled *bool `json:"enabled"`
@@ -659,7 +682,10 @@ func (u *UIServer) handleFailoverToggle(w http.ResponseWriter, r *http.Request) 
 
 func (u *UIServer) handleFailoverHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	history := u.engine.FailoverHistory()
+	var history []FailoverEvent
+	if u.engine != nil {
+		history = u.engine.FailoverHistory()
+	}
 	if history == nil {
 		history = []FailoverEvent{}
 	}
@@ -668,6 +694,11 @@ func (u *UIServer) handleFailoverHistory(w http.ResponseWriter, r *http.Request)
 
 func (u *UIServer) handleFECToggle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	if u.engine == nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{"fecEnabled": false})
+		return
+	}
 
 	if r.Method == http.MethodPost {
 		var req struct {
@@ -935,7 +966,10 @@ func (u *UIServer) handleGameTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	catalog := u.profileMgr.Catalog()
-	engineStats := u.engine.Stats()
+	var engineStats TunnelStats
+	if u.engine != nil {
+		engineStats = u.engine.Stats()
+	}
 
 	// Probe nearest community relay for real comparison
 	var bestRelayRTT float64 = 0

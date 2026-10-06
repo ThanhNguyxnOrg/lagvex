@@ -351,6 +351,10 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.packetsRecovered.Store(0)
 	e.fecParitySent.Store(0)
 	e.fecParityRecv.Store(0)
+	e.bytesUp.Store(0)
+	e.bytesDown.Store(0)
+	e.upRate.Store(0)
+	e.downRate.Store(0)
 	e.mu.Unlock()
 
 	// If manual mode, install routes right away
@@ -444,6 +448,10 @@ func (e *Engine) Disconnect() error {
 	e.activeRelayID = ""
 	e.activeRelayName = ""
 	e.pingMs.Store(0)
+	e.bytesUp.Store(0)
+	e.bytesDown.Store(0)
+	e.upRate.Store(0)
+	e.downRate.Store(0)
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Tunnel disconnected and routes cleaned.")
