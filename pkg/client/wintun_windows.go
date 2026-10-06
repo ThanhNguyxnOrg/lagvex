@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -103,7 +104,7 @@ type WintunAdapter struct {
 	ifIndex    uint32
 	name       string
 	tunnelType string
-	closed     bool
+	closed     atomic.Bool
 }
 
 // OpenOrCreateWintunAdapter creates a WinTun adapter (or opens if exists).
@@ -186,7 +187,7 @@ func (w *WintunAdapter) InterfaceIndex() uint32 {
 // ReadPacket reads a raw IP packet from the WinTun ring buffer, waiting if necessary.
 func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
 	for {
-		if w.closed {
+		if w.closed.Load() {
 			return 0, errors.New("adapter closed")
 		}
 
@@ -219,7 +220,7 @@ func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
 
 // WritePacket writes a raw IP packet into the WinTun send ring buffer.
 func (w *WintunAdapter) WritePacket(packet []byte) error {
-	if w.closed {
+	if w.closed.Load() {
 		return errors.New("adapter closed")
 	}
 
@@ -239,10 +240,9 @@ func (w *WintunAdapter) WritePacket(packet []byte) error {
 func (w *WintunAdapter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.closed {
+	if w.closed.Swap(true) {
 		return nil
 	}
-	w.closed = true
 
 	if w.sessionH != 0 {
 		procWintunEndSession.Call(w.sessionH)

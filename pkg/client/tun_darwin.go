@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -15,7 +16,7 @@ import (
 type WintunAdapter struct {
 	file   *os.File
 	name   string
-	closed bool
+	closed atomic.Bool
 }
 
 const (
@@ -133,9 +134,8 @@ func (w *WintunAdapter) WritePacket(packet []byte) error {
 }
 
 func (w *WintunAdapter) Close() error {
-	if w.closed {
+	if w.closed.Swap(true) {
 		return nil
 	}
-	w.closed = true
 	return w.file.Close()
 }
