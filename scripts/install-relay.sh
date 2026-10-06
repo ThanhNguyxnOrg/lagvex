@@ -10,6 +10,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
+WHITE='\033[1;37m'
 NC='\033[0m'
 
 echo -e "${CYAN}${BOLD}"
@@ -72,6 +73,8 @@ cat > /etc/sysctl.d/99-lagvex.conf << 'EOF'
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.rp_filter = 2
 net.ipv4.conf.default.rp_filter = 2
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 net.core.rmem_max = 8388608
 net.core.wmem_max = 8388608
 net.ipv4.udp_rmem_min = 16384
