@@ -864,8 +864,8 @@ export default function App() {
 
   // Graceful App Shutdown Handler
   const handleShutdownApp = async () => {
-    if (window.confirm("Thoát hoàn toàn Lagvex? Mọi kết nối tăng tốc game sẽ được ngắt an toàn.")) {
-      notify("Đang đóng ứng dụng Lagvex...");
+    if (window.confirm("Exit Lagvex completely? All game acceleration tunnels will be safely terminated.")) {
+      notify("Shutting down Lagvex application...");
       try {
         await fetch("/api/shutdown", { method: "POST" });
       } catch {
@@ -1765,7 +1765,7 @@ export default function App() {
             <button
               onClick={handleShutdownApp}
               className="h-[38px] px-3.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 flex items-center gap-1.5 text-xs font-brand font-bold text-red-400 hover:text-red-300 cursor-pointer transition-all shadow group"
-              title="Đóng và thoát hoàn toàn ứng dụng Lagvex"
+              title="Safely exit and close Lagvex application"
             >
               <IconPower className="w-3.5 h-3.5 text-red-400 group-hover:scale-110 transition-transform" />
               <span>Quit</span>
@@ -1776,7 +1776,7 @@ export default function App() {
         {/* ── 3. DYNAMIC TAB VIEWS ── */}
         <div className="p-8 flex-1 flex flex-col">
           {/* ========================================================= */}
-          {/* TAB 0: HOME (DASHBOARD TỔNG QUAN CHÍNH)                   */}
+          {/* TAB 0: HOME (MAIN DASHBOARD OVERVIEW)                    */}
           {/* ========================================================= */}
           {activeTab === "home" && (
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">

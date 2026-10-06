@@ -10,9 +10,44 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
   </head>
   <body class="bg-[#0b0e14] text-white selection:bg-[#00F0FF] selection:text-black overflow-x-hidden">
     <div id="root"></div>
+
+    <!-- Optional In-Game Mini Floating HUD (User-toggleable, draggable, dismissable) -->
+    <div id="lagvex-hud-container" style="display: none;">
+      <div class="lagvex-hud-pill" id="lagvex-hud-pill">
+        <span class="hud-drag-handle" title="Hold & Drag to Reposition">⋮⋮</span>
+        <span class="hud-dot" id="hud-dot"></span>
+        <div class="hud-metric">
+          <span class="hud-metric-label">PING</span>
+          <span class="hud-metric-value" id="hud-ping">-- ms</span>
+        </div>
+        <div class="hud-divider"></div>
+        <div class="hud-metric">
+          <span class="hud-metric-label">LOSS</span>
+          <span class="hud-metric-value good" id="hud-loss">0%</span>
+        </div>
+        <div class="hud-divider"></div>
+        <div class="hud-metric">
+          <span class="hud-metric-label">NODE</span>
+          <span class="hud-metric-value" id="hud-node" style="font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Auto</span>
+        </div>
+        <div class="hud-ctrls">
+          <button class="hud-btn" id="hud-min-btn" title="Minimize / Expand">−</button>
+          <button class="hud-btn" id="hud-close-btn" title="Close HUD">×</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Persistent Launcher Button (allows user to re-enable or summon HUD anytime) -->
+    <button id="lagvex-hud-toggle-btn" title="Toggle In-Game Mini HUD Overlay">
+      <span>⚡</span>
+      <span id="hud-toggle-text">HUD [ON/OFF]</span>
+    </button>
+
     <script type="module" src="/src/main.tsx"></script>
+    <script src="/app.js"></script>
   </body>
 </html>

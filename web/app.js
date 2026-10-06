@@ -161,7 +161,7 @@
       ping: '15 ms',
       baselinePing: 52,
       accelPing: 15,
-      region: 'Việt Nam & Southeast Asia',
+      region: 'Vietnam & Southeast Asia',
       trend: '&minus; 48%'
     },
     {

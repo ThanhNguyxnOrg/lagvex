@@ -624,7 +624,7 @@
         {
           "id": "vn",
           "continent": "Asia-Pacific",
-          "name": "Việt Nam (VNG Datacenter)",
+          "name": "Vietnam (VNG Datacenter)",
           "cidrs": [
             "103.1.0.0/20",
             "118.69.0.0/16"
