@@ -26,14 +26,18 @@ go.work.sum
 data/
 
 
-# OS and Editor files
+# OS, Editor, and Dev scratch files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 .agents/
 .agent/
+*~
+*.bak
+scratch/
 *.zip
 *.tar.gz
 dist/
 skills-lock.json
+
