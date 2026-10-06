@@ -51,6 +51,7 @@ func NewConfigStore(customPath string) *ConfigStore {
 				"disableNagle":  true,
 				"mmcssPriority": true,
 				"mtuClamping":   true,
+				"smartL4Filter": true,
 			},
 		},
 	}

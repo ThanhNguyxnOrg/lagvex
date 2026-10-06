@@ -52,6 +52,7 @@ type TunnelStats struct {
 	PacketsRecovered uint64         `json:"packetsRecovered"`
 	FECParitySent    uint64         `json:"fecParitySent"`
 	FECParityRecv    uint64         `json:"fecParityRecv"`
+	SmartL4Filter    bool           `json:"smartL4Filter"`
 	DriverMode       string         `json:"driverMode,omitempty"`
 	LastError        string         `json:"lastError,omitempty"`
 }
@@ -107,6 +108,7 @@ type Engine struct {
 	packetsRecovered atomic.Uint64
 	fecParitySent    atomic.Uint64
 	fecParityRecv    atomic.Uint64
+	l4FilterEnabled  atomic.Bool
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -128,6 +130,7 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 	}
 	e.autoFailoverEnabled.Store(true)
 	e.fecEnabled.Store(true)
+	e.l4FilterEnabled.Store(true)
 	return e, nil
 }
 
@@ -169,6 +172,7 @@ func (e *Engine) Stats() TunnelStats {
 		PacketsRecovered: e.packetsRecovered.Load(),
 		FECParitySent:    e.fecParitySent.Load(),
 		FECParityRecv:    e.fecParityRecv.Load(),
+		SmartL4Filter:    e.l4FilterEnabled.Load(),
 		DriverMode:       e.driverMode,
 		LastError:        lastErrStr,
 	}
@@ -501,19 +505,22 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 			continue
 		}
 
+		isUDP := inBuf[9] == 17
+		isGameTick := !e.l4FilterEnabled.Load() || isUDP
+
 		// Immediate systematic delivery (0 RTT latency overhead on game packets)
 		pkt := crypto.EncodeData(outBuf, sessID, inBuf[:n])
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
 			// Multi-Path Packet Hedging: when loss is detected and FEC active, hedge critical gaming inputs (<=256B)
-			if e.fecEnabled.Load() && e.packetsRecovered.Load() > 0 && n <= 256 {
+			if isGameTick && e.fecEnabled.Load() && e.packetsRecovered.Load() > 0 && n <= 256 {
 				_, _ = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 			}
 		}
 
-		// Systematic FEC: Feed packet and emit XOR parity frame when block boundary reached
-		if e.fecEnabled.Load() && e.fecEncoder != nil {
+		// Systematic FEC: Feed packet and emit XOR parity frame when block boundary reached (prioritize UDP game ticks)
+		if isGameTick && e.fecEnabled.Load() && e.fecEncoder != nil {
 			seq := binary.BigEndian.Uint64(pkt[9:17])
 			fecPayloadBytes, hasParity := e.fecEncoder.AddPacket(seq, inBuf[:n])
 			if hasParity {
@@ -995,6 +1002,17 @@ func (e *Engine) SetFECEnabled(enabled bool) {
 // IsFECEnabled reports whether FEC is currently enabled.
 func (e *Engine) IsFECEnabled() bool {
 	return e.fecEnabled.Load()
+}
+
+// SetL4FilterEnabled toggles L4 smart game tick filtering on or off.
+func (e *Engine) SetL4FilterEnabled(enabled bool) {
+	e.l4FilterEnabled.Store(enabled)
+	log.Printf("[Engine] Smart L4 Filter set to: %v", enabled)
+}
+
+// IsL4FilterEnabled reports whether L4 smart game tick filtering is currently enabled.
+func (e *Engine) IsL4FilterEnabled() bool {
+	return e.l4FilterEnabled.Load()
 }
 
 // FailoverHistory returns recent failover events.

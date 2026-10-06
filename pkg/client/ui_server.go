@@ -164,6 +164,7 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"fecParityRecv":    stats.FECParityRecv,
 		"driverMode":       stats.DriverMode,
 		"lastError":        stats.LastError,
+		"smartL4Filter":    stats.SmartL4Filter,
 		"packetLoss":       0.0,
 		"packetLossPct":    0.0,
 	}
@@ -481,6 +482,7 @@ type tweakReq struct {
 	DisableNagle  bool `json:"disableNagle"`
 	MMCSSPriority bool `json:"mmcssPriority"`
 	MTUClamping   bool `json:"mtuClamping"`
+	SmartL4Filter bool `json:"smartL4Filter"`
 }
 
 func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
@@ -558,12 +560,20 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		applied = append(applied, "Linux Kernel Socket Buffers Tuned")
 	}
 
+	if u.engine != nil {
+		u.engine.SetL4FilterEnabled(req.SmartL4Filter)
+	}
+	if req.SmartL4Filter {
+		applied = append(applied, "Smart L4 Game Tick Filter Activated (UDP Prioritized)")
+	}
+
 	if u.configStore != nil {
 		u.configStore.SetTweaks(map[string]bool{
 			"tcpNoDelay":    req.TCPNoDelay,
 			"disableNagle":  req.DisableNagle,
 			"mmcssPriority": req.MMCSSPriority,
 			"mtuClamping":   req.MTUClamping,
+			"smartL4Filter": req.SmartL4Filter,
 		})
 	}
 
