@@ -202,19 +202,8 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	// 1. Resolve Relay endpoint
 	udpAddr, err := net.ResolveUDPAddr("udp4", relayEndpoint)
 	if err != nil {
-		if !isLocal {
-			log.Printf("[Engine] Remote relay %s could not be resolved (%v). Engaging Local Low-Latency Engine (127.0.0.1:4433)...", relayEndpoint, err)
-			localPSK := []byte("lagvex-community-us-free-public-psk-2026")
-			_ = EnsureLocalRelayRunning("127.0.0.1:4433", localPSK)
-			relayEndpoint = "127.0.0.1:4433"
-			isLocal = true
-			psk = localPSK
-			udpAddr, err = net.ResolveUDPAddr("udp4", relayEndpoint)
-		}
-		if err != nil {
-			e.resetState()
-			return recordErr(fmt.Errorf("resolve relay endpoint %s: %w", relayEndpoint, err))
-		}
+		e.resetState()
+		return recordErr(fmt.Errorf("resolve relay endpoint %s: %w", relayEndpoint, err))
 	}
 	relayAddrPort := udpAddr.AddrPort()
 	relayIP := relayAddrPort.Addr()
@@ -258,38 +247,6 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 
 	_ = conn.SetReadDeadline(time.Time{})
-
-	// Zero-VPS Fallback: If remote relay is unreachable, seamlessly fall back to embedded Local Accelerator!
-	if (resp == nil || resp.Status != protocol.StatusOK) && !isLocal {
-		log.Printf("[Engine] Remote relay %s is unreachable. Activating Local Low-Latency Engine (127.0.0.1:4433)...", relayEndpoint)
-		localPSK := []byte("lagvex-community-us-free-public-psk-2026")
-		_ = EnsureLocalRelayRunning("127.0.0.1:4433", localPSK)
-		localUdp, lErr := net.ResolveUDPAddr("udp4", "127.0.0.1:4433")
-		if lErr == nil {
-			udpAddr = localUdp
-			relayAddrPort = udpAddr.AddrPort()
-			relayIP = relayAddrPort.Addr()
-			relayEndpoint = "127.0.0.1:4433"
-			isLocal = true
-			psk = localPSK
-			fallbackReqBuf := protocol.EncodeHandshakeRequest(psk, req)
-
-			for attempt := 1; attempt <= 3; attempt++ {
-				_, _ = conn.WriteToUDP(fallbackReqBuf, udpAddr)
-				_ = conn.SetReadDeadline(time.Now().Add(1000 * time.Millisecond))
-				n, _, readErr := conn.ReadFromUDP(recvBuf)
-				if readErr == nil {
-					var decErr error
-					resp, decErr = protocol.DecodeHandshakeResponse(psk, recvBuf[:n], nonce)
-					if decErr == nil && resp.Status == protocol.StatusOK {
-						log.Printf("[Engine] Successfully established fallback session with Local Accelerator!")
-						break
-					}
-				}
-			}
-			_ = conn.SetReadDeadline(time.Time{})
-		}
-	}
 
 	if resp == nil || resp.Status != protocol.StatusOK {
 		conn.Close()
@@ -439,7 +396,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 // Disconnect stops the tunnel and cleans up all routes.
 func (e *Engine) Disconnect() error {
 	e.mu.Lock()
-	if e.state != StateConnected && e.state != StateConnecting {
+	if e.state != StateConnected && e.state != StateConnecting && e.state != StateError {
 		e.mu.Unlock()
 		return nil
 	}
@@ -465,6 +422,9 @@ func (e *Engine) Disconnect() error {
 		cancel()
 	}
 
+	// Clean up routes first while interface still exists
+	e.routeManager.RemoveAll()
+
 	if adapter != nil {
 		_ = adapter.Close()
 	}
@@ -473,9 +433,6 @@ func (e *Engine) Disconnect() error {
 	}
 
 	e.wg.Wait()
-
-	// Clean up routes
-	e.routeManager.RemoveAll()
 
 	e.mu.Lock()
 	if e.state != StateError {
@@ -938,6 +895,18 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 		return fmt.Errorf("initialize crypto for candidate: %w", err)
 	}
 
+	// Reconfigure adapter IP if candidate assigned a different inner IP
+	e.mu.Lock()
+	oldClientIP := e.clientIP
+	wtAdapter := e.wintun
+	e.mu.Unlock()
+
+	if wtAdapter != nil && resp.ClientIP != oldClientIP {
+		if err := e.routeManager.ConfigureAdapter(wtAdapter.InterfaceIndex(), resp.ClientIP, 24, int(resp.MTU)); err != nil {
+			log.Printf("[Failover] Warning: reconfigure adapter IP to %s: %v", resp.ClientIP, err)
+		}
+	}
+
 	// 6. Pin candidate relay IP route via default gateway
 	if err := e.routeManager.PinRelayRoute(candIP); err != nil {
 		log.Printf("[Failover] Warning: pin candidate route: %v", err)
@@ -945,6 +914,8 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 
 	// 7. Atomic state swap
 	e.mu.Lock()
+	e.clientIP = resp.ClientIP
+	e.gatewayIP = resp.GatewayIP
 	e.udpConn = newConn
 	e.crypto = newCrypto
 	e.sessionID = resp.SessionID

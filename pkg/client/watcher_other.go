@@ -4,14 +4,37 @@ package client
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
 
-// findRunningProcess checks running processes via /proc on Linux or basic scan.
+// findRunningProcess checks running processes via ps on macOS or /proc on Linux.
 func findRunningProcess(targets []string) (bool, string, int) {
 	if len(targets) == 0 {
+		return false, "", 0
+	}
+
+	if runtime.GOOS == "darwin" {
+		out, err := exec.Command("ps", "-A", "-c", "-o", "pid=,comm=").Output()
+		if err != nil {
+			return false, "", 0
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			fields := strings.Fields(strings.TrimSpace(line))
+			if len(fields) < 2 {
+				continue
+			}
+			pid, _ := strconv.Atoi(fields[0])
+			comm := strings.ToLower(fields[1])
+			for _, target := range targets {
+				if comm == target || comm == strings.TrimSuffix(target, ".exe") {
+					return true, target, pid
+				}
+			}
+		}
 		return false, "", 0
 	}
 

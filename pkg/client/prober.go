@@ -97,18 +97,8 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 
 	udpAddr, err := net.ResolveUDPAddr("udp4", relay.Endpoint)
 	if err != nil {
-		if fbGateway := regionalFallbackGateway(relay); fbGateway != "" {
-			if fbRTTs, fbErr := probeTCPGateway(ctx, fbGateway, samples); fbErr == nil && len(fbRTTs) > 0 {
-				result.Reachable = true
-				result.RTTMedianMs = roundTo(calculateMedian(fbRTTs), 1)
-				result.JitterMs = roundTo(calculateJitter(fbRTTs), 2)
-				result.PacketLoss = 0.0
-				result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs), 1)
-				result.Error = ""
-				return result
-			}
-		}
 		result.Error = fmt.Sprintf("dns resolve failed: %v", err)
+		result.PacketLoss = 100.0
 		return result
 	}
 
@@ -151,17 +141,6 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 	recvBuf := make([]byte, protocol.MaxPacketSize)
 	n, _, err := conn.ReadFromUDP(recvBuf)
 	if err != nil {
-		if fbGateway := regionalFallbackGateway(relay); fbGateway != "" {
-			if fbRTTs, fbErr := probeTCPGateway(ctx, fbGateway, samples); fbErr == nil && len(fbRTTs) > 0 {
-				result.Reachable = true
-				result.RTTMedianMs = roundTo(calculateMedian(fbRTTs), 1)
-				result.JitterMs = roundTo(calculateJitter(fbRTTs), 2)
-				result.PacketLoss = 0.0
-				result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs), 1)
-				result.Error = ""
-				return result
-			}
-		}
 		result.Error = "timeout reaching relay"
 		result.PacketLoss = 100.0
 		return result
@@ -170,17 +149,6 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 	hsRTT := float64(time.Since(start).Microseconds()) / 1000.0
 	resp, err := protocol.DecodeHandshakeResponse(psk, recvBuf[:n], nonce)
 	if err != nil {
-		if fbGateway := regionalFallbackGateway(relay); fbGateway != "" {
-			if fbRTTs, fbErr := probeTCPGateway(ctx, fbGateway, samples); fbErr == nil && len(fbRTTs) > 0 {
-				result.Reachable = true
-				result.RTTMedianMs = roundTo(calculateMedian(fbRTTs), 1)
-				result.JitterMs = roundTo(calculateJitter(fbRTTs), 2)
-				result.PacketLoss = 0.0
-				result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs), 1)
-				result.Error = ""
-				return result
-			}
-		}
 		result.Error = "invalid handshake response (bad PSK?)"
 		result.PacketLoss = 100.0
 		return result
@@ -576,42 +544,7 @@ func (p *Prober) ProbeDirectGateway(ctx context.Context, hostPort string) (float
 	return roundTo(medianRTT, 1), roundTo(lossPct, 1), nil
 }
 
-// regionalFallbackGateway maps a relay region to an active, reliable public datacenter edge POP.
-func regionalFallbackGateway(relay profiles.RelayEndpoint) string {
-	id := strings.ToLower(relay.ID + " " + relay.Name + " " + relay.Endpoint)
-	switch {
-	case strings.Contains(id, "127.0.0.1") || strings.Contains(id, "local"):
-		return "127.0.0.1:4433"
-	case strings.Contains(id, "sg") || strings.Contains(id, "singapore"):
-		return "ec2.ap-southeast-1.amazonaws.com:443"
-	case strings.Contains(id, "jp") || strings.Contains(id, "tokyo") || strings.Contains(id, "japan"):
-		return "ec2.ap-northeast-1.amazonaws.com:443"
-	case strings.Contains(id, "kr") || strings.Contains(id, "seoul") || strings.Contains(id, "korea"):
-		return "ec2.ap-northeast-2.amazonaws.com:443"
-	case strings.Contains(id, "hk") || strings.Contains(id, "hong kong"):
-		return "ec2.ap-east-1.amazonaws.com:443"
-	case strings.Contains(id, "us-east") || strings.Contains(id, "virginia") || strings.Contains(id, "ashburn"):
-		return "ec2.us-east-1.amazonaws.com:443"
-	case strings.Contains(id, "us-west") || strings.Contains(id, "california") || strings.Contains(id, "silicon"):
-		return "ec2.us-west-1.amazonaws.com:443"
-	case strings.Contains(id, "us-central") || strings.Contains(id, "dallas") || strings.Contains(id, "texas"):
-		return "ec2.us-east-2.amazonaws.com:443"
-	case strings.Contains(id, "eu-central") || strings.Contains(id, "frankfurt") || strings.Contains(id, "germany"):
-		return "ec2.eu-central-1.amazonaws.com:443"
-	case strings.Contains(id, "eu-west") || strings.Contains(id, "london") || strings.Contains(id, "united kingdom"):
-		return "ec2.eu-west-2.amazonaws.com:443"
-	case strings.Contains(id, "eu-north") || strings.Contains(id, "stockholm") || strings.Contains(id, "sweden"):
-		return "ec2.eu-north-1.amazonaws.com:443"
-	case strings.Contains(id, "syd") || strings.Contains(id, "sydney") || strings.Contains(id, "australia") || strings.Contains(id, "oceania"):
-		return "ec2.ap-southeast-2.amazonaws.com:443"
-	case strings.Contains(id, "br") || strings.Contains(id, "sa-") || strings.Contains(id, "brazil") || strings.Contains(id, "paulo"):
-		return "ec2.sa-east-1.amazonaws.com:443"
-	case strings.Contains(id, "dxb") || strings.Contains(id, "dubai") || strings.Contains(id, "me-") || strings.Contains(id, "uae"):
-		return "ec2.me-central-1.amazonaws.com:443"
-	default:
-		return "1.1.1.1:53"
-	}
-}
+
 
 // probeTCPGateway measures real microsecond round-trip TCP connect latency to a target host.
 func probeTCPGateway(ctx context.Context, hostPort string, samples int) ([]float64, error) {

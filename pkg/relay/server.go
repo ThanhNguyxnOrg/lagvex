@@ -280,7 +280,9 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 		return
 	}
 
-	plainBuf := make([]byte, protocol.MaxPacketSize)
+	bufPtr := s.bufPool.Get().(*[]byte)
+	defer s.bufPool.Put(bufPtr)
+	plainBuf := *bufPtr
 	decType, payload, err := sess.Crypto.OpenPacket(plainBuf, raw)
 	if err != nil || decType != mtype {
 		return // Dropped: AEAD auth failure or anti-replay violation
@@ -439,6 +441,26 @@ func (s *Server) loopReaper(ctx context.Context) {
 				}
 			}
 			s.mu.Unlock()
+
+			// Reap stale squad rooms (> 24h old or inactive > 2m)
+			s.squadRoomsMu.Lock()
+			for code, room := range s.squadRooms {
+				room.mu.Lock()
+				empty := len(room.Members) == 0
+				expired := now.Sub(room.CreatedAt) > 24*time.Hour
+				allStale := true
+				for _, m := range room.Members {
+					if now.Sub(m.LastSeen) < 2*time.Minute {
+						allStale = false
+						break
+					}
+				}
+				room.mu.Unlock()
+				if empty || expired || allStale {
+					delete(s.squadRooms, code)
+				}
+			}
+			s.squadRoomsMu.Unlock()
 		}
 	}
 }

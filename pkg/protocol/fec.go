@@ -82,6 +82,14 @@ func (e *FECEncoder) AddPacket(seq uint64, data []byte) ([]byte, bool) {
 		return nil, false
 	}
 
+	// If a sequence gap is detected (e.g. keepalive Ping consumed an AEAD nonce counter),
+	// flush the current block first to ensure all sequence numbers in a block are strictly contiguous.
+	var flushed []byte
+	var hasFlushed bool
+	if e.count > 0 && seq != e.baseSeq+uint64(e.count) {
+		flushed, hasFlushed = e.emitBlockLocked()
+	}
+
 	if e.count == 0 {
 		e.baseSeq = seq
 		e.lastFlush = time.Now()
@@ -111,6 +119,10 @@ func (e *FECEncoder) AddPacket(seq uint64, data []byte) ([]byte, bool) {
 	// Emit parity if group size reached
 	if e.count >= e.blockSize {
 		return e.emitBlockLocked()
+	}
+
+	if hasFlushed {
+		return flushed, true
 	}
 
 	return nil, false

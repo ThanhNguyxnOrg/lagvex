@@ -71,8 +71,8 @@ func (cs *ConfigStore) load() {
 
 // Save writes current config to disk.
 func (cs *ConfigStore) Save() error {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
 
 	data, err := json.MarshalIndent(cs.config, "", "  ")
 	if err != nil {
