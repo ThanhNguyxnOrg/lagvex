@@ -56,6 +56,10 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 }
 
 func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
+	if relayIP.IsLoopback() {
+		return nil
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

@@ -270,26 +270,8 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Printf("[Dashboard] Auto-selected optimal relay: %s (%s, score=%.1f)", best.Name, best.Endpoint, best.Score)
 		} else {
-			// Find local relay or first configured relay
-			var selectedRelay *profiles.RelayEndpoint
-			for i := range catalog.Relays {
-				if strings.Contains(catalog.Relays[i].Endpoint, "127.0.0.1") || strings.Contains(catalog.Relays[i].Endpoint, "localhost") {
-					selectedRelay = &catalog.Relays[i]
-					break
-				}
-			}
-			if selectedRelay == nil && len(catalog.Relays) > 0 {
-				selectedRelay = &catalog.Relays[0]
-			}
-
-			if selectedRelay != nil {
-				req.RelayEndpoint = selectedRelay.Endpoint
-				req.PSK = selectedRelay.PSK
-				log.Printf("[Dashboard] Probing public nodes offline, engaging optimal relay: %s (%s)", selectedRelay.Name, req.RelayEndpoint)
-			} else {
-				req.RelayEndpoint = "127.0.0.1:4433"
-				req.PSK = "lagvex-community-us-free-public-psk-2026"
-			}
+			http.Error(w, "No reachable relays found in catalog", http.StatusServiceUnavailable)
+			return
 		}
 	} else if req.PSK == "" {
 		// Lookup PSK from catalog if not explicitly provided

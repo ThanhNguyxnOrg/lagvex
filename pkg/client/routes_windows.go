@@ -72,6 +72,10 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 // PinRelayRoute pins a /32 route for the VPS relay through the physical network gateway.
 // This prevents the critical routing loop where relay packets could get diverted into the tunnel.
 func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
+	if relayIP.IsLoopback() {
+		return nil
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

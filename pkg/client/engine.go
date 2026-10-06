@@ -498,8 +498,8 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
-			// Multi-Path Packet Hedging: when loss is detected, hedge critical gaming inputs (<=256B)
-			if e.packetsRecovered.Load() > 0 && n <= 256 {
+			// Multi-Path Packet Hedging: when loss is detected and FEC active, hedge critical gaming inputs (<=256B)
+			if e.fecEnabled.Load() && e.packetsRecovered.Load() > 0 && n <= 256 {
 				_, _ = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 			}
 		}

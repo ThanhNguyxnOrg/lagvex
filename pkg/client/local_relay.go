@@ -2,9 +2,11 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
+	"runtime"
 	"sync"
 	"time"
 
@@ -22,6 +24,10 @@ var (
 // If no server is listening, it launches an embedded in-process Relay server using the userspace TUN device.
 // This allows gamers to run and test acceleration instantly without needing a remote VPS.
 func EnsureLocalRelayRunning(listenAddr string, psk []byte) error {
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("embedded relay server requires Linux kernel TUN support (unsupported on %s)", runtime.GOOS)
+	}
+
 	localRelayMu.Lock()
 	defer localRelayMu.Unlock()
 
