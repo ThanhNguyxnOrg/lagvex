@@ -509,9 +509,10 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 
 		n, err := wt.ReadPacket(inBuf)
 		if err != nil {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || strings.Contains(err.Error(), "closed") {
 				return
 			}
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 
