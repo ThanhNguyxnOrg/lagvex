@@ -30,7 +30,7 @@ func findRunningProcess(targets []string) (bool, string, int) {
 			pid, _ := strconv.Atoi(fields[0])
 			comm := strings.ToLower(strings.Join(fields[1:], " "))
 			for _, target := range targets {
-				if comm == target || comm == strings.TrimSuffix(target, ".exe") {
+				if strings.EqualFold(comm, target) || strings.EqualFold(comm, strings.TrimSuffix(target, ".exe")) {
 					return true, target, pid
 				}
 			}
@@ -58,7 +58,7 @@ func findRunningProcess(targets []string) (bool, string, int) {
 		}
 		procName := strings.ToLower(strings.TrimSpace(string(commBytes)))
 		for _, target := range targets {
-			if procName == target || strings.TrimSuffix(target, ".exe") == procName {
+			if strings.EqualFold(procName, target) || strings.EqualFold(procName, strings.TrimSuffix(target, ".exe")) {
 				return true, target, pid
 			}
 		}

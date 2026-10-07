@@ -20,6 +20,7 @@ type IPPool struct {
 	endIP        netip.Addr
 	usedIPs      map[netip.Addr]uint64   // IP -> SessionID
 	reservations map[uint64]reservedAddr // ClientID -> reserved IP info
+	reservedIPs  map[netip.Addr]uint64   // IP -> ClientID (for O(1) reservation check)
 }
 
 type reservedAddr struct {
@@ -58,6 +59,7 @@ func NewIPPool(subnet netip.Prefix) (*IPPool, error) {
 		endIP:        lastClient,
 		usedIPs:      make(map[netip.Addr]uint64),
 		reservations: make(map[uint64]reservedAddr),
+		reservedIPs:  make(map[netip.Addr]uint64),
 	}, nil
 }
 
@@ -72,8 +74,10 @@ func (p *IPPool) Allocate(clientID, sessionID uint64) (netip.Addr, bool, error) 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// 1. Check reservation
-	if res, ok := p.reservations[clientID]; ok && time.Now().Before(res.expiresAt) {
+	now := time.Now()
+
+	// 1. Check reservation for this client
+	if res, ok := p.reservations[clientID]; ok && now.Before(res.expiresAt) {
 		// If not currently used by someone else
 		if existingSess, inUse := p.usedIPs[res.ip]; !inUse || existingSess == sessionID {
 			p.usedIPs[res.ip] = sessionID
@@ -81,16 +85,45 @@ func (p *IPPool) Allocate(clientID, sessionID uint64) (netip.Addr, bool, error) 
 		}
 	}
 
-	// 2. Linear scan for available IP
+	bindIP := func(ip netip.Addr) (netip.Addr, bool, error) {
+		p.usedIPs[ip] = sessionID
+		if oldRes, ok := p.reservations[clientID]; ok {
+			delete(p.reservedIPs, oldRes.ip)
+		}
+		if prevClient, ok := p.reservedIPs[ip]; ok && prevClient != clientID {
+			delete(p.reservations, prevClient)
+		}
+		p.reservations[clientID] = reservedAddr{
+			ip:        ip,
+			expiresAt: now.Add(24 * time.Hour),
+		}
+		p.reservedIPs[ip] = clientID
+		return ip, false, nil
+	}
+
+	// 2. Pass 1: Scan for an available IP that is unused AND unreserved (or reservation expired)
 	curr := p.startIP
 	for {
 		if _, inUse := p.usedIPs[curr]; !inUse {
-			p.usedIPs[curr] = sessionID
-			p.reservations[clientID] = reservedAddr{
-				ip:        curr,
-				expiresAt: time.Now().Add(24 * time.Hour),
+			resClient, isReserved := p.reservedIPs[curr]
+			if !isReserved || resClient == clientID {
+				return bindIP(curr)
 			}
-			return curr, false, nil
+			if r, ok := p.reservations[resClient]; !ok || !now.Before(r.expiresAt) {
+				return bindIP(curr)
+			}
+		}
+		if curr == p.endIP {
+			break
+		}
+		curr = curr.Next()
+	}
+
+	// 3. Pass 2: Pool exhausted of unreserved IPs. Reclaim an unused IP even if reserved by another client.
+	curr = p.startIP
+	for {
+		if _, inUse := p.usedIPs[curr]; !inUse {
+			return bindIP(curr)
 		}
 		if curr == p.endIP {
 			break
@@ -101,7 +134,7 @@ func (p *IPPool) Allocate(clientID, sessionID uint64) (netip.Addr, bool, error) 
 	return netip.Addr{}, false, ErrPoolExhausted
 }
 
-// Release frees an IP allocated to a session and keeps a reservation for clientID.
+// Release frees an IP allocated to a session and optionally keeps a reservation for clientID.
 func (p *IPPool) Release(ip netip.Addr, clientID uint64, keepReservation bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -109,5 +142,8 @@ func (p *IPPool) Release(ip netip.Addr, clientID uint64, keepReservation bool) {
 	delete(p.usedIPs, ip)
 	if !keepReservation {
 		delete(p.reservations, clientID)
+		if curClient, ok := p.reservedIPs[ip]; ok && curClient == clientID {
+			delete(p.reservedIPs, ip)
+		}
 	}
 }

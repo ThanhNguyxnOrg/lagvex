@@ -77,3 +77,45 @@ func TestIPPoolReconnectStorm(t *testing.T) {
 		lastIP = ip
 	}
 }
+
+func TestIPPoolReservationNotStolenByOtherClients(t *testing.T) {
+	subnet := netip.MustParsePrefix("10.88.0.0/24")
+	pool, err := NewIPPool(subnet)
+	if err != nil {
+		t.Fatalf("failed to create pool: %v", err)
+	}
+
+	clientA := uint64(101)
+	sessA := uint64(201)
+	ipA, _, err := pool.Allocate(clientA, sessA)
+	if err != nil || ipA.String() != "10.88.0.2" {
+		t.Fatalf("clientA expected 10.88.0.2, got %v", ipA)
+	}
+
+	// Client A disconnects, reserving 10.88.0.2
+	pool.Release(ipA, clientA, true)
+
+	// Client B connects
+	clientB := uint64(102)
+	sessB := uint64(202)
+	ipB, _, err := pool.Allocate(clientB, sessB)
+	if err != nil {
+		t.Fatalf("clientB allocate failed: %v", err)
+	}
+	if ipB.String() == ipA.String() {
+		t.Fatalf("clientB should NOT steal reserved IP %s of clientA, got %s", ipA, ipB)
+	}
+	if ipB.String() != "10.88.0.3" {
+		t.Fatalf("clientB expected 10.88.0.3, got %s", ipB)
+	}
+
+	// Client A reconnects
+	sessA2 := uint64(203)
+	ipAReconnected, resumed, err := pool.Allocate(clientA, sessA2)
+	if err != nil || !resumed {
+		t.Fatalf("clientA reconnect expected resumed allocation, got %v, resumed=%v", ipAReconnected, resumed)
+	}
+	if ipAReconnected != ipA {
+		t.Fatalf("clientA expected resumed IP %s, got %s", ipA, ipAReconnected)
+	}
+}

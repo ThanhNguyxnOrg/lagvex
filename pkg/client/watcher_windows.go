@@ -30,7 +30,7 @@ func findRunningProcess(targets []string) (bool, string, int) {
 	for err == nil {
 		procName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
 		for _, target := range targets {
-			if procName == target {
+			if strings.EqualFold(procName, target) || strings.EqualFold(procName, strings.TrimSuffix(target, ".exe")) {
 				return true, target, int(entry.ProcessID)
 			}
 		}
