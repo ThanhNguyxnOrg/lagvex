@@ -36,6 +36,7 @@ var (
 
 	procConvertInterfaceLuidToIndex = modIphlpapi.NewProc("ConvertInterfaceLuidToIndex")
 	procWaitForSingleObject         = modKernel32.NewProc("WaitForSingleObject")
+	procSetEvent                    = modKernel32.NewProc("SetEvent")
 )
 
 func initWintunProcs(dllPath string) error {
@@ -242,6 +243,10 @@ func (w *WintunAdapter) Close() error {
 	defer w.mu.Unlock()
 	if w.closed.Swap(true) {
 		return nil
+	}
+
+	if w.readEvent != 0 {
+		procSetEvent.Call(w.readEvent)
 	}
 
 	if w.sessionH != 0 {

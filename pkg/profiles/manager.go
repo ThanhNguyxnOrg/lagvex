@@ -79,11 +79,7 @@ func (m *Manager) Catalog() ProfileCatalog {
 	return m.catalog
 }
 
-// FindGameByID looks up a game by ID.
-func (m *Manager) FindGameByID(id string) (*GameDefinition, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
+func (m *Manager) findGameByIDLocked(id string) (*GameDefinition, bool) {
 	for _, g := range m.catalog.Games {
 		if strings.EqualFold(g.ID, id) {
 			copied := g
@@ -91,6 +87,13 @@ func (m *Manager) FindGameByID(id string) (*GameDefinition, bool) {
 		}
 	}
 	return nil, false
+}
+
+// FindGameByID looks up a game by ID.
+func (m *Manager) FindGameByID(id string) (*GameDefinition, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.findGameByIDLocked(id)
 }
 
 // FindGameByProcess matches a running executable name against registered game processes.
@@ -115,7 +118,7 @@ func (m *Manager) GetRegionCIDRs(gameID, regionID string) ([]string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	game, ok := m.FindGameByID(gameID)
+	game, ok := m.findGameByIDLocked(gameID)
 	if !ok {
 		return nil, fmt.Errorf("game %q not found", gameID)
 	}

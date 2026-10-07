@@ -165,8 +165,8 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"driverMode":       stats.DriverMode,
 		"lastError":        stats.LastError,
 		"smartL4Filter":    stats.SmartL4Filter,
-		"packetLoss":       0.0,
-		"packetLossPct":    0.0,
+		"packetLoss":       stats.PacketLoss,
+		"packetLossPct":    stats.PacketLossPct,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }

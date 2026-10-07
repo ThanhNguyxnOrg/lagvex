@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/netip"
 	"runtime"
@@ -53,6 +54,8 @@ type TunnelStats struct {
 	FECParitySent    uint64         `json:"fecParitySent"`
 	FECParityRecv    uint64         `json:"fecParityRecv"`
 	SmartL4Filter    bool           `json:"smartL4Filter"`
+	PacketLoss       float64        `json:"packetLoss"`
+	PacketLossPct    float64        `json:"packetLossPct"`
 	DriverMode       string         `json:"driverMode,omitempty"`
 	LastError        string         `json:"lastError,omitempty"`
 }
@@ -109,6 +112,7 @@ type Engine struct {
 	fecParitySent    atomic.Uint64
 	fecParityRecv    atomic.Uint64
 	l4FilterEnabled  atomic.Bool
+	lossPctBits      atomic.Uint64
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -149,6 +153,8 @@ func (e *Engine) Stats() TunnelStats {
 		fecRatio = fmt.Sprintf("%d:1", e.fecEncoder.BlockSize())
 	}
 
+	loss := math.Float64frombits(e.lossPctBits.Load())
+
 	return TunnelStats{
 		State:            e.state,
 		RelayAddr:        e.relayAddr.String(),
@@ -173,6 +179,8 @@ func (e *Engine) Stats() TunnelStats {
 		FECParitySent:    e.fecParitySent.Load(),
 		FECParityRecv:    e.fecParityRecv.Load(),
 		SmartL4Filter:    e.l4FilterEnabled.Load(),
+		PacketLoss:       loss,
+		PacketLossPct:    loss,
 		DriverMode:       e.driverMode,
 		LastError:        lastErrStr,
 	}
@@ -369,6 +377,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.bytesDown.Store(0)
 	e.upRate.Store(0)
 	e.downRate.Store(0)
+	e.lossPctBits.Store(0)
 	e.mu.Unlock()
 
 	// If manual mode, install routes right away
@@ -467,6 +476,7 @@ func (e *Engine) Disconnect() error {
 	e.bytesDown.Store(0)
 	e.upRate.Store(0)
 	e.downRate.Store(0)
+	e.lossPctBits.Store(0)
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Tunnel disconnected and routes cleaned.")
@@ -749,6 +759,7 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 			}
 
 			lossPct := lossRate * 100.0
+			e.lossPctBits.Store(math.Float64bits(lossPct))
 
 			// Adaptively adjust FEC block size based on loss telemetry
 			if e.fecEnabled.Load() && e.fecController != nil && e.fecEncoder != nil {
