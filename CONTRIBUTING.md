@@ -313,5 +313,5 @@ Lagvex is committed to total legal transparency and intellectual property respec
 - 📡 [**Protocol Specification**](docs/PROTOCOL.md)
 - 🚀 [**Deployment Guide**](docs/DEPLOYMENT.md)
 - 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md)
-- 🗺️ [**Engineering Roadmap**](docs/ROADMAP.md)
+- 📝 [**Changelog & Releases**](CHANGELOG.md)
 - ⚖️ [**Legal Disclaimer**](docs/DISCLAIMER.md)

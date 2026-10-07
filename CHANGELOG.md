@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-10-07
+
+### ⚡ Layer-4 Smart Game Tick Filter & Split-Tunneling Inspection
+- 🎮 **Layer-4 Game Loop Prioritization (`pkg/client/engine.go`)**:
+  - Implemented high-throughput Layer-4 packet classification that selectively accelerates UDP game tick traffic through the tunnel while letting bulky TCP patch downloads and game updates flow directly over the local ISP connection.
+  - Eliminates bandwidth saturation during background game downloads and keeps gaming loop jitter near zero.
+  - Dynamically toggleable at runtime via the dashboard UI and `POST /api/tweak`.
+
+### 🪟 In-Game Draggable Floating HUD Widget
+- 📊 **Real-Time Glassmorphic Cockpit Pill (`web/`, `web/style.css`, `web/index.html`)**:
+  - Introduced an optional, draggable in-game overlay widget displaying real-time RTT latency, jitter, live packet loss percentage, and Zero-RTT FEC active status.
+  - Smooth drag-and-drop repositioning with automatic browser local storage coordinate persistence.
+  - Expandable detailed telemetry metrics card with 1-click toggle controls.
+
+### 🛡️ Adaptive Forward Error Correction (FEC) Standby & Optimization
+- 📉 **Zero-Overhead Standby Mode (`pkg/protocol/fec.go`, `pkg/client/engine.go`)**:
+  - Corrected return semantics and change tracking in `AdaptiveFECController.UpdateLoss`: returns exact `(blockSize int, changed bool)` to prevent redundant reconfiguration and log spamming.
+  - Added zero-redundancy Standby mode (`k = 0`) to `FECEncoder`: when packet loss drops below $0.5\%$, the encoder immediately ceases XOR parity generation and packet emissions, saving up to $17\%$ bandwidth and conserving CPU cycles.
+  - Automatically resets pending partial blocks and scales dynamically (10:1 $\to$ 6:1 $\to$ 4:1) upon network degradation.
+  - Synchronized `SetFECEnabled` toggle state across controller, encoder, and engine telemetry.
+
+### 🔄 Relay IP Pool 2-Pass Allocation & Sticky IP Affinity
+- 🔒 **Hijack-Resistant Client Reservations (`pkg/relay/pool.go`, `pkg/relay/pool_test.go`)**:
+  - Implemented a 2-pass allocation algorithm with dedicated `reservedIPs` mapping to guarantee that a temporarily disconnected player's 24-hour reserved inner IP cannot be stolen by new clients during reconnect storms.
+  - Pass 1 allocates unused and unreserved IPs; Pass 2 reclaims un-used reservations only when the entire subnet is completely full.
+
+### 🎯 Route Advisor Direct Host Probing
+- 🌐 **Valid Host IP Resolution (`pkg/client/ui_server.go`)**:
+  - Updated Route Advisor gateway probing to use `netip.ParsePrefix` and `p.Addr().Next()` to probe the first usable host (`.1:443`) rather than the invalid subnet base network address (`.0:443`).
+  - Ensures accurate real-time comparison between direct ISP peering and accelerated VPS relay paths.
+
+### 🚀 Cross-Platform Kernel Stability & Concurrency Hardening
+- 🍏 **Darwin/macOS Zero-Allocation Data Plane (`pkg/client/tun_darwin.go`)**:
+  - Implemented `utunBufPool` (`sync.Pool`) for macOS `ReadPacket` and `WritePacket`, eliminating per-packet heap allocations.
+  - Fixed C NUL-terminated string parsing in `getUTunName` to prevent slice underflow and runtime panic.
+- 🪟 **Instant WinTun Teardown (`pkg/client/wintun_windows.go`, `pkg/client/engine.go`)**:
+  - WinTun `Close()` explicitly signals `readEvent` via `SetEvent`, allowing `ReadPacket` to unblock instantly in 0ms instead of waiting for a 1000ms timeout.
+  - Guarded `pumpWinTunToUDP` against high-CPU tight-loop spinning if the virtual adapter closes unexpectedly.
+- 🔒 **Race & Deadlock Elimination (`pkg/profiles/manager.go`, `pkg/client/engine.go`)**:
+  - Fixed Go `sync.RWMutex` recursive read-lock deadlock by extracting `findGameByIDLocked` in `profiles.Manager`.
+  - Eliminated data races in `Engine.Disconnect()` by strictly using local captured variables under lock.
+  - Prevented zombie UDP sockets on interrupted failover handovers and aborted connection attempts.
+- 🐧 **Linux Relay BBR Congestion Control & Prefix Validation (`scripts/install_relay.sh`, `pkg/relay/config.go`)**:
+  - Enabled Linux kernel TCP BBR congestion control in the automated VPS installer script.
+  - Enforced strict client subnet prefix validation between `/8` and `/30` to prevent infinite loops in IP allocation.
+
+### 🔍 Universal Case-Insensitive Process Detection
+- 🎯 **Cross-Platform Matching (`pkg/client/watcher_windows.go`, `pkg/client/watcher_other.go`)**:
+  - Standardized process name comparison using `strings.EqualFold` with transparent handling of with/without `.exe` suffixes across Windows, macOS, and Linux.
+
+### 🌐 100% English Localization & Brand Consistency
+- 🌍 **Complete UI & Telemetry Localization**:
+  - Refined all dashboard tabs, settings modals, HUD badges, toasts, and notifications to consistent, professional English.
+
+---
+
 ## [1.0.0] - 2026-09-22
 
 ### 🌐 Enterprise Squad Signaling Hub & Cross-Network Sync

@@ -14,7 +14,7 @@
   <a href="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml"><img src="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform"></a>
   <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Anti--Cheat-Non--Invasive%20(No%20Hooks)-brightgreen" alt="Anti-Cheat: Non-Invasive"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.0.0-blueviolet" alt="Changelog"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.1.0-blueviolet" alt="Changelog"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -98,9 +98,9 @@ Lagvex includes pre-verified, narrow CIDR IP pools covering **105 regional serve
 | 📡 [**Wire Protocol v1 Specification**](docs/PROTOCOL.md) | Binary packet format, HMAC-SHA256 handshake, 9-byte data header, keepalive ping/pong, and MTU arithmetic. |
 | 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
 | 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md) | Profile JSON schema, cloud provider network maps (Valve SDR, Riot Direct, AWS, Azure), and capturing new games. |
-| 🔬 [**Networking Research & Whitepaper**](docs/RESEARCH.md) | Empirical network latency studies, bufferbloat mitigation, and kernel-level packet scheduling research. |
+| 📝 [**Changelog & Release Notes**](CHANGELOG.md) | **Version History**: Full release logs, protocol enhancements, and architectural evolution. |
 | 🌐 [**Why a Relay (VPS) is Required**](docs/WHY_VPS.md) | **Technical FAQ**: Why an intermediate relay server is physically needed, ISP undersea routing limits, squad sharing, and vendor-neutral specs. |
-| 🗺️ [**Engineering Roadmap (P0–P4)**](docs/ROADMAP.md) | **Production Execution Plan**: Data-plane AEAD (ChaCha20-Poly1305), anti-replay cache, native Win32 IP Helper APIs, tail-latency metrics, and adaptive FEC. |
+| 🎯 [**Product Overview & Architecture**](PRODUCT.md) | Core product principles, supported gaming environments, and esports latency benchmarks. |
 | ⚖️ [**Legal Disclaimer & Ban Waiver**](docs/DISCLAIMER.md) | **Crucial reading**: Educational use terms, anti-cheat policy, and zero ban liability agreement. |
 
 ---
