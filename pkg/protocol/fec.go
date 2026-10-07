@@ -56,11 +56,17 @@ func NewFECEncoder(cfg FECEncoderConfig) *FECEncoder {
 	}
 }
 
-// SetBlockSize updates the adaptive group size K (e.g. 4 to 10).
+// SetBlockSize updates the adaptive group size K (e.g. 4 to 10), or 0 for standby.
 func (e *FECEncoder) SetBlockSize(k int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if k >= 2 && k <= 32 {
+	if k == 0 || (k >= 2 && k <= 32) {
+		if e.blockSize != k && k == 0 {
+			e.count = 0
+			e.lengths = e.lengths[:0]
+			e.parity = e.parity[:0]
+			e.baseSeq = 0
+		}
 		e.blockSize = k
 	}
 }
@@ -78,7 +84,7 @@ func (e *FECEncoder) AddPacket(seq uint64, data []byte) ([]byte, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if len(data) == 0 {
+	if e.blockSize <= 0 || len(data) == 0 {
 		return nil, false
 	}
 
@@ -134,6 +140,9 @@ func (e *FECEncoder) CheckFlush(now time.Time) ([]byte, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if e.blockSize <= 0 {
+		return nil, false
+	}
 	if e.count >= 2 && now.Sub(e.lastFlush) >= e.flushInterval {
 		return e.emitBlockLocked()
 	}
@@ -285,8 +294,8 @@ type AdaptiveFECController struct {
 func NewAdaptiveFECController() *AdaptiveFECController {
 	return &AdaptiveFECController{
 		enabled:      true,
-		currentRatio: "Off",
-		blockSize:    0,
+		currentRatio: "Medium (6:1)",
+		blockSize:    6,
 	}
 }
 
@@ -312,32 +321,32 @@ func (a *AdaptiveFECController) Status() (ratio string, blockSize int, active bo
 }
 
 // UpdateLoss adapts the block size based on measured loss percentage.
-func (a *AdaptiveFECController) UpdateLoss(lossPct float64) (blockSize int, active bool) {
+// It returns the target block size (0 for standby) and whether the block size changed.
+func (a *AdaptiveFECController) UpdateLoss(lossPct float64) (blockSize int, changed bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	prevBlockSize := a.blockSize
 	if !a.enabled {
 		a.currentRatio = "Disabled"
 		a.blockSize = 0
-		return 0, false
+		return 0, prevBlockSize != 0
 	}
 
 	switch {
 	case lossPct < 0.5:
 		a.currentRatio = "Standby (0%)"
 		a.blockSize = 0
-		return 0, false
 	case lossPct < 3.0:
 		a.currentRatio = "Light (10:1)"
 		a.blockSize = 10
-		return 10, true
 	case lossPct < 8.0:
 		a.currentRatio = "Medium (6:1)"
 		a.blockSize = 6
-		return 6, true
 	default:
 		a.currentRatio = "Aggressive (4:1)"
 		a.blockSize = 4
-		return 4, true
 	}
+
+	return a.blockSize, a.blockSize != prevBlockSize
 }

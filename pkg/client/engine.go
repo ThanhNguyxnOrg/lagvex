@@ -150,7 +150,11 @@ func (e *Engine) Stats() TunnelStats {
 
 	var fecRatio string = "Off"
 	if e.fecEnabled.Load() && e.fecEncoder != nil {
-		fecRatio = fmt.Sprintf("%d:1", e.fecEncoder.BlockSize())
+		if bs := e.fecEncoder.BlockSize(); bs > 0 {
+			fecRatio = fmt.Sprintf("%d:1", bs)
+		} else {
+			fecRatio = "Standby"
+		}
 	}
 
 	loss := math.Float64frombits(e.lossPctBits.Load())
@@ -1023,6 +1027,12 @@ func (e *Engine) IsAutoFailoverEnabled() bool {
 // SetFECEnabled toggles Forward Error Correction on or off.
 func (e *Engine) SetFECEnabled(enabled bool) {
 	e.fecEnabled.Store(enabled)
+	if e.fecController != nil {
+		e.fecController.SetEnabled(enabled)
+	}
+	if !enabled && e.fecEncoder != nil {
+		e.fecEncoder.Reset()
+	}
 	log.Printf("[Engine] FEC enabled set to: %v", enabled)
 }
 

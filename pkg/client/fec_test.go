@@ -177,35 +177,47 @@ func TestAdaptiveFECControllerScaling(t *testing.T) {
 		t.Errorf("expected enabled by default")
 	}
 
-	// 0.2% loss -> Off / standby
-	bs, active := ctrl.UpdateLoss(0.2)
-	if active || bs != 0 {
-		t.Errorf("expected standby at 0.2%% loss, got bs=%d active=%v", bs, active)
+	// 0.2% loss -> Off / standby (transitions from initial 6 to 0)
+	bs, changed := ctrl.UpdateLoss(0.2)
+	if bs != 0 || !changed {
+		t.Errorf("expected standby (bs=0, changed=true) at 0.2%% loss, got bs=%d changed=%v", bs, changed)
+	}
+
+	// Stable 0.2% loss -> still standby, changed should be false
+	bs, changed = ctrl.UpdateLoss(0.2)
+	if bs != 0 || changed {
+		t.Errorf("expected standby (bs=0, changed=false) at stable loss, got bs=%d changed=%v", bs, changed)
 	}
 
 	// 1.5% loss -> Light (10:1)
-	bs, active = ctrl.UpdateLoss(1.5)
-	if !active || bs != 10 {
-		t.Errorf("expected Light (10:1) at 1.5%% loss, got bs=%d active=%v", bs, active)
+	bs, changed = ctrl.UpdateLoss(1.5)
+	if bs != 10 || !changed {
+		t.Errorf("expected Light (10:1) at 1.5%% loss, got bs=%d changed=%v", bs, changed)
 	}
 
 	// 5.0% loss -> Medium (6:1)
-	bs, active = ctrl.UpdateLoss(5.0)
-	if !active || bs != 6 {
-		t.Errorf("expected Medium (6:1) at 5.0%% loss, got bs=%d active=%v", bs, active)
+	bs, changed = ctrl.UpdateLoss(5.0)
+	if bs != 6 || !changed {
+		t.Errorf("expected Medium (6:1) at 5.0%% loss, got bs=%d changed=%v", bs, changed)
 	}
 
 	// 12.0% loss -> Aggressive (4:1)
-	bs, active = ctrl.UpdateLoss(12.0)
-	if !active || bs != 4 {
-		t.Errorf("expected Aggressive (4:1) at 12.0%% loss, got bs=%d active=%v", bs, active)
+	bs, changed = ctrl.UpdateLoss(12.0)
+	if bs != 4 || !changed {
+		t.Errorf("expected Aggressive (4:1) at 12.0%% loss, got bs=%d changed=%v", bs, changed)
+	}
+
+	// Repeat 12.0% loss -> no change
+	bs, changed = ctrl.UpdateLoss(12.0)
+	if bs != 4 || changed {
+		t.Errorf("expected unchanged (changed=false) at constant 12.0%% loss, got bs=%d changed=%v", bs, changed)
 	}
 
 	// Disabled test
 	ctrl.SetEnabled(false)
-	bs, active = ctrl.UpdateLoss(12.0)
-	if active || bs != 0 {
-		t.Errorf("expected inactive when disabled, got bs=%d active=%v", bs, active)
+	bs, changed = ctrl.UpdateLoss(12.0)
+	if bs != 0 || !changed {
+		t.Errorf("expected inactive when disabled (bs=0, changed=true), got bs=%d changed=%v", bs, changed)
 	}
 }
 

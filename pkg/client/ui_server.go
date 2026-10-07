@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -642,8 +643,12 @@ func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
 			} else {
 				for _, reg := range game.Regions {
 					if (regionID == "" || strings.EqualFold(reg.ID, regionID)) && len(reg.CIDRs) > 0 {
-						prefix := strings.Split(reg.CIDRs[0], "/")[0]
-						targetHost = prefix + ":443"
+						if p, err := netip.ParsePrefix(reg.CIDRs[0]); err == nil {
+							targetHost = net.JoinHostPort(p.Addr().Next().String(), "443")
+						} else {
+							prefix := strings.Split(reg.CIDRs[0], "/")[0]
+							targetHost = prefix + ":443"
+						}
 						break
 					}
 				}
