@@ -28,7 +28,7 @@ func findRunningProcess(targets []string) (bool, string, int) {
 				continue
 			}
 			pid, _ := strconv.Atoi(fields[0])
-			comm := strings.ToLower(fields[1])
+			comm := strings.ToLower(strings.Join(fields[1:], " "))
 			for _, target := range targets {
 				if comm == target || comm == strings.TrimSuffix(target, ".exe") {
 					return true, target, pid

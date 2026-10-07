@@ -7,10 +7,18 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
+
+var utunBufPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 2048)
+		return &b
+	},
+}
 
 // WintunAdapter on macOS implements the TUN interface via native utun.
 type WintunAdapter struct {
@@ -115,7 +123,13 @@ func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
 		return 0, errors.New("adapter closed")
 	}
 
-	tempBuf := make([]byte, len(buf)+4)
+	bufPtr := utunBufPool.Get().(*[]byte)
+	defer utunBufPool.Put(bufPtr)
+	tempBuf := *bufPtr
+	if len(buf)+4 > len(tempBuf) {
+		tempBuf = make([]byte, len(buf)+4)
+	}
+
 	n, err := w.file.Read(tempBuf)
 	if err != nil {
 		return 0, err
@@ -134,11 +148,21 @@ func (w *WintunAdapter) WritePacket(packet []byte) error {
 		return errors.New("adapter closed")
 	}
 
-	tempBuf := make([]byte, len(packet)+4)
-	tempBuf[3] = syscall.AF_INET // Protocol family IPv4 in network byte order
-	copy(tempBuf[4:], packet)
+	bufPtr := utunBufPool.Get().(*[]byte)
+	defer utunBufPool.Put(bufPtr)
+	tempBuf := *bufPtr
+	needed := len(packet) + 4
+	if needed > len(tempBuf) {
+		tempBuf = make([]byte, needed)
+	}
 
-	_, err := w.file.Write(tempBuf)
+	tempBuf[0] = 0
+	tempBuf[1] = 0
+	tempBuf[2] = 0
+	tempBuf[3] = syscall.AF_INET // Protocol family IPv4 in network byte order
+	copy(tempBuf[4:needed], packet)
+
+	_, err := w.file.Write(tempBuf[:needed])
 	return err
 }
 

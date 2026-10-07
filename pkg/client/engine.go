@@ -324,6 +324,16 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e.mu.Lock()
+	if e.state != StateConnecting {
+		e.mu.Unlock()
+		cancel()
+		if adapter != nil {
+			_ = adapter.Close()
+		}
+		conn.Close()
+		e.routeManager.RemoveAll()
+		return recordErr(fmt.Errorf("connection aborted: client disconnected"))
+	}
 	e.state = StateConnected
 	e.sessionID = resp.SessionID
 	e.clientIP = resp.ClientIP
@@ -930,6 +940,11 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 
 	// 7. Atomic state swap
 	e.mu.Lock()
+	if e.state != StateConnected {
+		e.mu.Unlock()
+		newConn.Close()
+		return fmt.Errorf("handover aborted: tunnel is no longer connected (state: %s)", e.state)
+	}
 	e.clientIP = resp.ClientIP
 	e.gatewayIP = resp.GatewayIP
 	e.udpConn = newConn

@@ -26,8 +26,8 @@ func (c *Config) Validate() error {
 	if c.TunName == "" {
 		c.TunName = "lagvex0"
 	}
-	if !c.Subnet.IsValid() || !c.Subnet.Addr().Is4() {
-		return errors.New("valid IPv4 subnet prefix is required")
+	if !c.Subnet.IsValid() || !c.Subnet.Addr().Is4() || c.Subnet.Bits() < 8 || c.Subnet.Bits() > 30 {
+		return errors.New("valid IPv4 client subnet prefix between /8 and /30 is required")
 	}
 	if len(c.PSK) == 0 {
 		return errors.New("pre-shared key (PSK) cannot be empty")
