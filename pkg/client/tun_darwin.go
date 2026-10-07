@@ -83,7 +83,16 @@ func OpenOrCreateWintunAdapter(name, tunnelType, dllPath string) (*WintunAdapter
 		return nil, fmt.Errorf("getsockopt(UTUN_OPT_IFNAME): %w", errno)
 	}
 
-	ifName := string(ifNameBuf[:ifNameLen-1])
+	var ifName string
+	for i, b := range ifNameBuf {
+		if b == 0 {
+			ifName = string(ifNameBuf[:i])
+			break
+		}
+	}
+	if ifName == "" {
+		ifName = "utun0"
+	}
 	file := os.NewFile(uintptr(fd), ifName)
 
 	return &WintunAdapter{
@@ -102,7 +111,7 @@ func (w *WintunAdapter) InterfaceIndex() uint32 {
 
 // ReadPacket reads from utun (skipping the 4-byte macOS AF header).
 func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
-	if w.closed {
+	if w.closed.Load() {
 		return 0, errors.New("adapter closed")
 	}
 
@@ -121,7 +130,7 @@ func (w *WintunAdapter) ReadPacket(buf []byte) (int, error) {
 
 // WritePacket writes to utun (prepending 4-byte AF_INET header).
 func (w *WintunAdapter) WritePacket(packet []byte) error {
-	if w.closed {
+	if w.closed.Load() {
 		return errors.New("adapter closed")
 	}
 

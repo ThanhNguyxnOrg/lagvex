@@ -414,12 +414,13 @@ func (e *Engine) Disconnect() error {
 	conn := e.udpConn
 	rAddr := e.relayAddr
 	adapter := e.wintun
+	crypto := e.crypto
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Disconnecting tunnel...")
 
 	// Send authenticated Disconnect message to relay
-	if conn != nil && e.crypto != nil {
+	if conn != nil && crypto != nil {
 		discBuf := make([]byte, protocol.SecureHeaderLen+protocol.TagLen)
 		sealedDisc := e.crypto.EncodeDisconnect(discBuf, sessID)
 		udpTarget := net.UDPAddrFromAddrPort(rAddr)

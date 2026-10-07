@@ -85,6 +85,13 @@ func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
 	}
 
 	prefix := fmt.Sprintf("%s/32", relayIP.String())
+
+	// Remove previous pin if IP changed
+	if r.pinnedRelay != "" && r.pinnedRelay != prefix {
+		_ = exec.Command("ip", "route", "del", r.pinnedRelay).Run()
+		r.pinnedRelay = ""
+	}
+
 	_ = exec.Command("ip", "route", "del", prefix).Run()
 
 	cmdAdd := exec.Command("ip", "route", "add", prefix, "via", gw, "dev", dev)

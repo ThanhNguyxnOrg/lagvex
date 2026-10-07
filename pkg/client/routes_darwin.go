@@ -76,7 +76,13 @@ func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
 		return fmt.Errorf("default gateway not found")
 	}
 
-	// Delete existing pin
+	// Remove any previous pin if IP changed
+	if r.pinnedRelay != "" && r.pinnedRelay != relayIP.String() {
+		_ = exec.Command("route", "delete", "-host", r.pinnedRelay).Run()
+		r.pinnedRelay = ""
+	}
+
+	// Delete existing pin before adding to avoid duplicate conflict
 	_ = exec.Command("route", "delete", "-host", relayIP.String()).Run()
 
 	// route add -host <relayIP> <gateway>
