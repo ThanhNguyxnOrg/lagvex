@@ -445,7 +445,7 @@ func (e *Engine) Disconnect() error {
 	// Send authenticated Disconnect message to relay
 	if conn != nil && crypto != nil {
 		discBuf := make([]byte, protocol.SecureHeaderLen+protocol.TagLen)
-		sealedDisc := e.crypto.EncodeDisconnect(discBuf, sessID)
+		sealedDisc := crypto.EncodeDisconnect(discBuf, sessID)
 		udpTarget := net.UDPAddrFromAddrPort(rAddr)
 		_, _ = conn.WriteToUDP(sealedDisc, udpTarget)
 	}
