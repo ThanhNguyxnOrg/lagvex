@@ -209,6 +209,12 @@ irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install
 | **Linux & Steam Deck** 🐧 | Linux Kernel `/dev/net/tun` + `ip route` | Steam Deck (SteamOS), Proton gaming, CS2 native, Dota 2, Apex | `sudo ./lagvex-client-linux-amd64` |
 | **macOS (Apple Silicon)** 🍎 | Darwin native `utun` + BSD `route` | League of Legends & TFT (Mac native), Dota 2, Apple GPTK2 games | `sudo ./lagvex-client-darwin-arm64` |
 
+> [!TIP]
+> **First-time Launch Notice:**
+> - **Windows (SmartScreen)**: If warned by Windows Defender, click **"More info"** ➔ **"Run anyway"**.
+> - **macOS (Gatekeeper)**: If binary is quarantined, run `xattr -cr lagvex-client-darwin-arm64` before executing.
+
+
 #### 🌟 Advanced CLI Headless Launch:
 ```bash
 # Connect immediately via command line without opening HUD:
