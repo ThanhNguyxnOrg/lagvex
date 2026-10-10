@@ -71,6 +71,7 @@ jobs:
       - name: Auto-merge safe updates
         if: steps.strategy.outputs.safe == 'true'
         run: |
+          BODY=$(printf "🤖 Verified and auto-merged by ThanhNguyxnAgent\n\nCo-authored-by: ThanhNguyxnAgent[bot] <296222857+thanhnguyxnagent[bot]@users.noreply.github.com>\nSigned-off-by: ThanhNguyxnAgent[bot] <296222857+thanhnguyxnagent[bot]@users.noreply.github.com>")
           gh pr review "$PR_URL" --approve
           gh pr merge "$PR_URL" --squash --body "$BODY" || gh pr merge "$PR_URL" --auto --squash --body "$BODY" || echo "Auto-merge deferred"
         env:
