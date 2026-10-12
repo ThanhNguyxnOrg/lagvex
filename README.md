@@ -1,6 +1,10 @@
 # ⚡ Lagvex 🚀
 
 <p align="center">
+  <img src="assets/logo.png" alt="Lagvex logo" width="140" />
+</p>
+
+<p align="center">
   <img src="assets/banner.jpg" alt="Lagvex Banner" width="100%">
 </p>
 
