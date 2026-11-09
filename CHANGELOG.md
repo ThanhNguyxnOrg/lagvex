@@ -188,3 +188,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cryptographically authenticated dynamic roaming protecting against IP hijacking.
 - 🌐 **Ultra-Lightweight Go Relay Daemon (`cmd/lagvex-relay`)**:
   - Zero-allocation packet routing, IP masquerade NAT, and TCP MSS clamping.
+
+## [1.1.1] - 2026-11-09
+
+### Bug Fixes and Performance
+
+- use tag name from create event context ([4dc1ded](https://github.com/ThanhNguyxnOrg/lagvex/commit/4dc1ded6fea78ffafe9d014742b67e2d69c36b05))
+
