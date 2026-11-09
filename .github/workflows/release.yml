@@ -1,10 +1,7 @@
 name: 🚀 Build & Publish Release 📦
 
 on:
-  push:
-    branches: [ main ]
-    tags:
-      - 'v*'
+  create
 
 jobs:
   detect:
@@ -21,36 +18,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🔍 Parse Commit Message or Tag
+      - name: 🔍 Resolve centrally created release tag
         id: check
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref }}
         run: |
-          MSG="${{ github.event.head_commit.message }}"
-          REF="${{ github.ref }}"
           SHOULD_RELEASE="false"
           VERSION=""
           TAG=""
-
-          if [[ "$REF" == refs/tags/v* ]]; then
-            TAG="${REF#refs/tags/}"
+          if [[ "$REF_TYPE" == "tag" && "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?)$ ]]; then
+            TAG="$REF_NAME"
             VERSION="${TAG#v}"
             SHOULD_RELEASE="true"
-            echo "Triggered by git tag: $TAG"
-          else
-            # Check if commit message starts with release pattern
-            FIRST_LINE=$(echo "$MSG" | head -n 1)
-            echo "Checking commit message: $FIRST_LINE"
-            if [[ "$FIRST_LINE" =~ ^[Rr]elease:?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]] || \
-               [[ "$FIRST_LINE" =~ ^chore\(release\):?[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\.-]*) ]]; then
-              VERSION="${BASH_REMATCH[1]}"
-              TAG="v${VERSION}"
-              SHOULD_RELEASE="true"
-              echo "Detected release commit message -> Tag: $TAG (Version: $VERSION)"
-            fi
           fi
-
-          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "should_release=$SHOULD_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Central release event: tag=$TAG should_release=$SHOULD_RELEASE"
 
   build-and-release:
     name: 📦 Build Multi-Platform & Publish
@@ -78,59 +63,6 @@ jobs:
         with:
           go-version: 'stable'
           cache: true
-
-      - name: 🏷️ Ensure Git Tag Exists
-        env:
-          TAG: ${{ needs.detect.outputs.tag }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            git config user.name "ThanhNguyxnAgent[bot]"
-            git config user.email "296222857+thanhnguyxnagent[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
-            echo "Created and pushed tag $TAG"
-          else
-            echo "Tag $TAG already exists."
-          fi
-
-      - name: 📜 Extract Changelog
-        id: changelog
-        env:
-          VERSION: ${{ needs.detect.outputs.version }}
-        run: |
-          # Extract notes for [VERSION] from CHANGELOG.md using Python for accurate UTF-8 & section parsing
-          if [ -f "CHANGELOG.md" ]; then
-            python3 -c '
-          import os, re, sys
-
-          version = os.environ.get("VERSION", "").strip()
-          if not version:
-              sys.exit(0)
-
-          try:
-              with open("CHANGELOG.md", "r", encoding="utf-8") as f:
-                  content = f.read()
-
-              pattern = rf"##\s*\[{re.escape(version)}\][^\n]*\n(.*?)(?=\n##\s|\Z)"
-              match = re.search(pattern, content, re.DOTALL)
-              if match:
-                  notes = match.group(1).strip()
-                  with open("RELEASE_NOTES.md", "w", encoding="utf-8") as out:
-                      out.write(notes + "\n")
-          except Exception as e:
-              print(f"Warning: Failed to extract changelog: {e}", file=sys.stderr)
-          '
-          fi
-
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "### 🚀 What's Changed in ${VERSION}" > RELEASE_NOTES.md
-            git log -n 10 --pretty=format:"* %s (%h)" >> RELEASE_NOTES.md
-          fi
-          echo "" >> RELEASE_NOTES.md
-          echo "---" >> RELEASE_NOTES.md
-          echo "### 🔐 SHA-256 Checksums" >> RELEASE_NOTES.md
-          echo "Refer to \`checksums.txt\` attached below to verify your downloads." >> RELEASE_NOTES.md
 
       - name: 🔨 Compile Release Binaries
         env:
@@ -209,18 +141,15 @@ jobs:
           sha256sum * > checksums.txt
           cd ..
 
-      - name: 🚀 Publish GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.detect.outputs.tag }}
-          name: "Lagvex ${{ needs.detect.outputs.tag }} 🚀"
-          body_path: RELEASE_NOTES.md
-          files: |
-            release-artifacts/*.zip
-            release-artifacts/*.tar.gz
-            release-artifacts/checksums.txt
-          draft: false
-          prerelease: false
+      - name: Upload assets to central draft release
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-
+          TAG: ${{ needs.detect.outputs.tag }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          shopt -s nullglob
+          assets=(release-artifacts/*.zip release-artifacts/*.tar.gz release-artifacts/checksums.txt)
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::No release artifacts were generated."
+            exit 1
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
