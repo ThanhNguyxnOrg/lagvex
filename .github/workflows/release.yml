@@ -1,7 +1,13 @@
 name: 🚀 Build & Publish Release 📦
 
 on:
-  create
+  create:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to rebuild after a failed release (no tag is created).
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -20,21 +26,38 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 🔍 Resolve centrally created release tag
         id: check
         env:
+          EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           SHOULD_RELEASE="false"
           VERSION=""
           TAG=""
-          if [[ "$REF_TYPE" == "tag" && "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?)$ ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="$INPUT_TAG"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
             TAG="$REF_NAME"
+          fi
+
+          if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?)$ ]]; then
+            CHECKED_OUT_TAG="$(git describe --tags --exact-match HEAD)"
+            if [[ "$CHECKED_OUT_TAG" != "$TAG" ]]; then
+              echo "::error::The selected ref is not the exact requested tag: $TAG"
+              exit 1
+            fi
             VERSION="${TAG#v}"
             SHOULD_RELEASE="true"
+          elif [[ -n "$TAG" ]]; then
+            echo "::error::Invalid release tag: $TAG"
+            exit 1
           fi
           echo "should_release=$SHOULD_RELEASE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -49,10 +72,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout release tag
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.detect.outputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 🐹 Set up Go
         uses: actions/setup-go@v7
