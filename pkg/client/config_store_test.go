@@ -13,7 +13,11 @@ func TestConfigStorePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	})
 
 	cfgPath := filepath.Join(tempDir, "user_config.json")
 	cs := NewConfigStore(cfgPath)
