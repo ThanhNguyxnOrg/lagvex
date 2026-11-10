@@ -203,3 +203,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - make golangci-lint a required quality gate ([00767e8](https://github.com/ThanhNguyxnOrg/lagvex/commit/00767e853ac9300d49e914ddb44b989a9a41252e))
 - address strict Go lint findings ([2735012](https://github.com/ThanhNguyxnOrg/lagvex/commit/27350123e9f27940f80f6781c470ed25b590b2ed))
 
+## [1.1.3] - 2026-11-10
+
+### Bug Fixes and Performance
+
+- grant artifact-read permissions to shared publisher ([1bdac98](https://github.com/ThanhNguyxnOrg/lagvex/commit/1bdac984e043fe66b864d73fcab01c2726dcd6a4))
+
