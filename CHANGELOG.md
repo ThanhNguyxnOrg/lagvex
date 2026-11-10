@@ -195,3 +195,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - use tag name from create event context ([4dc1ded](https://github.com/ThanhNguyxnOrg/lagvex/commit/4dc1ded6fea78ffafe9d014742b67e2d69c36b05))
 
+## [1.1.2] - 2026-11-10
+
+### Bug Fixes and Performance
+
+- migrate golangci-lint config to v2 ([9214732](https://github.com/ThanhNguyxnOrg/lagvex/commit/9214732e8a5d73fc81613ae333ab0576db2d324b))
+- make golangci-lint a required quality gate ([00767e8](https://github.com/ThanhNguyxnOrg/lagvex/commit/00767e853ac9300d49e914ddb44b989a9a41252e))
+- address strict Go lint findings ([2735012](https://github.com/ThanhNguyxnOrg/lagvex/commit/27350123e9f27940f80f6781c470ed25b590b2ed))
+
