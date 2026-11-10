@@ -15,19 +15,19 @@ func TestFailoverDegradationDetection(t *testing.T) {
 	}
 
 	// Missed pongs degradation
-	degraded, reason = fc.IsDegraded(3, 30.0, 30.0, 0.0)
+	degraded, _ = fc.IsDegraded(3, 30.0, 30.0, 0.0)
 	if !degraded {
 		t.Fatalf("expected degraded on 3 missed pongs, got healthy")
 	}
 
 	// Packet loss degradation (threshold is 3.0%)
-	degraded, reason = fc.IsDegraded(0, 30.0, 30.0, 3.5)
+	degraded, _ = fc.IsDegraded(0, 30.0, 30.0, 3.5)
 	if !degraded {
 		t.Fatalf("expected degraded on 3.5%% loss, got healthy")
 	}
 
 	// Latency spike degradation (baseline 30ms -> current 50ms, +66% > 40%)
-	degraded, reason = fc.IsDegraded(0, 50.0, 30.0, 0.0)
+	degraded, _ = fc.IsDegraded(0, 50.0, 30.0, 0.0)
 	if !degraded {
 		t.Fatalf("expected degraded on latency spike (30ms -> 50ms), got healthy")
 	}
