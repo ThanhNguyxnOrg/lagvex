@@ -51,7 +51,7 @@ func Open(name string) (*Device, error) {
 
 	var req ifReq
 	if len(name) >= len(req.Name) {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("interface name %q too long", name)
 	}
 	copy(req.Name[:], name)
@@ -63,7 +63,7 @@ func Open(name string) (*Device, error) {
 		uintptr(tunSetIff),
 		uintptr(unsafe.Pointer(&req)),
 	); errno != 0 {
-		f.Close()
+		_ = f.Close()
 		log.Printf("[TUN] Notice: ioctl TUNSETIFF failed (%v), falling back to userspace virtual device", errno)
 		return &Device{
 			name:        name,

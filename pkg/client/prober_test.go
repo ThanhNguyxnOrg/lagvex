@@ -84,7 +84,7 @@ func startMockRelayUDPServer(t *testing.T, psk []byte, simulatedDelay time.Durat
 	}
 
 	go func() {
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		buf := make([]byte, protocol.MaxPacketSize)
 		var sessCrypto *protocol.SessionCrypto
 		var sessionID uint64
@@ -124,12 +124,13 @@ func startMockRelayUDPServer(t *testing.T, psk []byte, simulatedDelay time.Durat
 				plain := make([]byte, protocol.MaxPacketSize)
 				mtype, payload, err := sessCrypto.OpenPacket(plain, buf[:n])
 				if err == nil {
-					if mtype == protocol.TypePing {
+					switch mtype {
+					case protocol.TypePing:
 						ts, _ := protocol.DecodeControlPayload(payload)
 						pongBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 						pong := sessCrypto.EncodePong(pongBuf, sessionID, ts)
 						_, _ = conn.WriteToUDP(pong, remote)
-					} else if mtype == protocol.TypeDisconnect {
+					case protocol.TypeDisconnect:
 						sessCrypto = nil
 						sessionID = 0
 					}

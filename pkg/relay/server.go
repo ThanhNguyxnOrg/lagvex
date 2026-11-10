@@ -93,7 +93,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("open tun %s: %w", s.cfg.TunName, err)
 	}
 	s.tunDev = dev
-	defer s.tunDev.Close()
+	defer func() {
+		if closeErr := s.tunDev.Close(); closeErr != nil {
+			log.Printf("[Relay] close TUN device: %v", closeErr)
+		}
+	}()
 
 	// 2. Configure TUN interface with gateway IP
 	gwCidr := fmt.Sprintf("%s/%d", s.pool.Gateway(), s.cfg.Subnet.Bits())
@@ -112,7 +116,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("listen udp: %w", err)
 	}
 	s.conn = conn
-	defer s.conn.Close()
+	defer func() {
+		if closeErr := s.conn.Close(); closeErr != nil {
+			log.Printf("[Relay] close UDP socket: %v", closeErr)
+		}
+	}()
 
 	// Tune UDP socket buffers
 	_ = s.conn.SetReadBuffer(8 * 1024 * 1024)

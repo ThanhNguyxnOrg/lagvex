@@ -15,7 +15,6 @@ import (
 
 var (
 	localRelayMu     sync.Mutex
-	localRelayServer *relay.Server
 	localRelayCancel context.CancelFunc
 	localRelayActive bool
 )
@@ -73,7 +72,6 @@ func EnsureLocalRelayRunning(listenAddr string, psk []byte) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	localRelayServer = server
 	localRelayCancel = cancel
 	localRelayActive = true
 
@@ -102,5 +100,4 @@ func StopLocalRelay() {
 		localRelayCancel = nil
 	}
 	localRelayActive = false
-	localRelayServer = nil
 }

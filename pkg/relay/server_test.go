@@ -51,7 +51,7 @@ func TestRelaySquadSignaling(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on health check, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// 2. Create Squad Room
 	createBody, _ := json.Marshal(map[string]any{
@@ -68,7 +68,7 @@ func TestRelaySquadSignaling(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 on squad create, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// 3. Join Squad Room
 	joinBody, _ := json.Marshal(map[string]any{
@@ -89,7 +89,7 @@ func TestRelaySquadSignaling(t *testing.T) {
 		Members []RelaySquadMember `json:"members"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&joinResult)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if len(joinResult.Members) != 2 {
 		t.Fatalf("expected 2 members in squad room, got %d", len(joinResult.Members))
@@ -104,7 +104,7 @@ func TestRelaySquadSignaling(t *testing.T) {
 		Members []RelaySquadMember `json:"members"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&roomResult)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if len(roomResult.Members) != 2 {
 		t.Fatalf("expected 2 members from query room, got %d", len(roomResult.Members))

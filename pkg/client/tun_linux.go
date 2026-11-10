@@ -45,7 +45,7 @@ func OpenOrCreateWintunAdapter(name, tunnelType, dllPath string) (*WintunAdapter
 	req.Flags = iffTun | iffNoPI
 
 	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(tunSetIff), uintptr(unsafe.Pointer(&req))); errno != 0 {
-		f.Close()
+		_ = f.Close()
 		return nil, fmt.Errorf("ioctl TUNSETIFF: %w", errno)
 	}
 

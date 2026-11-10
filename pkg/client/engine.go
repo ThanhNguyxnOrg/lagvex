@@ -148,7 +148,7 @@ func (e *Engine) Stats() TunnelStats {
 		lastErrStr = *ptr
 	}
 
-	var fecRatio string = "Off"
+	fecRatio := "Off"
 	if e.fecEnabled.Load() && e.fecEncoder != nil {
 		if bs := e.fecEncoder.BlockSize(); bs > 0 {
 			fecRatio = fmt.Sprintf("%d:1", bs)
@@ -265,7 +265,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	_ = conn.SetReadDeadline(time.Time{})
 
 	if resp == nil || resp.Status != protocol.StatusOK {
-		conn.Close()
+		_ = conn.Close()
 		e.resetState()
 		return recordErr(fmt.Errorf("handshake failed with relay %s (host unreachable or PSK mismatch)", relayEndpoint))
 	}
@@ -276,16 +276,17 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	// Phase P0.1: Initialize ChaCha20-Poly1305 AEAD session cipher
 	clientCrypto, err := protocol.NewClientCrypto(psk, nonce, resp.SessionID, e.clientID)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		e.resetState()
 		return recordErr(fmt.Errorf("initialize session crypto: %w", err))
 	}
 
 	// 4. Create Virtual TUN adapter (WinTun on Windows, utun on macOS, /dev/net/tun on Linux)
 	kernelName := "WinTun NDIS"
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		kernelName = "macOS utun"
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		kernelName = "Linux dev/net/tun"
 	}
 	driverMode := fmt.Sprintf("Kernel (%s)", kernelName)
@@ -342,7 +343,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		if adapter != nil {
 			_ = adapter.Close()
 		}
-		conn.Close()
+		_ = conn.Close()
 		e.routeManager.RemoveAll()
 		return recordErr(fmt.Errorf("connection aborted: client disconnected"))
 	}
@@ -636,7 +637,11 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 
 		case protocol.TypeDisconnect:
 			log.Printf("[Engine] Received server-initiated disconnect")
-			go e.Disconnect()
+			go func() {
+				if err := e.Disconnect(); err != nil {
+					log.Printf("[Engine] disconnect after server request: %v", err)
+				}
+			}()
 			return
 		}
 	}
@@ -662,7 +667,11 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 				e.mu.Lock()
 				e.state = StateError
 				e.mu.Unlock()
-				go e.Disconnect()
+				go func() {
+					if err := e.Disconnect(); err != nil {
+						log.Printf("[Engine] disconnect after keepalive timeout: %v", err)
+					}
+				}()
 				return
 			}
 
@@ -926,14 +935,14 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 	_ = newConn.SetReadDeadline(time.Time{})
 
 	if resp == nil || resp.Status != protocol.StatusOK {
-		newConn.Close()
+		_ = newConn.Close()
 		return fmt.Errorf("handshake failed with candidate %s (%s)", candidate.Name, candidate.Endpoint)
 	}
 
 	// 5. Initialize session crypto for candidate
 	newCrypto, err := protocol.NewClientCrypto(pskBytes, nonce, resp.SessionID, clientID)
 	if err != nil {
-		newConn.Close()
+		_ = newConn.Close()
 		return fmt.Errorf("initialize crypto for candidate: %w", err)
 	}
 
@@ -958,7 +967,7 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 	e.mu.Lock()
 	if e.state != StateConnected {
 		e.mu.Unlock()
-		newConn.Close()
+		_ = newConn.Close()
 		return fmt.Errorf("handover aborted: tunnel is no longer connected (state: %s)", e.state)
 	}
 	e.clientIP = resp.ClientIP

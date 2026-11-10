@@ -107,7 +107,7 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 		result.Error = fmt.Sprintf("udp listen failed: %v", err)
 		return result
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	psk := []byte(relay.PSK)
 	if len(psk) == 0 {
@@ -174,10 +174,11 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 
 		// Remaining samples: Ping / Pong RTT over established AEAD session
 		pingBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+		sampleLoop:
 		for s := 1; s < samples; s++ {
 			select {
 			case <-ctx.Done():
-				break
+				break sampleLoop
 			case <-time.After(p.cfg.SampleInterval):
 			}
 
@@ -552,10 +553,11 @@ func probeTCPGateway(ctx context.Context, hostPort string, samples int) ([]float
 		samples = 3
 	}
 	var rtts []float64
+	probeLoop:
 	for i := 0; i < samples; i++ {
 		select {
 		case <-ctx.Done():
-			break
+			break probeLoop
 		default:
 		}
 		t0 := time.Now()

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
 	"github.com/ThanhNguyxnOrg/lagvex/web"
@@ -345,10 +346,11 @@ func (u *UIServer) handleTestRelay(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var endpoint, psk string
 
-	if r.Method == http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
 		endpoint = r.URL.Query().Get("endpoint")
 		psk = r.URL.Query().Get("psk")
-	} else if r.Method == http.MethodPost {
+	case http.MethodPost:
 		var req struct {
 			Endpoint string `json:"endpoint"`
 			PSK      string `json:"psk"`
@@ -357,7 +359,7 @@ func (u *UIServer) handleTestRelay(w http.ResponseWriter, r *http.Request) {
 			endpoint = req.Endpoint
 			psk = req.PSK
 		}
-	} else {
+	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -498,7 +500,8 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 
 	applied := []string{}
 
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		// 1. Flush DNS cache
 		if err := exec.Command("ipconfig", "/flushdns").Run(); err == nil {
 			applied = append(applied, "DNS Resolver Cache Flushed")
@@ -524,7 +527,7 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		if req.MTUClamping {
 			applied = append(applied, "MTU Clamped to 1400-byte Frame Boundary")
 		}
-	} else if runtime.GOOS == "darwin" {
+	case "darwin":
 		// macOS Network Tweaks
 		_ = exec.Command("dscacheutil", "-flushcache").Run()
 		_ = exec.Command("killall", "-HUP", "mDNSResponder").Run()
@@ -539,7 +542,7 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 			applied = append(applied, "MTU Frame Boundary Clamped to 1400 Bytes")
 		}
 		applied = append(applied, "macOS Kernel Network Buffers Tuned")
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		// Linux Network Tweaks
 		if resolvePath, err := exec.LookPath("resolvectl"); err == nil {
 			_ = exec.Command(resolvePath, "flush-caches").Run()
@@ -740,7 +743,11 @@ func (u *UIServer) handleOptimizeProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	game, ok := u.profileMgr.FindGameByID(gameID)
-	gameTitle := strings.Title(gameID)
+	gameTitle := gameID
+	if gameID != "" {
+		firstRune, size := utf8.DecodeRuneInString(gameID)
+		gameTitle = strings.ToUpper(string(firstRune)) + gameID[size:]
+	}
 	genre := "FPS"
 	subnetsCount := 8
 
@@ -821,9 +828,10 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	driverName := "WinTun NDIS"
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		driverName = "macOS utun"
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		driverName = "Linux dev/net/tun"
 	}
 
@@ -876,7 +884,7 @@ func (u *UIServer) handleNetworkDiagnostics(w http.ResponseWriter, r *http.Reque
 
 	tG := time.Now()
 	gConn, gErr := net.DialTimeout("tcp", gateway+":80", 400*time.Millisecond)
-	var lanPingMs float64 = 1.0
+	var lanPingMs float64
 	if gErr == nil {
 		lanPingMs = float64(time.Since(tG).Microseconds()) / 1000.0
 		_ = gConn.Close()
@@ -1225,7 +1233,7 @@ func (u *UIServer) proxyRelaySquad(w http.ResponseWriter, path, method string, b
 	if err != nil || resp == nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(resp.StatusCode)
