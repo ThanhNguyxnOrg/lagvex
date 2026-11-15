@@ -134,6 +134,19 @@ func (cs *ConfigStore) AddCustomRelay(relay profiles.RelayEndpoint) {
 	_ = cs.Save()
 }
 
+// SetSelections persists the last selected game and relay ids.
+func (cs *ConfigStore) SetSelections(gameID, relayID string) {
+	cs.mu.Lock()
+	if gameID != "" {
+		cs.config.LastSelectedGame = gameID
+	}
+	if relayID != "" {
+		cs.config.LastSelectedRelay = relayID
+	}
+	cs.mu.Unlock()
+	_ = cs.Save()
+}
+
 // SetTweaks updates system tweak flags and persists to disk.
 func (cs *ConfigStore) SetTweaks(tweaks map[string]bool) {
 	cs.mu.Lock()

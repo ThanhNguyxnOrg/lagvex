@@ -298,10 +298,26 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 	p.history[key] = stored
 	p.histMu.Unlock()
 
+	avgMs, stdMs, lossAvgPct, trend, lastAt := summarizeHistory(stored)
+	result.HistorySamples = len(stored)
+	if !lastAt.IsZero() {
+		result.LastProbeAt = lastAt.Format(time.RFC3339)
+	}
+	if len(trend) > 0 {
+		result.RTTAvgMs = avgMs
+		result.RTTStdMs = stdMs
+		result.RTTTrend = trend
+	}
+	if len(stored) > 0 {
+		result.LossAvgPct = lossAvgPct
+	}
+}
+
+// summarizeHistory computes measured statistics from retained probe runs.
+func summarizeHistory(entries []probeHistoryEntry) (avgMs, stdMs, lossAvgPct float64, trend []float64, lastAt time.Time) {
 	var rtts, lossPcts []float64
-	trend := make([]float64, 0, len(stored))
-	lastAt := time.Time{}
-	for _, e := range stored {
+	trend = make([]float64, 0, len(entries))
+	for _, e := range entries {
 		if e.Reached && e.RTTMs > 0 {
 			rtts = append(rtts, e.RTTMs)
 			trend = append(trend, roundTo(e.RTTMs, 2))
@@ -311,17 +327,54 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 			lastAt = e.At
 		}
 	}
-
-	result.HistorySamples = len(stored)
-	result.LastProbeAt = lastAt.Format(time.RFC3339)
 	if len(rtts) > 0 {
-		result.RTTAvgMs = roundTo(calculateMean(rtts), 2)
-		result.RTTStdMs = roundTo(calculateStdDev(rtts), 2)
-		result.RTTTrend = trend
+		avgMs = roundTo(calculateMean(rtts), 2)
+		stdMs = roundTo(calculateStdDev(rtts), 2)
 	}
 	if len(lossPcts) > 0 {
-		result.LossAvgPct = roundTo(calculateMean(lossPcts), 1)
+		lossAvgPct = roundTo(calculateMean(lossPcts), 1)
 	}
+	return avgMs, stdMs, lossAvgPct, trend, lastAt
+}
+
+// ProbeHistoryReport summarizes the measured history retained for one endpoint.
+type ProbeHistoryReport struct {
+	Endpoint       string    `json:"endpoint"`
+	RTTAvgMs       float64   `json:"rttAvgMs,omitempty"`
+	RTTStdMs       float64   `json:"rttStdMs,omitempty"`
+	LossAvgPct     float64   `json:"lossAvgPct,omitempty"`
+	HistorySamples int       `json:"historySamples"`
+	LastProbeAt    string    `json:"lastProbeAt,omitempty"`
+	RTTTrend       []float64 `json:"rttTrend,omitempty"`
+}
+
+// HistorySnapshot returns a copy of the measured history for every endpoint
+// this prober has probed, without performing any new probes.
+func (p *Prober) HistorySnapshot() []ProbeHistoryReport {
+	p.histMu.Lock()
+	defer p.histMu.Unlock()
+
+	reports := make([]ProbeHistoryReport, 0, len(p.history))
+	for endpoint, entries := range p.history {
+		stored := make([]probeHistoryEntry, len(entries))
+		copy(stored, entries)
+		avgMs, stdMs, lossAvgPct, trend, lastAt := summarizeHistory(stored)
+
+		report := ProbeHistoryReport{
+			Endpoint:       endpoint,
+			RTTAvgMs:       avgMs,
+			RTTStdMs:       stdMs,
+			LossAvgPct:     lossAvgPct,
+			HistorySamples: len(stored),
+			RTTTrend:       trend,
+		}
+		if !lastAt.IsZero() {
+			report.LastProbeAt = lastAt.Format(time.RFC3339)
+		}
+		reports = append(reports, report)
+	}
+	sort.Slice(reports, func(i, j int) bool { return reports[i].Endpoint < reports[j].Endpoint })
+	return reports
 }
 
 func calculateMean(vals []float64) float64 {

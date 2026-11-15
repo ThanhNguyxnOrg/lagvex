@@ -103,6 +103,8 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/shutdown", u.handleShutdown)
 	mux.HandleFunc("/api/diagnose-network", u.handleNetworkDiagnostics)
 	mux.HandleFunc("/api/diagnose-bufferbloat", u.handleDiagnoseBufferbloat)
+	mux.HandleFunc("/api/diagnostics/export", u.handleDiagnosticsExport)
+	mux.HandleFunc("/api/diagnostics/import", u.handleDiagnosticsImport)
 	mux.HandleFunc("/api/game-telemetry", u.handleGameTelemetry)
 	mux.HandleFunc("/api/squad/create", u.handleSquadCreate)
 	mux.HandleFunc("/api/squad/join", u.handleSquadJoin)

@@ -732,6 +732,8 @@ export default function App() {
   const [mmcssPriority, setMmcssPriority] = useState(true);
   const [mtuClamping, setMtuClamping] = useState(true);
   const [dnsFlushed, setDnsFlushed] = useState(false);
+  const [snapshotResult, setSnapshotResult] = useState<{ applied: string[]; warnings: string[] } | null>(null);
+  const snapshotFileRef = useRef<HTMLInputElement | null>(null);
 
   // Oscilloscope Canvas Ref
   const historyCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -965,6 +967,53 @@ export default function App() {
     setTimeout(() => {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, 3000);
+  };
+
+  // Diagnostics snapshot: export measured state, import non-secret settings
+  const handleExportDiagnostics = async () => {
+    try {
+      const res = await fetch("/api/diagnostics/export");
+      if (!res.ok) {
+        notify("Could not export a diagnostics snapshot.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `lagvex-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      notify("Diagnostics snapshot downloaded. Relay PSKs are not included.");
+    } catch {
+      notify("Failed to reach the local Lagvex service.");
+    }
+  };
+
+  const handleImportDiagnostics = async (file: File) => {
+    try {
+      const text = await file.text();
+      const res = await fetch("/api/diagnostics/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: text
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        notify(`❌ Import failed: ${data?.error || res.statusText}`);
+        return;
+      }
+      setSnapshotResult({
+        applied: Array.isArray(data?.applied) ? data.applied : [],
+        warnings: Array.isArray(data?.warnings) ? data.warnings : []
+      });
+      await refreshGames();
+      notify("Snapshot imported.");
+    } catch {
+      notify("Failed to read or import the snapshot file.");
+    }
   };
 
   // Save nickname
@@ -3047,6 +3096,67 @@ export default function App() {
                   <span>DNS resolver cache flushed by the local service.</span>
                 </div>
               )}
+
+              {/* Diagnostics Snapshot Card */}
+              <div className="p-6 rounded-3xl bg-[#0b1018] border border-[#1c2738] flex flex-col gap-4 shadow-lg">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                      <IconShieldCheck className="w-4 h-4" />
+                      <span>DIAGNOSTICS SNAPSHOT</span>
+                    </div>
+                    <h3 className="font-brand font-extrabold text-lg text-white">
+                      Export Measured State, Import Settings
+                    </h3>
+                    <p className="text-xs text-white/60 max-w-[620px]">
+                      The snapshot contains only measured values (tunnel state, relay probe history) plus your non-secret
+                      settings. Relay pre-shared keys are never written to a snapshot and relays are therefore skipped on import.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleExportDiagnostics}
+                      className="h-[42px] px-5 rounded-2xl bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 text-xs font-brand font-bold text-[#00F0FF] cursor-pointer transition-all"
+                    >
+                      Export Snapshot
+                    </button>
+                    <button
+                      onClick={() => snapshotFileRef.current?.click()}
+                      className="h-[42px] px-5 rounded-2xl bg-[#101722] hover:bg-[#162130] border border-[#223042] text-xs font-brand font-bold text-white cursor-pointer transition-all"
+                    >
+                      Import Snapshot
+                    </button>
+                    <input
+                      ref={snapshotFileRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void handleImportDiagnostics(file);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {snapshotResult && (
+                  <div className="p-4 rounded-2xl bg-[#080d14] border border-[#1a2535] flex flex-col gap-2">
+                    <span className="text-[10px] font-brand font-bold text-white/40 uppercase tracking-wider">
+                      Last import
+                    </span>
+                    <span className="text-xs text-[#10b981]">
+                      Applied: {snapshotResult.applied.length > 0 ? snapshotResult.applied.join(", ") : "nothing"}
+                    </span>
+                    {snapshotResult.warnings.map((warning, idx) => (
+                      <span key={idx} className="text-xs text-[#f59e0b]">
+                        {warning}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
