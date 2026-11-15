@@ -1,0 +1,195 @@
+/* Optional floating latency HUD. Values come only from /api/status. */
+
+.lvx-hud-root {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 999999;
+  user-select: none;
+  touch-action: none;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.lvx-hud-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(0, 240, 255, 0.15);
+  color: #f8fafc;
+  cursor: grab;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.lvx-hud-pill:active {
+  cursor: grabbing;
+}
+
+.lvx-hud-pill:hover {
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(0, 240, 255, 0.3);
+}
+
+.lvx-hud-drag {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.lvx-hud-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  box-shadow: 0 0 8px #64748b;
+}
+
+.lvx-hud-dot.is-online {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: lvx-hud-pulse 2s infinite ease-in-out;
+}
+
+.lvx-hud-dot.is-error {
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+}
+
+@keyframes lvx-hud-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
+}
+
+.lvx-hud-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lvx-hud-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+}
+
+.lvx-hud-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00f0ff;
+  white-space: nowrap;
+}
+
+.lvx-hud-value.is-good {
+  color: #10b981;
+}
+
+.lvx-hud-value.is-mid {
+  color: #f59e0b;
+}
+
+.lvx-hud-value.is-high {
+  color: #ef4444;
+}
+
+.lvx-hud-node {
+  display: block;
+  max-width: 130px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
+.lvx-hud-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lvx-hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.lvx-hud-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.lvx-hud-button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.lvx-hud-launcher {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 999998;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  color: #00f0ff;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.lvx-hud-launcher:hover {
+  border-color: #00f0ff;
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.lvx-hud-launcher.is-open {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #10b981;
+}

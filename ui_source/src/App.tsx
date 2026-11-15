@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import FloatingHUD from "./FloatingHUD";
 
 // ==================== BRAND ASSETS ====================
 const imgLagvexLogo = "/assets/logo.jpg";
@@ -156,7 +157,22 @@ function IconPower({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-// ==================== 100% REAL GAME CATALOG ====================
+// ==================== GAME PRESENTATION METADATA ====================
+// Regions and CIDRs are loaded from the backend profile catalog.
+export type GameRegion = {
+  id: string;
+  name: string;
+  cidrs: string[];
+};
+
+export type GameProfile = {
+  id: string;
+  name: string;
+  category: string;
+  processNames: string[];
+  regions: GameRegion[];
+};
+
 export type Game = {
   id: string;
   name: string;
@@ -170,10 +186,9 @@ export type Game = {
   heroArt: string;
   coverImg: string;
   artType: "transparent-character" | "cover-keyart";
-  baselinePing: number;
-  accelPing: number;
   region: string;
-  trend: string;
+  regions?: GameRegion[];
+  profileAvailable?: boolean;
 };
 
 const OFFICIAL_GAMES: Game[] = [
@@ -189,10 +204,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/valorant-chamber.png",
     coverImg: "/assets/games/valorant.png",
     artType: "transparent-character",
-    baselinePing: 58,
-    accelPing: 16.6,
     region: "Asia-Pacific (Singapore)",
-    trend: "38% Faster"
   },
   {
     id: "cs2",
@@ -207,10 +219,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/cs2-hero-real.jpg",
     coverImg: "/assets/games/cs2.jpg",
     artType: "cover-keyart",
-    baselinePing: 62,
-    accelPing: 18.2,
     region: "Hong Kong / Singapore SDR",
-    trend: "45% Faster"
   },
   {
     id: "pubg",
@@ -225,10 +234,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/pubg-hero-real.jpg",
     coverImg: "/assets/games/pubg.jpg",
     artType: "cover-keyart",
-    baselinePing: 78,
-    accelPing: 26.4,
     region: "Southeast Asia (AWS SEA)",
-    trend: "52% Faster"
   },
   {
     id: "apex",
@@ -243,10 +249,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/apex-hero-real.jpg",
     coverImg: "/assets/games/apex.jpg",
     artType: "cover-keyart",
-    baselinePing: 68,
-    accelPing: 22.1,
     region: "Tokyo & Singapore Datacenter",
-    trend: "40% Faster"
   },
   {
     id: "lol",
@@ -260,10 +263,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/lol-hero-real.jpg",
     coverImg: "/assets/games/lol.jpg",
     artType: "cover-keyart",
-    baselinePing: 42,
-    accelPing: 12.0,
     region: "Asia-Pacific (Regional Low-Latency)",
-    trend: "48% Faster"
   },
   {
     id: "cod",
@@ -278,10 +278,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/cod-hero-real.jpg",
     coverImg: "/assets/games/cod.jpg",
     artType: "cover-keyart",
-    baselinePing: 82,
-    accelPing: 28.5,
     region: "Southeast Asia Dedicated",
-    trend: "42% Faster"
   },
   {
     id: "dota2",
@@ -296,10 +293,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/dota2-hero-real.jpg",
     coverImg: "/assets/games/dota2.jpg",
     artType: "cover-keyart",
-    baselinePing: 54,
-    accelPing: 17.2,
     region: "SEA Valve Backbone",
-    trend: "32% Faster"
   },
   {
     id: "thefinals",
@@ -314,10 +308,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/thefinals-hero-real.jpg",
     coverImg: "/assets/games/thefinals.jpg",
     artType: "cover-keyart",
-    baselinePing: 70,
-    accelPing: 23.5,
     region: "Asia Central Edge",
-    trend: "38% Faster"
   },
   {
     id: "deltaforce",
@@ -332,10 +323,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/deltaforce-hero-real.jpg",
     coverImg: "/assets/games/deltaforce.jpg",
     artType: "cover-keyart",
-    baselinePing: 65,
-    accelPing: 21.5,
     region: "Asia Central GCE",
-    trend: "36% Faster"
   },
   {
     id: "overwatch2",
@@ -349,10 +337,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/overwatch-hero-real.jpg",
     coverImg: "/assets/games/overwatch2.jpg",
     artType: "cover-keyart",
-    baselinePing: 75,
-    accelPing: 24.0,
     region: "Taiwan / Tokyo AWS Core",
-    trend: "40% Faster"
   },
   {
     id: "cyberpunk",
@@ -367,10 +352,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/cyberpunk-hero-real.jpg",
     coverImg: "/assets/games/cyberpunk.jpg",
     artType: "cover-keyart",
-    baselinePing: 45,
-    accelPing: 18.0,
     region: "Global Cloud Save Sync",
-    trend: "30% Faster"
   },
   {
     id: "eldenring",
@@ -385,10 +367,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/eldenring-hero-real.jpg",
     coverImg: "/assets/games/eldenring.jpg",
     artType: "cover-keyart",
-    baselinePing: 85,
-    accelPing: 32.0,
     region: "P2P Co-op Relay Network",
-    trend: "35% Faster"
   },
   {
     id: "hunt",
@@ -403,10 +382,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/hunt-hero-real.jpg",
     coverImg: "/assets/games/hunt.jpg",
     artType: "cover-keyart",
-    baselinePing: 72,
-    accelPing: 24.0,
     region: "Asia Dedicated AWS Edge",
-    trend: "38% Faster"
   },
   {
     id: "fallguys",
@@ -421,10 +397,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/fallguys-hero-real.jpg",
     coverImg: "/assets/games/fallguys.jpg",
     artType: "cover-keyart",
-    baselinePing: 72,
-    accelPing: 25.0,
     region: "Asia-Pacific Dedicated",
-    trend: "35% Faster"
   },
   {
     id: "r6s",
@@ -439,10 +412,7 @@ const OFFICIAL_GAMES: Game[] = [
     heroArt: "/assets/r6-hero-real.jpg",
     coverImg: "/assets/games/r6.jpg",
     artType: "cover-keyart",
-    baselinePing: 60,
-    accelPing: 19.5,
     region: "Asia-Pacific South (Azure)",
-    trend: "40% Faster"
   }
 ];
 
@@ -455,165 +425,215 @@ export type RelayNode = {
   country: string;
   flag: string;
   pingMs: number;
-  quality: number;
+  packetLoss: number;
+  reachable: boolean;
+  /** Measured locally by the prober; retained across probe sweeps. */
+  rttAvgMs: number;
+  rttStdMs: number;
+  lossAvgPct: number;
+  rttTrend: number[];
+  historySamples: number;
+  lastProbeAt: string;
+};
+
+export type DetectedGame = {
+  gameId: string;
+  name: string;
+  matchedProcess?: string;
+  pid?: number;
+  running: boolean;
 };
 
 function cleanNodeDisplayName(rawName: string, loc: string): { title: string; subtitle: string; flag: string } {
-  let clean = rawName.replace(/^\[.*?\]\s*/i, "");
-  clean = clean.replace(/^(us|sg|jp|de|eu|vn|hk|au)\s+/i, "");
-  clean = clean.replace(/\s*\([A-Z]{2}\s+[A-Za-z]+\)$/i, "");
-  clean = clean.replace(/\s*\(Silicon Valley\)$/i, "");
-  clean = clean.trim();
+  // Preserve the operator-provided name instead of rewriting it into a
+  // marketing label. Only strip a leading bracketed region prefix.
+  const clean = rawName.replace(/^\[.*?\]\s*/i, "").trim();
+  const haystack = `${rawName} ${loc}`;
 
   let flag = "🌐";
-  if (rawName.includes("Local") || rawName.includes("127.0.0.1")) {
-    flag = "⚡";
-    clean = "Local Engine (127.0.0.1)";
-  } else if (clean.includes("North America East") || loc.includes("VA") || loc.includes("Ashburn")) {
-    flag = "🇺🇸";
-    clean = "US East (Virginia)";
-  } else if (clean.includes("North America Central") || loc.includes("Dallas") || loc.includes("TX")) {
-    flag = "🇺🇸";
-    clean = "US Central (Dallas)";
-  } else if (clean.includes("North America West") || loc.includes("San Jose") || loc.includes("Silicon Valley")) {
-    flag = "🇺🇸";
-    clean = "US West (San Jose)";
-  } else if (clean.includes("Singapore") || loc.includes("Singapore")) {
-    flag = "🇸🇬";
-    clean = "Singapore SDR Edge";
-  } else if (clean.includes("Tokyo") || clean.includes("Japan") || loc.includes("Japan")) {
-    flag = "🇯🇵";
-    clean = "Tokyo Low-Latency Route";
-  } else if (clean.includes("Seoul") || clean.includes("Korea") || loc.includes("Korea")) {
-    flag = "🇰🇷";
-    clean = "Seoul Direct Core";
-  } else if (clean.includes("Hong Kong") || loc.includes("Hong Kong")) {
-    flag = "🇭🇰";
-    clean = "Hong Kong Mega-i";
-  } else if (clean.includes("Frankfurt") || clean.includes("Europe Central") || loc.includes("Germany")) {
-    flag = "🇩🇪";
-    clean = "Frankfurt Core AWS";
-  } else if (clean.includes("London") || loc.includes("London") || loc.includes("UK")) {
-    flag = "🇬🇧";
-    clean = "London Telehouse";
-  } else if (clean.includes("Paris") || loc.includes("Paris") || loc.includes("France")) {
-    flag = "🇫🇷";
-    clean = "Paris Interxion";
-  } else if (clean.includes("Stockholm") || loc.includes("Stockholm") || loc.includes("Sweden")) {
-    flag = "🇸🇪";
-    clean = "Stockholm Equinix";
-  } else if (clean.includes("Sydney") || clean.includes("Oceania") || loc.includes("Australia")) {
-    flag = "🇦🇺";
-    clean = "Sydney Equinix SY3";
-  } else if (clean.includes("São Paulo") || clean.includes("Brazil") || loc.includes("Brazil")) {
-    flag = "🇧🇷";
-    clean = "São Paulo SP4";
-  }
+  if (/local|127\.0\.0\.1|localhost/i.test(haystack)) flag = "💻";
+  else if (/singapore|\bsg\b/i.test(haystack)) flag = "🇸🇬";
+  else if (/tokyo|japan|\bjp\b/i.test(haystack)) flag = "🇯🇵";
+  else if (/seoul|korea|\bkr\b/i.test(haystack)) flag = "🇰🇷";
+  else if (/hong kong|\bhk\b/i.test(haystack)) flag = "🇭🇰";
+  else if (/frankfurt|germany|\bde\b/i.test(haystack)) flag = "🇩🇪";
+  else if (/london|\buk\b/i.test(haystack)) flag = "🇬🇧";
+  else if (/paris|france|\bfr\b/i.test(haystack)) flag = "🇫🇷";
+  else if (/stockholm|sweden|\bse\b/i.test(haystack)) flag = "🇸🇪";
+  else if (/sydney|australia|\bau\b/i.test(haystack)) flag = "🇦🇺";
+  else if (/são paulo|sao paulo|brazil|\bbr\b/i.test(haystack)) flag = "🇧🇷";
 
-  return { title: clean, subtitle: loc || "Tier-1 Datacenter Edge", flag };
+  return { title: clean || loc || "Relay Node", subtitle: loc || "", flag };
 }
 
-const DEFAULT_COMMUNITY_RELAYS: RelayNode[] = [
-  {
-    id: "auto",
-    name: "Auto Smart Multi-Hop",
-    cleanName: "Auto (Smart Routing)",
-    address: "auto",
-    location: "Global Dynamic Anycast",
-    country: "GLOBAL",
-    flag: "⚡",
-    pingMs: 12,
-    quality: 100
-  },
-  {
-    id: "sg",
-    name: "Singapore SDR Edge Node",
-    cleanName: "Singapore SDR Edge",
-    address: "sg.relay.lagvex.net:443",
-    location: "Equinix SG1, Singapore",
-    country: "ASIA",
-    flag: "🇸🇬",
-    pingMs: 14,
-    quality: 100
-  },
-  {
-    id: "jp",
-    name: "Tokyo Low-Latency Route",
-    cleanName: "Tokyo Low-Latency Route",
-    address: "jp.relay.lagvex.net:443",
-    location: "Tokyo TY2, Japan",
-    country: "ASIA",
-    flag: "🇯🇵",
-    pingMs: 28,
-    quality: 99
-  },
-  {
-    id: "hk",
-    name: "Hong Kong Direct Edge",
-    cleanName: "Hong Kong Mega-i",
-    address: "hk.relay.lagvex.net:443",
-    location: "Mega-i IDC, Hong Kong",
-    country: "ASIA",
-    flag: "🇭🇰",
-    pingMs: 22,
-    quality: 99
-  },
-  {
-    id: "kr",
-    name: "Seoul Direct KINX Core",
-    cleanName: "Seoul Direct Core",
-    address: "kr.relay.lagvex.net:443",
-    location: "KINX Datacenter, Seoul",
-    country: "ASIA",
-    flag: "🇰🇷",
-    pingMs: 34,
-    quality: 98
-  },
-  {
-    id: "us-west",
-    name: "US West (San Jose)",
-    cleanName: "US West (San Jose)",
-    address: "us-w.relay.lagvex.net:443",
-    location: "Silicon Valley, USA",
-    country: "NORTH AMERICA",
-    flag: "🇺🇸",
-    pingMs: 135,
-    quality: 97
-  },
-  {
-    id: "us-east",
-    name: "US East (N. Virginia)",
-    cleanName: "US East (Virginia)",
-    address: "us-e.relay.lagvex.net:443",
-    location: "Equinix DC2, Ashburn",
-    country: "NORTH AMERICA",
-    flag: "🇺🇸",
-    pingMs: 165,
-    quality: 96
-  },
-  {
-    id: "de",
-    name: "Frankfurt Core AWS",
-    cleanName: "Frankfurt Core AWS",
-    address: "de.relay.lagvex.net:443",
-    location: "Frankfurt FRA1, Germany",
-    country: "EUROPE",
-    flag: "🇩🇪",
-    pingMs: 148,
-    quality: 96
-  },
-  {
-    id: "au",
-    name: "Sydney Equinix SY3",
-    cleanName: "Sydney Equinix SY3",
-    address: "au.relay.lagvex.net:443",
-    location: "Sydney, Australia",
-    country: "OCEANIA",
-    flag: "🇦🇺",
-    pingMs: 98,
-    quality: 97
+const EMPTY_RELAY: RelayNode = {
+  id: "none",
+  name: "No relay configured",
+  cleanName: "No relay configured",
+  address: "",
+  location: "Deploy a relay or add a custom node",
+  country: "GLOBAL",
+  flag: "⚠️",
+  pingMs: 0,
+  packetLoss: 0,
+  reachable: false,
+  rttAvgMs: 0,
+  rttStdMs: 0,
+  lossAvgPct: 0,
+  rttTrend: [],
+  historySamples: 0,
+  lastProbeAt: ""
+};
+
+function mapProbeRelays(data: unknown): RelayNode[] {
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter((item: any) => item && (item.relayId || item.id || item.endpoint || item.address))
+    .map((item: any) => {
+      const rawName = item.name || item.endpoint || item.address || "Relay";
+      const { title, flag } = cleanNodeDisplayName(rawName, item.location || "");
+      const measuredRtt =
+        typeof item.rttMedianMs === "number" && item.rttMedianMs > 0
+          ? item.rttMedianMs
+          : typeof item.latencyMs === "number" && item.latencyMs > 0
+            ? item.latencyMs
+            : typeof item.pingMs === "number" && item.pingMs > 0
+              ? item.pingMs
+              : 0;
+      return {
+        id: item.relayId || item.id || item.endpoint || item.address,
+        name: rawName,
+        cleanName: title,
+        address: item.endpoint || item.address,
+        location: typeof item.location === "string" ? item.location : "",
+        country: item.continent || item.country || "GLOBAL",
+        flag,
+        pingMs: measuredRtt > 0 ? Math.round(measuredRtt * 10) / 10 : 0,
+        packetLoss:
+          typeof item.packetLoss === "number" ? Math.round(item.packetLoss * 10) / 10 : 0,
+        reachable: item.reachable === true,
+        rttAvgMs: typeof item.rttAvgMs === "number" ? item.rttAvgMs : 0,
+        rttStdMs: typeof item.rttStdMs === "number" ? item.rttStdMs : 0,
+        lossAvgPct: typeof item.lossAvgPct === "number" ? item.lossAvgPct : 0,
+        rttTrend: Array.isArray(item.rttTrend)
+          ? item.rttTrend.filter((v: unknown): v is number => typeof v === "number")
+          : [],
+        historySamples: typeof item.historySamples === "number" ? item.historySamples : 0,
+        lastProbeAt: typeof item.lastProbeAt === "string" ? item.lastProbeAt : ""
+      };
+    });
+}
+
+/** Small measured-RTT sparkline. Renders a dash until two real samples exist. */
+function RttSparkline({ samples, width = 110, height = 26 }: { samples: number[]; width?: number; height?: number }) {
+  if (!samples || samples.length < 2) {
+    return <span className="text-[10px] text-white/30">Not enough samples</span>;
   }
-];
+  const min = Math.min(...samples);
+  const max = Math.max(...samples);
+  const range = max - min || 1;
+  const step = width / (samples.length - 1);
+  const points = samples
+    .map((v, i) => {
+      const x = i * step;
+      const y = height - 3 - ((v - min) / range) * (height - 6);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const last = samples[samples.length - 1];
+  const lastY = height - 3 - ((last - min) / range) * (height - 6);
+  return (
+    <svg width={width} height={height} className="overflow-visible" role="img" aria-label="Measured RTT history">
+      <polyline
+        points={points}
+        fill="none"
+        stroke="#00F0FF"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx={width} cy={lastY} r="2" fill="#00F0FF" />
+    </svg>
+  );
+}
+
+// Legacy UI ids that differ from the backend profile catalog.
+const GAME_PROFILE_ALIASES: Record<string, string> = {
+  cod: "cod_warzone",
+};
+
+function mergeGameProfiles(catalog: GameProfile[]): Game[] {
+  const byId = new Map<string, GameProfile>();
+  for (const profile of catalog) {
+    byId.set(profile.id.toLowerCase(), profile);
+  }
+
+  const merged = OFFICIAL_GAMES.map((game) => {
+    const profileId = (GAME_PROFILE_ALIASES[game.id] || game.id).toLowerCase();
+    const profile = byId.get(profileId);
+    const regions = (profile?.regions || []).filter((region) => region.cidrs?.length > 0);
+    return {
+      ...game,
+      name: profile?.name || game.name,
+      processNames: profile?.processNames?.length ? profile.processNames : game.processNames,
+      region: regions[0]?.name || game.region,
+      regions,
+      profileAvailable: regions.length > 0,
+    };
+  });
+
+  const known = new Set(merged.map((game) => game.id.toLowerCase()));
+  const aliased = new Set(Object.values(GAME_PROFILE_ALIASES).map((id) => id.toLowerCase()));
+  for (const profile of catalog) {
+    const id = profile.id.toLowerCase();
+    if (known.has(id) || aliased.has(id)) continue;
+    const regions = (profile.regions || []).filter((region) => region.cidrs?.length > 0);
+    merged.push({
+      id: profile.id,
+      name: profile.name,
+      genre: profile.category || "Custom",
+      tag: "FPS",
+      platforms: "Custom profile",
+      publisher: "Local profile",
+      processNames: profile.processNames || [],
+      cidrs: regions.flatMap((region) => region.cidrs),
+      heroArt: "/assets/logo_clean.png",
+      coverImg: "/assets/logo_clean.png",
+      artType: "cover-keyart",
+      region: regions[0]?.name || "Global",
+      regions,
+      profileAvailable: regions.length > 0,
+    });
+  }
+
+  return merged;
+}
+
+function pickRegionForRelay(regions: GameRegion[], relay: RelayNode): string {
+  const haystack = `${relay.country} ${relay.location} ${relay.name}`.toLowerCase();
+  let prefix = "";
+  if (/(asia|singapore|japan|tokyo|hong|korea|seoul|mumbai|sydney|oceania|apac)/.test(haystack)) {
+    prefix = "asia";
+  } else if (/(europe|germany|frankfurt|london|stockholm|paris|amsterdam)/.test(haystack)) {
+    prefix = "eu";
+  } else if (/(america|united states|chicago|virginia|california|seattle)/.test(haystack)) {
+    prefix = "na";
+  }
+
+  if (prefix) {
+    const match = regions.find((region) => {
+      const key = `${region.id} ${region.name}`.toLowerCase();
+      return prefix === "asia"
+        ? /(asia|sg|jp|tokyo|hk|kr|seoul|mumbai|sydney)/.test(key)
+        : prefix === "eu"
+        ? /(eu|frankfurt|london|stockholm|paris)/.test(key)
+        : /(na|us-|america|chicago|virginia|california)/.test(key);
+    });
+    if (match) return match.id;
+  }
+
+  return regions[0]?.id || "";
+}
 
 export type SquadMember = {
   name: string;
@@ -621,7 +641,6 @@ export type SquadMember = {
   isp: string;
   ping: number;
   game: string;
-  status: string;
   isSelf?: boolean;
 };
 
@@ -646,8 +665,13 @@ export default function App() {
   const [boostSubTab, setBoostSubTab] = useState<"routing" | "history">("routing");
 
   // Relays
-  const [relays, setRelays] = useState<RelayNode[]>(DEFAULT_COMMUNITY_RELAYS);
+  const [relays, setRelays] = useState<RelayNode[]>([]);
   const [selectedRelayIdx, setSelectedRelayIdx] = useState(0);
+
+  // Backend game catalog (the source of truth for regions and CIDRs)
+  const [games, setGames] = useState<Game[]>(OFFICIAL_GAMES);
+  const [selectedRegionId, setSelectedRegionId] = useState("");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Custom Game & Custom Node Modals State
   const [isAddingGame, setIsAddingGame] = useState(false);
@@ -655,13 +679,14 @@ export default function App() {
   const [newGameProcess, setNewGameProcess] = useState("");
   const [newGameCategory, setNewGameCategory] = useState<"FPS" | "MOBA" | "BR" | "RPG">("FPS");
   const [newGameRegion, setNewGameRegion] = useState("Asia-Pacific");
+  const [newGameCidrs, setNewGameCidrs] = useState("");
 
   const [isAddingNode, setIsAddingNode] = useState(false);
   const [newNodeName, setNewNodeName] = useState("");
   const [newNodeEndpoint, setNewNodeEndpoint] = useState("");
   const [newNodeLocation, setNewNodeLocation] = useState("");
   const [newNodeContinent, setNewNodeContinent] = useState("ASIA");
-  const [newNodePsk, setNewNodePsk] = useState("lagvex-community-us-free-public-psk-2026");
+  const [newNodePsk, setNewNodePsk] = useState("");
 
   // Node Search & Continent Filter
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
@@ -669,7 +694,7 @@ export default function App() {
 
   // Admin & Bufferbloat Diagnostics State
   const [isAdmin, setIsAdmin] = useState(false);
-  const [driverName, setDriverName] = useState<string>("Kernel Virtual TUN");
+  const [driverName, setDriverName] = useState<string>("Detecting adapter…");
   const [isTestingBufferbloat, setIsTestingBufferbloat] = useState(false);
   const [bufferbloatResult, setBufferbloatResult] = useState<{
     baselineMs: number;
@@ -681,16 +706,18 @@ export default function App() {
   } | null>(null);
 
   // Real Hardware & Network Socket Telemetry (Zero Fake Numbers)
-  const [gameTelemetry, setGameTelemetry] = useState<Record<string, { baselinePing: number; accelPing: number; trend: string; region: string }>>({});
   const [networkDiag, setNetworkDiag] = useState<{ gateway: string; lanPingMs: number; ispPingMs: number; dnsServer: string } | null>(null);
   const recentPingsRef = useRef<number[]>([]);
+
+  // Detected game processes (measured by one local process-table scan)
+  const [detectedGames, setDetectedGames] = useState<Record<string, DetectedGame>>({});
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [livePing, setLivePing] = useState(16.6);
-  const [packetLoss, setPacketLoss] = useState(0.0);
-  const [jitter, setJitter] = useState(0.2);
+  const [livePing, setLivePing] = useState(0);
+  const [packetLoss, setPacketLoss] = useState<number | null>(null);
+  const [jitter, setJitter] = useState(0);
   const [sessionSeconds, setSessionSeconds] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -709,15 +736,18 @@ export default function App() {
   // Oscilloscope Canvas Ref
   const historyCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const pingHistoryRef = useRef<number[]>(Array.from({ length: 50 }, () => 16.6));
+  const pingHistoryRef = useRef<number[]>([]);
 
   // Current items
-  const selectedGame = OFFICIAL_GAMES[selectedGameIdx] || OFFICIAL_GAMES[0];
-  const selectedRelay = relays[selectedRelayIdx] || relays[0];
+  const selectedGame = games[selectedGameIdx] || games[0] || OFFICIAL_GAMES[0];
+  const selectedRelay = relays[selectedRelayIdx] || relays[0] || EMPTY_RELAY;
+  const selectedRegion =
+    (selectedGame.regions || []).find((region) => region.id === selectedRegionId) ||
+    (selectedGame.regions || [])[0];
 
   // Filtered games for Library Tab
   const filteredGames = useMemo(() => {
-    return OFFICIAL_GAMES.filter((g) => {
+    return games.filter((g) => {
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -727,7 +757,7 @@ export default function App() {
       const matchCat = selectedCategory === "ALL" || g.tag === selectedCategory;
       return matchSearch && matchCat;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [games, searchQuery, selectedCategory]);
 
   // Filtered Relays for Nodes Explorer
   const filteredRelays = useMemo(() => {
@@ -751,10 +781,45 @@ export default function App() {
     });
   }, [relays, nodeSearchQuery, selectedNodeContinent]);
 
+  // Keep a valid server region selected for the active game and relay.
+  useEffect(() => {
+    const regions = selectedGame.regions || [];
+    if (regions.length === 0) {
+      if (selectedRegionId) setSelectedRegionId("");
+      return;
+    }
+    if (!regions.some((region) => region.id === selectedRegionId)) {
+      setSelectedRegionId(pickRegionForRelay(regions, selectedRelay));
+    }
+  }, [selectedGame.id, selectedRelay.id, selectedRegionId, games]);
+
+  const refreshGames = async (): Promise<Game[]> => {
+    try {
+      const res = await fetch("/api/games");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const merged = mergeGameProfiles(data as GameProfile[]);
+          setGames(merged);
+          return merged;
+        }
+      }
+    } catch {}
+    return games;
+  };
+
   // Add Custom Game Handler
   const handleCreateCustomGame = async () => {
     if (!newGameName.trim() || !newGameProcess.trim()) {
       notify("Please provide Game Name and Executable Process Name!");
+      return;
+    }
+    const cidrs = newGameCidrs
+      .split(/[\s,]+/)
+      .map((cidr) => cidr.trim())
+      .filter(Boolean);
+    if (cidrs.length === 0) {
+      notify("Enter at least one verified game server CIDR (for example 203.0.113.0/24).");
       return;
     }
     const id = newGameName.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -767,17 +832,23 @@ export default function App() {
           name: newGameName.trim(),
           category: newGameCategory,
           processNames: [newGameProcess.trim()],
-          regions: [{ id: "global", name: newGameRegion, cidrs: ["1.1.1.0/24"] }]
+          regions: [{ id: "global", name: newGameRegion.trim() || "Global", cidrs }]
         })
       });
-      if (res.ok) {
-        notify(`✅ Added custom game: ${newGameName}`);
-        setIsAddingGame(false);
-        setNewGameName("");
-        setNewGameProcess("");
-      } else {
-        notify("Failed to add custom game.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify(`Failed to add custom game: ${data.error || res.statusText}`);
+        return;
       }
+      const merged = await refreshGames();
+      const idx = merged.findIndex((game) => game.id === id);
+      if (idx >= 0) setSelectedGameIdx(idx);
+      notify(`✅ Added custom game: ${newGameName}`);
+      setIsAddingGame(false);
+      setNewGameName("");
+      setNewGameProcess("");
+      setNewGameCidrs("");
+      setActiveTab("boost");
     } catch {
       notify("Failed to connect to backend.");
     }
@@ -787,6 +858,10 @@ export default function App() {
   const handleCreateCustomNode = async () => {
     if (!newNodeName.trim() || !newNodeEndpoint.trim()) {
       notify("Please provide Node Name and IP:Port Endpoint!");
+      return;
+    }
+    if (!newNodePsk.trim()) {
+      notify("Relay PSK is required. Enter the PSK printed by your relay installer.");
       return;
     }
     const id = "custom-" + Date.now();
@@ -800,43 +875,26 @@ export default function App() {
           endpoint: newNodeEndpoint.trim(),
           location: newNodeLocation.trim() || "Dedicated Host",
           continent: newNodeContinent,
-          psk: newNodePsk.trim() || "lagvex-community-us-free-public-psk-2026",
+          psk: newNodePsk.trim(),
           tier: "custom"
         })
       });
-      if (res.ok) {
-        notify(`✅ Added custom relay node: ${newNodeName}`);
-        setIsAddingNode(false);
-        setNewNodeName("");
-        setNewNodeEndpoint("");
-        setNewNodeLocation("");
-        // Re-probe relays
-        const pRes = await fetch("/api/probe-relays");
-        if (pRes.ok) {
-          const data = await pRes.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const mapped: RelayNode[] = data.map((item: any) => {
-              const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
-              const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
-                ? Math.round(item.rttMedianMs * 10) / 10
-                : (item.latencyMs || item.pingMs || 0);
-              return {
-                id: item.relayId || item.id || item.endpoint || item.address,
-                name: item.name || item.endpoint || item.address,
-                cleanName: title,
-                address: item.endpoint || item.address,
-                location: item.location || "Datacenter Node",
-                country: item.continent || item.country || "GLOBAL",
-                flag,
-                pingMs: pMs,
-                quality: 99
-              };
-            });
-            setRelays(mapped);
-          }
-        }
-      } else {
-        notify("Failed to add custom relay node.");
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Failed to add relay: ${message.trim()}`);
+        return;
+      }
+      notify(`✅ Added custom relay node: ${newNodeName}`);
+      setIsAddingNode(false);
+      setNewNodeName("");
+      setNewNodeEndpoint("");
+      setNewNodeLocation("");
+      setNewNodePsk("");
+      // Re-probe relays
+      const pRes = await fetch("/api/probe-relays");
+      if (pRes.ok) {
+        const data = await pRes.json();
+        setRelays(mapProbeRelays(data));
       }
     } catch {
       notify("Failed to connect to backend.");
@@ -883,13 +941,18 @@ export default function App() {
     notify("⚡ Testing connection latency under load (Bufferbloat Analysis)...");
     try {
       const res = await fetch("/api/diagnose-bufferbloat");
-      if (res.ok) {
-        const data = await res.json();
-        setBufferbloatResult(data);
-        notify(`✅ Bufferbloat Test complete: Grade ${data.grade} (${data.rating})`);
-      } else {
-        notify("Bufferbloat test completed with standard rating.");
+      if (!res.ok) {
+        notify(`Bufferbloat test failed (${res.status}).`);
+        return;
       }
+      const data = await res.json();
+      if (data.available === false) {
+        setBufferbloatResult(null);
+        notify(`⚠️ ${data.error || "Bufferbloat could not be measured."}`);
+        return;
+      }
+      setBufferbloatResult(data);
+      notify(`✅ Bufferbloat Test complete: Grade ${data.grade} (${data.rating})`);
     } catch {
       notify("Bufferbloat diagnostic failed to connect.");
     } finally {
@@ -934,25 +997,6 @@ export default function App() {
     return `${h}:${m}:${s}`;
   };
 
-  // Dynamic Game Telemetry Resolver (Calculated from genuine network probes)
-  const getGameTelemetry = (g: Game) => {
-    const telem = gameTelemetry[g.id];
-    if (telem) {
-      return {
-        baselinePing: telem.baselinePing,
-        accelPing: telem.accelPing,
-        trend: telem.trend,
-        region: telem.region || g.region
-      };
-    }
-    return {
-      baselinePing: g.baselinePing,
-      accelPing: g.accelPing,
-      trend: g.trend,
-      region: g.region
-    };
-  };
-
   // Fetch real relays, status, system-info, and game-telemetry from Go Backend
   useEffect(() => {
     const fetchSystemInfo = async () => {
@@ -993,35 +1037,9 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            const mapped: RelayNode[] = data.map((item: any) => {
-              const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
-              const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
-                ? Math.round(item.rttMedianMs * 10) / 10
-                : (item.latencyMs || item.pingMs || 0);
-              return {
-                id: item.relayId || item.id || item.endpoint || item.address,
-                name: item.name || item.endpoint || item.address,
-                cleanName: title,
-                address: item.endpoint || item.address,
-                location: item.location || "Datacenter Node",
-                country: item.continent || item.country || "GLOBAL",
-                flag,
-                pingMs: pMs,
-                quality: pMs > 0 && pMs < 160 ? 98 : (pMs > 0 ? 88 : 70)
-              };
-            });
+            const mapped = mapProbeRelays(data);
             setRelays(mapped);
           }
-        }
-      } catch {}
-    };
-
-    const fetchGameTelemetry = async () => {
-      try {
-        const res = await fetch("/api/game-telemetry");
-        if (res.ok) {
-          const data = await res.json();
-          setGameTelemetry(data);
         }
       } catch {}
     };
@@ -1043,15 +1061,38 @@ export default function App() {
     fetchSystemInfo();
     fetchNetworkDiagnostics();
     fetchRelays();
-    fetchGameTelemetry();
+    refreshGames();
     fetchStatus();
   }, []);
 
-  // Ping History Oscilloscope Chart Loop
+  // Real process detection: which configured game processes are running now.
+  // One local process-table scan per poll; no game process is touched.
   useEffect(() => {
-    let phase = 0;
+    let stopped = false;
+    const pollDetected = async () => {
+      try {
+        const res = await fetch("/api/detected-processes");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped || !Array.isArray(data.games)) return;
+        const next: Record<string, DetectedGame> = {};
+        for (const g of data.games) {
+          if (g && typeof g.gameId === "string") next[g.gameId] = g as DetectedGame;
+        }
+        setDetectedGames(next);
+      } catch {}
+    };
+    pollDetected();
+    const timer = setInterval(pollDetected, 15000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  // Ping History Oscilloscope Chart Loop (renders only real engine samples)
+  useEffect(() => {
     const render = () => {
-      phase += 0.08;
       const canvas = historyCanvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
@@ -1070,13 +1111,11 @@ export default function App() {
             ctx.stroke();
           }
 
-          const baseVal = isBoosting ? livePing : (gameTelemetry[selectedGame.id]?.baselinePing || selectedGame.baselinePing);
-          const jitterFactor = isBoosting ? Math.max(0.15, jitter * 0.4) : 1.5;
-          const nextVal = baseVal + Math.sin(phase * 1.5) * jitterFactor;
-
           const hist = pingHistoryRef.current;
-          hist.push(nextVal);
-          if (hist.length > 60) hist.shift();
+          if (hist.length < 2) {
+            animationFrameRef.current = requestAnimationFrame(render);
+            return;
+          }
 
           const step = width / (hist.length - 1);
           const minP = Math.min(...hist) - 2;
@@ -1117,7 +1156,38 @@ export default function App() {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isBoosting, livePing, selectedGame, gameTelemetry, jitter]);
+  }, [isBoosting]);
+
+  // Keep UI state in sync with the real engine, including failures and
+  // disconnects triggered outside this browser tab.
+  useEffect(() => {
+    let stopped = false;
+    const pollStatus = async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped) return;
+
+        if (data.state === "connected") {
+          setIsBoosting(true);
+          setConnectionError(null);
+          if (data.pingMs > 0) setLivePing(data.pingMs);
+          if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
+        } else if (data.state === "disconnected" || data.state === "error") {
+          setIsBoosting(false);
+          if (data.lastError) setConnectionError(data.lastError);
+        }
+      } catch {}
+    };
+
+    pollStatus();
+    const timer = setInterval(pollStatus, 2000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   // Live real telemetry polling (Zero fake data, poll live socket engine)
   useEffect(() => {
@@ -1129,41 +1199,46 @@ export default function App() {
           if (res.ok) {
             const data = await res.json();
             if (data.active || data.state === "connected") {
-              const currentPing = data.pingMs > 0
-                ? data.pingMs
-                : (selectedRelay.pingMs > 0 ? selectedRelay.pingMs : (gameTelemetry[selectedGame.id]?.accelPing || selectedGame.accelPing));
-              
-              setLivePing(Number(currentPing.toFixed(1)));
-              
-              // True RFC 3550 Jitter calculation from rolling sample difference
-              recentPingsRef.current.push(currentPing);
-              if (recentPingsRef.current.length > 8) {
-                recentPingsRef.current.shift();
-              }
-              const samples = recentPingsRef.current;
-              if (samples.length >= 2) {
-                let sumDiff = 0;
-                for (let i = 1; i < samples.length; i++) {
-                  sumDiff += Math.abs(samples[i] - samples[i - 1]);
+              if (data.pingMs > 0) {
+                const currentPing = Number(data.pingMs);
+                setLivePing(Number(currentPing.toFixed(1)));
+
+                const chart = pingHistoryRef.current;
+                chart.push(currentPing);
+                if (chart.length > 60) chart.shift();
+
+                // Mean absolute difference between recent measured RTT samples.
+                recentPingsRef.current.push(currentPing);
+                if (recentPingsRef.current.length > 8) {
+                  recentPingsRef.current.shift();
                 }
-                setJitter(Number((sumDiff / (samples.length - 1)).toFixed(2)));
+                const samples = recentPingsRef.current;
+                if (samples.length >= 2) {
+                  let sumDiff = 0;
+                  for (let i = 1; i < samples.length; i++) {
+                    sumDiff += Math.abs(samples[i] - samples[i - 1]);
+                  }
+                  setJitter(Number((sumDiff / (samples.length - 1)).toFixed(2)));
+                }
               }
-              
+
               // Real packet loss from engine
-              const loss = data.packetLossPct !== undefined ? data.packetLossPct : (data.packetLoss || 0.0);
-              setPacketLoss(Number(loss.toFixed(1)));
+              if (data.packetLossPct !== undefined) {
+                setPacketLoss(Number(Number(data.packetLossPct).toFixed(1)));
+              }
             }
           }
         } catch {}
       }, 1200);
     } else {
-      const base = gameTelemetry[selectedGame.id]?.baselinePing || selectedGame.baselinePing;
-      setLivePing(base);
-      setJitter(0.3);
-      setPacketLoss(0.0);
+      setLivePing(0);
+      setJitter(0);
+      setPacketLoss(null);
+      recentPingsRef.current = [];
+      pingHistoryRef.current = [];
     }
     return () => clearInterval(timer);
-  }, [isBoosting, selectedGame, selectedRelay, gameTelemetry]);
+  }, [isBoosting, selectedGame, selectedRelay]);
 
   // Connect / Disconnect Handler
   const handleToggleBoost = async () => {
@@ -1172,48 +1247,67 @@ export default function App() {
       try {
         await fetch("/api/disconnect", { method: "POST" });
         setIsBoosting(false);
-        const base = gameTelemetry[selectedGame.id]?.baselinePing || selectedGame.baselinePing;
-        setLivePing(base);
+        setLivePing(0);
+        setConnectionError(null);
         notify("⚡ Acceleration stopped. Standby mode.");
       } catch {
+        notify("Could not reach the local Lagvex service to disconnect.");
+      } finally {
+        setIsConnecting(false);
+      }
+      return;
+    }
+
+    if (!selectedGame.profileAvailable || !selectedRegion) {
+      notify("This game has no verified region profile yet. Add a custom profile with server CIDRs first.");
+      return;
+    }
+    if (selectedRelay.id === "none" || !selectedRelay.address) {
+      notify("No relay is configured. Deploy a relay or add a custom node with its endpoint and PSK first.");
+      return;
+    }
+
+    setIsConnecting(true);
+    setConnectionError(null);
+    const targetRelayAddr = selectedRelay.address || "auto";
+    notify(`Accelerating ${selectedGame.name} (${selectedRegion.name}) via ${selectedRelay.cleanName}...`);
+    try {
+      const res = await fetch("/api/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: selectedGame.id,
+          regionId: selectedRegion.id,
+          relayEndpoint: targetRelayAddr,
+          relayAddr: targetRelayAddr,
+          autoNode: targetRelayAddr === "auto" || selectedRelay.id === "auto",
+          forceNow: true
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false || data.state === "error") {
+        const message = data.error || data.lastError || `Connection failed (${res.status})`;
+        setConnectionError(message);
         setIsBoosting(false);
-      } finally {
-        setIsConnecting(false);
+        notify(`❌ ${message}`);
+        return;
       }
-    } else {
-      setIsConnecting(true);
-      const targetRelayAddr = selectedRelay.address || "auto";
-      notify(`Accelerating ${selectedGame.name} via ${selectedRelay.cleanName}...`);
-      try {
-        const res = await fetch("/api/connect", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            gameId: selectedGame.id,
-            relayEndpoint: targetRelayAddr,
-            relayAddr: targetRelayAddr,
-            autoNode: targetRelayAddr === "auto" || selectedRelay.id === "auto"
-          })
-        });
-        const data = await res.json();
-        if (res.ok && (data.success || data.status === "connecting")) {
-          setIsBoosting(true);
-          const targetPing = selectedRelay.pingMs > 0 ? selectedRelay.pingMs : (gameTelemetry[selectedGame.id]?.accelPing || selectedGame.accelPing);
-          setLivePing(Number(targetPing.toFixed(1)));
-          notify(`⚡ Boost Active: ${selectedGame.name} optimized via ${selectedRelay.cleanName}!`);
-        } else {
-          setIsBoosting(true);
-          const targetPing = selectedRelay.pingMs > 0 ? selectedRelay.pingMs : (gameTelemetry[selectedGame.id]?.accelPing || selectedGame.accelPing);
-          setLivePing(Number(targetPing.toFixed(1)));
-          notify(`⚡ Boost Active: FastPath routing engaged!`);
-        }
-      } catch {
-        setIsBoosting(true);
-        const targetPing = selectedRelay.pingMs > 0 ? selectedRelay.pingMs : (gameTelemetry[selectedGame.id]?.accelPing || selectedGame.accelPing);
-        setLivePing(Number(targetPing.toFixed(1)));
-      } finally {
-        setIsConnecting(false);
-      }
+
+      setIsBoosting(true);
+      // Only show RTT reported by the tunnel engine. A relay probe performed
+      // before connecting is not live tunnel latency.
+      const targetPing = data.pingMs > 0 ? Number(data.pingMs) : 0;
+      setLivePing(Number(targetPing.toFixed(1)));
+      const routeNote = data.routeCount > 0
+        ? `${data.routeCount} game routes installed`
+        : "routes will activate when the game process starts";
+      notify(`⚡ Boost Active: ${selectedGame.name} via ${selectedRelay.cleanName} — ${routeNote}.`);
+    } catch {
+      setConnectionError("Could not reach the local Lagvex service.");
+      setIsBoosting(false);
+      notify("❌ Could not reach the local Lagvex service.");
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -1223,7 +1317,7 @@ export default function App() {
       window.open(`steam://rungameid/${selectedGame.steamAppId}`, "_blank");
       notify(`Opening Steam for ${selectedGame.name}...`);
     } else {
-      notify(`Game Process Detected: ${selectedGame.processNames[0] || selectedGame.name}. FastPath routing active.`);
+      notify(`Launch ${selectedGame.processNames[0] || selectedGame.name} manually. Lagvex will detect the process while a tunnel is active.`);
     }
   };
 
@@ -1231,43 +1325,51 @@ export default function App() {
   const handleSelectGameAndBoost = (idx: number) => {
     setSelectedGameIdx(idx);
     setActiveTab("boost");
-    notify(`Selected ${OFFICIAL_GAMES[idx].name}. GearUP HUD ready.`);
+    notify(`Selected ${games[idx]?.name || "game"}. Boost HUD ready.`);
   };
 
   // Create a new Squad Room (starts with ONLY YOU, real state!)
   const handleCreateSquadRoom = async () => {
     const code = `LGVX-${Math.floor(1000 + Math.random() * 9000)}`;
-    const selfMember: SquadMember = {
-      name: gamerNickname,
-      role: "Host",
-      isp: networkDiag ? `${networkDiag.gateway} • Local Machine` : "Local Machine",
-      ping: Math.round(livePing),
-      game: selectedGame.name,
-      status: "Party Host 👑",
-      isSelf: true
-    };
-    setCurrentSquadRoom(code);
-    setSquadMembers([selfMember]);
     try {
-      await fetch("/api/squad/create", {
+      const res = await fetch("/api/squad/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code,
-          name: gamerNickname,
+          host: gamerNickname,
+          relayId: selectedRelay.id !== "none" ? selectedRelay.id : "",
+          relayName: selectedRelay.id !== "none" ? selectedRelay.cleanName : "",
           game: selectedGame.name,
           ping: Math.round(livePing),
-          isp: networkDiag ? networkDiag.gateway : "Local Machine"
+          isp: networkDiag?.gateway || ""
         })
       });
-    } catch {}
-    notify(`Created Squad Room ${code}! Share code or link with your teammates.`);
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Could not create squad room: ${message.trim()}`);
+        return;
+      }
+      const selfMember: SquadMember = {
+        name: gamerNickname,
+        role: "Host",
+        isp: networkDiag?.gateway || "",
+        ping: Math.round(livePing),
+        game: selectedGame.name,
+        isSelf: true
+      };
+      setCurrentSquadRoom(code);
+      setSquadMembers([selfMember]);
+      notify(`Created Squad Room ${code}. Share the code with your teammates.`);
+    } catch {
+      notify("Failed to reach the local Lagvex service.");
+    }
   };
 
   // Join a Squad Room
   const handleJoinSquadRoom = async () => {
     if (!joinInputCode.trim()) {
-      notify("Please enter a valid Squad Room Code!");
+      notify("Please enter a Squad Room code first.");
       return;
     }
     const code = joinInputCode.trim().toUpperCase();
@@ -1280,30 +1382,35 @@ export default function App() {
           name: gamerNickname,
           game: selectedGame.name,
           ping: Math.round(livePing),
-          isp: networkDiag ? networkDiag.gateway : "Local Machine"
+          isp: networkDiag?.gateway || ""
         })
       });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentSquadRoom(code);
-        if (Array.isArray(data.members) && data.members.length > 0) {
-          const mapped: SquadMember[] = data.members.map((m: any) => ({
-            name: m.name,
-            role: m.role || "Member",
-            isp: m.isp || "Online Peer",
-            ping: m.ping || Math.round(livePing),
-            game: m.game || selectedGame.name,
-            status: m.status || "Synced ⚡",
-            isSelf: m.name === gamerNickname
-          }));
-          setSquadMembers(mapped);
-        }
-        notify(`Joined Squad Room ${code}! Syncing routes with party...`);
-      } else {
-        notify("Could not find active squad room. Please check the code.");
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Could not join squad room: ${message.trim()}`);
+        return;
       }
+      const data = await res.json();
+      setCurrentSquadRoom(code);
+      if (Array.isArray(data.members) && data.members.length > 0) {
+        const mapped: SquadMember[] = data.members.map((m: any) => ({
+          name: m.name,
+          role: m.role || "Member",
+          isp: typeof m.isp === "string" ? m.isp : "",
+          ping:
+            typeof m.ping === "number" && m.ping > 0
+              ? m.ping
+              : m.name === gamerNickname && livePing > 0
+                ? Math.round(livePing)
+                : 0,
+          game: typeof m.game === "string" ? m.game : "",
+          isSelf: m.name === gamerNickname
+        }));
+        setSquadMembers(mapped);
+      }
+      notify(`Joined Squad Room ${code}.`);
     } catch {
-      notify("Failed to connect to squad signaling server.");
+      notify("Failed to reach the local Lagvex service.");
     }
   };
 
@@ -1323,42 +1430,6 @@ export default function App() {
     notify("Left Squad Room. Returned to Lobby.");
   };
 
-  // Simulate friend joining for demo testing
-  const handleSimulateTeammateJoin = async () => {
-    if (squadMembers.length >= 5) {
-      notify("Squad Room is full (5/5 players)!");
-      return;
-    }
-    const sampleNames = ["CyberAim#4201", "Vortex_Sniper#8819", "NeonNova#1337", "PhantomClutch#9920"];
-    const name = sampleNames[squadMembers.length - 1] || `Teammate #${squadMembers.length + 1}`;
-    if (currentSquadRoom) {
-      try {
-        await fetch("/api/squad/join", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: currentSquadRoom,
-            name,
-            game: selectedGame.name,
-            ping: Math.round(livePing + (squadMembers.length * 1.5)),
-            isp: "Fiber Broadband"
-          })
-        });
-      } catch {}
-    }
-    setSquadMembers((prev) => [
-      ...prev,
-      {
-        name,
-        role: "Member",
-        isp: "Fiber Broadband",
-        ping: Math.round(livePing + (squadMembers.length * 1.5)),
-        game: selectedGame.name,
-        status: "Synced ⚡"
-      }
-    ]);
-    notify(`🎮 ${name} joined your Squad Room!`);
-  };
 
   // Squad Room Real-Time Heartbeat & Sync Loop (Auto purges stale peers & syncs ping)
   useEffect(() => {
@@ -1381,10 +1452,14 @@ export default function App() {
             const mapped: SquadMember[] = data.members.map((m: any) => ({
               name: m.name,
               role: m.role || "Member",
-              isp: m.isp || "Online Peer",
-              ping: m.ping || Math.round(livePing),
-              game: m.game || selectedGame.name,
-              status: m.status || "Synced ⚡",
+              isp: typeof m.isp === "string" ? m.isp : "",
+              ping:
+                typeof m.ping === "number" && m.ping > 0
+                  ? m.ping
+                  : m.name === gamerNickname && livePing > 0
+                    ? Math.round(livePing)
+                    : 0,
+              game: typeof m.game === "string" ? m.game : "",
               isSelf: m.name === gamerNickname
             }));
             setSquadMembers(mapped);
@@ -1408,16 +1483,27 @@ export default function App() {
           mtuClamping
         })
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify(`Tweak request failed (${res.status}).`);
+        return;
+      }
+      const applied: string[] = Array.isArray(data.applied) ? data.applied : [];
+      const failed: string[] = Array.isArray(data.failed) ? data.failed : [];
+      if (applied.some((item) => item.toLowerCase().includes("dns"))) {
         setDnsFlushed(true);
-        notify("✅ Windows Kernel Tweaks applied successfully (TCP NoDelay, MTU Clamping, DNS Flushed)!");
+      }
+      if (applied.length > 0 && failed.length === 0) {
+        notify(`✅ ${data.status || "Optimizations applied"}: ${applied.join(", ")}`);
+      } else if (applied.length > 0) {
+        notify(`⚠️ ${data.status || "Partially applied"}. Applied: ${applied.join(", ")}. Failed: ${failed.join(", ")}`);
+      } else if (failed.length > 0) {
+        notify(`❌ No system tweak was applied. Failed: ${failed.join(", ")}`);
       } else {
-        setDnsFlushed(true);
-        notify("✅ Windows Network Tweaks applied!");
+        notify(data.status || "Preferences saved.");
       }
     } catch {
-      setDnsFlushed(true);
-      notify("✅ Windows Network Tweaks applied!");
+      notify("❌ Could not reach the local Lagvex service; no tweaks were applied.");
     }
   };
 
@@ -1486,7 +1572,7 @@ export default function App() {
               <button onClick={() => setIsAddingGame(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
             </div>
             <p className="text-xs text-white/50">
-              Register any game executable. Lagvex will apply kernel QoS, MTU boundary clamping, and low-latency tunnel routing automatically.
+              Register a game executable and the verified server CIDRs it connects to. Lagvex only routes those subnets through the tunnel; traffic outside them stays direct.
             </p>
 
             <div className="flex flex-col gap-1.5">
@@ -1509,6 +1595,20 @@ export default function App() {
                 placeholder="e.g. Cyberpunk2077.exe, GTA5.exe..."
                 className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-mono outline-none focus:border-[#00F0FF]"
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Verified Server CIDRs (required)</label>
+              <textarea
+                value={newGameCidrs}
+                onChange={(e) => setNewGameCidrs(e.target.value)}
+                placeholder="e.g. 203.0.113.0/24, 198.51.100.0/24"
+                rows={2}
+                className="px-4 py-3 rounded-xl bg-[#121c2a] border border-[#23354b] text-xs text-white font-mono outline-none focus:border-[#00F0FF] resize-none"
+              />
+              <span className="text-[10px] text-white/35">
+                One or more IPv4/IPv6 prefixes, separated by commas, spaces or new lines.
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1587,6 +1687,21 @@ export default function App() {
                 placeholder="e.g. 104.28.19.42:4433"
                 className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-mono outline-none focus:border-[#00F0FF]"
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-brand font-bold text-white/40 uppercase">Relay PSK</label>
+              <input
+                type="password"
+                value={newNodePsk}
+                onChange={(e) => setNewNodePsk(e.target.value)}
+                placeholder="PSK printed by your relay installer"
+                autoComplete="off"
+                className="h-[44px] px-4 rounded-xl bg-[#121c2a] border border-[#23354b] text-sm text-white font-mono outline-none focus:border-[#00F0FF]"
+              />
+              <span className="text-[10px] text-white/35">
+                Stored locally and never returned by the API. A relay cannot be probed or used without its PSK.
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1718,19 +1833,19 @@ export default function App() {
             {isAdmin ? (
               <div
                 className="h-[38px] px-3.5 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center gap-2 text-xs font-brand font-bold text-[#10b981]"
-                title={`Kernel Driver Active: ${driverName} virtual adapter operational with Ring-0 packet interception`}
+                title={`Running with administrator rights. Tunnel adapter: ${driverName}.`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#10b981] shadow-[0_0_8px_#10b981]" />
-                <span>Kernel Mode ({driverName})</span>
+                <span>Elevated &bull; {driverName}</span>
               </div>
             ) : (
               <button
                 onClick={handleRelaunchAdmin}
                 className="h-[38px] px-3.5 rounded-xl bg-[#f59e0b]/15 hover:bg-[#f59e0b]/25 border border-[#f59e0b]/40 flex items-center gap-2 text-xs font-brand font-bold text-[#f59e0b] cursor-pointer transition-all shadow group"
-                title={`Click to elevate with Administrator privileges for hardware ${driverName} driver acceleration`}
+                title={`Administrator rights may be required to create the ${driverName} adapter. Click to request elevation.`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b] animate-pulse" />
-                <span>Userspace Mode &bull; Run as Admin &#x2197;</span>
+                <span>Standard user &bull; Elevate &#x2197;</span>
               </button>
             )}
 
@@ -1793,7 +1908,7 @@ export default function App() {
                     Welcome back, <span className="text-[#00F0FF]">{gamerNickname}</span>!
                   </h2>
                   <p className="text-xs text-white/60 leading-relaxed">
-                    Lagvex operates directly on Layer-3 network sockets to eliminate jitter, throttle bufferbloat, and prioritize competitive UDP traffic through dedicated high-speed routes.
+                    Lagvex routes only the selected game server subnets through a low-latency relay, leaving the rest of your traffic on the direct path. Connect to see live engine RTT and loss.
                   </p>
                   <div className="flex items-center gap-3 pt-2">
                     <button
@@ -1818,7 +1933,9 @@ export default function App() {
                 <div className="p-5 rounded-2xl bg-[#090e15]/90 border border-[#1c2738] flex flex-col gap-3 min-w-[280px] shadow-xl z-10">
                   <span className="text-[10px] font-brand font-bold text-white/50 uppercase tracking-wider flex items-center justify-between">
                     <span>YOUR LOCAL NETWORK</span>
-                    <span className="text-[#10b981] font-mono">100% HEALTH</span>
+                    <span className="text-[#10b981] font-mono">
+                      {networkDiag && networkDiag.ispPingMs > 0 ? "ONLINE" : "MEASURING"}
+                    </span>
                   </span>
                   <div className="flex flex-col gap-2 font-mono text-xs">
                     <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
@@ -1828,13 +1945,17 @@ export default function App() {
                     <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
                       <span className="text-white/50">Gateway LAN:</span>
                       <span className="text-[#00F0FF] font-bold">
-                        {networkDiag ? `${networkDiag.lanPingMs}ms (${networkDiag.gateway})` : "1.2ms (192.168.1.1)"}
+                        {networkDiag && networkDiag.lanPingMs > 0
+                          ? `${networkDiag.lanPingMs}ms (${networkDiag.gateway})`
+                          : "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
                       <span className="text-white/50">ISP Direct Latency:</span>
                       <span className="text-[#10b981] font-bold">
-                        {networkDiag ? `${networkDiag.ispPingMs}ms (Fiber Anycast)` : "23.5ms (Fiber)"}
+                        {networkDiag && networkDiag.ispPingMs > 0
+                          ? `${networkDiag.ispPingMs}ms`
+                          : "—"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
@@ -1858,8 +1979,8 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-5">
-                  {OFFICIAL_GAMES.slice(0, 4).map((game) => {
-                    const originalIdx = OFFICIAL_GAMES.findIndex((g) => g.id === game.id);
+                  {games.slice(0, 4).map((game) => {
+                    const originalIdx = games.findIndex((g) => g.id === game.id);
                     const isCurrentActive = isBoosting && selectedGame.id === game.id;
                     const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
                     return (
@@ -1882,6 +2003,11 @@ export default function App() {
                           <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur text-[10px] font-brand font-bold text-[#00F0FF] border border-white/10">
                             {game.tag}
                           </span>
+                          {detectedGames[game.id]?.running && (
+                            <span className="absolute top-3 left-3 px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
+                              RUNNING
+                            </span>
+                          )}
                         </div>
 
                         <div className="p-4 flex flex-col gap-2 flex-1">
@@ -1895,7 +2021,7 @@ export default function App() {
                               <>
                                 <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                   <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                  <span>{Math.round(livePing)} ms</span>
+                                  <span>{livePing > 0 ? `${Math.round(livePing)} ms` : "—"}</span>
                                 </div>
                                 <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                   TUNNEL LIVE
@@ -1907,7 +2033,7 @@ export default function App() {
                                   <span className="text-[#00F0FF]/85 font-medium truncate">{protocolRoute}</span>
                                 </div>
                                 <span className="text-[10px] font-brand font-semibold text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-md group-hover:border-[#00F0FF]/40 group-hover:text-[#00F0FF] transition-colors duration-200">
-                                  FastPath Ready
+                                  {game.profileAvailable ? "Profile Ready" : "Profile Pending"}
                                 </span>
                               </>
                             )}
@@ -1958,8 +2084,36 @@ export default function App() {
                           </span>
                         </div>
                         <p className="text-xs text-white/50 font-medium">
-                          {selectedGame.publisher} &bull; {gameTelemetry[selectedGame.id]?.region || selectedGame.region}
+                          {selectedGame.publisher} &bull; {selectedRegion?.name || selectedGame.region}
                         </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {selectedGame.profileAvailable ? (
+                            <>
+                              <span className="text-[9px] font-brand font-bold text-white/35 uppercase tracking-wider">
+                                Server region
+                              </span>
+                              <select
+                                value={selectedRegion?.id || ""}
+                                onChange={(e) => setSelectedRegionId(e.target.value)}
+                                disabled={isBoosting}
+                                className="h-7 max-w-[260px] px-2 rounded-lg bg-[#111b28] border border-[#24364b] text-[11px] font-mono text-[#00F0FF] outline-none focus:border-[#00F0FF] disabled:opacity-60"
+                              >
+                                {(selectedGame.regions || []).map((region) => (
+                                  <option key={region.id} value={region.id}>
+                                    {region.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <span className="text-[9px] font-mono text-white/30">
+                                {selectedRegion?.cidrs.length || 0} CIDRs
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[10px] font-brand font-bold text-[#f59e0b]">
+                              No verified region profile — add server CIDRs with “Add Custom Game” to enable routing.
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -1972,14 +2126,20 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
-                            {isBoosting ? Math.round(livePing) : (selectedRelay.pingMs > 0 ? Math.round(selectedRelay.pingMs) : 18)}
+                            {isBoosting && livePing > 0
+                              ? Math.round(livePing)
+                              : selectedRelay.pingMs > 0
+                              ? Math.round(selectedRelay.pingMs)
+                              : "—"}
                           </span>
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-brand text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
-                          <span>⚡</span> {isBoosting 
-                            ? `Zero Bufferbloat • Sub-millisecond Jitter`
-                            : `Direct Peering via ${selectedRelay.name || "Optimal Relay"} • Ready`}
+                          <span>⚡</span> {isBoosting && livePing > 0
+                            ? "Live RTT measured by the tunnel engine"
+                            : isBoosting
+                            ? "Waiting for the first tunnel RTT sample"
+                            : `Relay probe via ${selectedRelay.name || "Auto"} • Not connected`}
                         </span>
                       </div>
 
@@ -1990,12 +2150,14 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-white tracking-tight">
-                            {packetLoss.toFixed(1)}
+                            {isBoosting && packetLoss !== null ? packetLoss.toFixed(1) : "—"}
                           </span>
                           <span className="font-mono text-sm text-white/50 font-bold">%</span>
                         </div>
                         <span className="text-[10px] font-mono text-[#10b981] mt-1 font-semibold">
-                          Zero-Drop Forward Error Correction
+                          {isBoosting && packetLoss !== null
+                            ? "Estimated from missed relay keepalives"
+                            : "Connect to measure"}
                         </span>
                       </div>
 
@@ -2006,12 +2168,12 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-white tracking-tight">
-                            &plusmn;{jitter}
+                            {isBoosting && jitter > 0 ? `±${jitter}` : "—"}
                           </span>
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-mono text-[#00F0FF] mt-1 font-semibold">
-                          Ultra-Stable FastPath
+                          {isBoosting && jitter > 0 ? "Mean RTT variation" : "Connect to measure"}
                         </span>
                       </div>
                     </div>
@@ -2020,18 +2182,28 @@ export default function App() {
                     <div className="flex items-center gap-3 pt-2">
                       <button
                         onClick={handleToggleBoost}
-                        disabled={isConnecting}
+                        disabled={isConnecting || (!isBoosting && (!selectedGame.profileAvailable || !selectedRegion || selectedRelay.id === "none"))}
                         className={`h-[50px] px-8 rounded-2xl flex items-center gap-3 font-brand font-extrabold text-sm uppercase tracking-wider cursor-pointer border-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xl ${
                           isBoosting
                             ? "bg-[#ef4444] hover:bg-[#dc2626] text-white shadow-red-500/20 active:scale-[0.98]"
                             : isConnecting
                             ? "bg-[#00F0FF]/70 text-black cursor-wait"
+                            : !selectedGame.profileAvailable || !selectedRegion || selectedRelay.id === "none"
+                            ? "bg-white/10 text-white/40 cursor-not-allowed"
                             : "bg-[#00F0FF] hover:bg-[#33f3ff] text-[#051119] shadow-[#00F0FF]/30 hover:scale-[1.02] active:scale-[0.98]"
                         }`}
                       >
                         <IconBolt className={`w-5 h-5 ${isConnecting ? "animate-spin" : isBoosting ? "animate-glow-pulse text-white" : ""}`} />
                         <span>
-                          {isBoosting ? "STOP ACCELERATION" : isConnecting ? "CONNECTING..." : "BOOST NOW"}
+                          {isBoosting
+                            ? "STOP ACCELERATION"
+                            : isConnecting
+                            ? "CONNECTING..."
+                            : !selectedGame.profileAvailable || !selectedRegion
+                            ? "PROFILE REQUIRED"
+                            : selectedRelay.id === "none"
+                            ? "RELAY REQUIRED"
+                            : "BOOST NOW"}
                         </span>
                       </button>
 
@@ -2050,6 +2222,12 @@ export default function App() {
                         CHANGE GAME
                       </button>
                     </div>
+
+                    {connectionError && (
+                      <div className="p-3 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/30 text-[11px] text-[#fca5a5] font-mono leading-relaxed">
+                        Tunnel error: {connectionError}
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Hero Artwork */}
@@ -2102,6 +2280,18 @@ export default function App() {
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">{gamerNickname} (PC)</span>
                       <span className="text-[9px] font-mono text-white/40">127.0.0.1</span>
+                      <span
+                        className={`text-[9px] font-mono ${detectedGames[selectedGame.id]?.running ? "text-[#10b981]" : "text-white/30"}`}
+                        title={
+                          detectedGames[selectedGame.id]?.running
+                            ? `Process scan found ${detectedGames[selectedGame.id]?.matchedProcess || "a game process"}`
+                            : "The local process scan has not found this game's process yet"
+                        }
+                      >
+                        {detectedGames[selectedGame.id]?.running
+                          ? `${detectedGames[selectedGame.id]?.matchedProcess || "game"} running`
+                          : "game process not detected"}
+                      </span>
                     </div>
 
                     {/* Connecting Hop 1 -> 2 */}
@@ -2112,7 +2302,7 @@ export default function App() {
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-[#00F0FF] font-bold mt-1">
-                        {networkDiag ? `${networkDiag.lanPingMs} ms (LAN)` : "1.2 ms (LAN)"}
+                        {networkDiag && networkDiag.lanPingMs > 0 ? `${networkDiag.lanPingMs} ms (LAN)` : "—"}
                       </span>
                     </div>
 
@@ -2133,7 +2323,11 @@ export default function App() {
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-[#00F0FF] font-bold mt-1">
-                        {isBoosting ? `${selectedRelay.pingMs || Math.round(livePing)} ms` : `${selectedRelay.pingMs || 25} ms`}
+                        {isBoosting && livePing > 0
+                          ? `${Math.round(livePing)} ms`
+                          : selectedRelay.pingMs > 0
+                          ? `${selectedRelay.pingMs} ms`
+                          : "—"}
                       </span>
                     </div>
 
@@ -2143,7 +2337,7 @@ export default function App() {
                         {selectedRelay.flag}
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">{selectedRelay.cleanName}</span>
-                      <span className="text-[9px] font-mono text-[#00F0FF]">FastRoute Node</span>
+                      <span className="text-[9px] font-mono text-[#00F0FF]">Relay Node</span>
                     </div>
 
                     {/* Connecting Hop 3 -> 4 */}
@@ -2154,7 +2348,7 @@ export default function App() {
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-[#10b981] font-bold mt-1">
-                        {isBoosting ? "Bypass Active" : "Direct Peering"}
+                        {isBoosting ? "Relay Active" : "Direct Peering"}
                       </span>
                     </div>
 
@@ -2165,7 +2359,7 @@ export default function App() {
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">{selectedGame.name} Server</span>
                       <span className="text-[9px] font-mono text-white/40">
-                        {gameTelemetry[selectedGame.id]?.region || selectedGame.region}
+                        {selectedRegion?.name || selectedGame.region}
                       </span>
                     </div>
                   </div>
@@ -2184,7 +2378,7 @@ export default function App() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
                                 <span>{proc}</span>
                               </span>
-                              <span className="text-[10px] text-white/40">Intercepted</span>
+                              <span className="text-[10px] text-white/40">{isBoosting ? "Watched" : "Idle"}</span>
                             </div>
                           ))}
                         </div>
@@ -2195,7 +2389,7 @@ export default function App() {
                           ACTIVE IP CIDR SUBNETS
                         </span>
                         <div className="flex flex-col gap-1.5 font-mono text-xs text-white/80 max-h-[110px] overflow-y-auto">
-                          {selectedGame.cidrs.map((cidr) => (
+                          {(selectedRegion?.cidrs || []).map((cidr) => (
                             <div key={cidr} className="flex items-center justify-between p-1.5 rounded bg-white/[0.02]">
                               <span className="flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]" />
@@ -2204,6 +2398,11 @@ export default function App() {
                               <span className="text-[10px] text-[#00F0FF]">Split-Tunnel</span>
                             </div>
                           ))}
+                          {(selectedRegion?.cidrs || []).length === 0 && (
+                            <span className="text-[10px] text-[#f59e0b]">
+                              No verified CIDRs for this game/region.
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2211,10 +2410,10 @@ export default function App() {
                     <div className="mt-4 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
-                          REAL-TIME PING OSCILLOSCOPE (128Hz)
+                          LIVE ENGINE RTT SAMPLES
                         </span>
                         <span className="text-[10px] font-mono text-white/45">
-                          Avg: {Math.round(livePing)}ms &bull; Jitter: &plusmn;{jitter}ms
+                          Latest: {livePing > 0 ? `${Math.round(livePing)}ms` : "—"} &bull; Jitter: {isBoosting && jitter > 0 ? `±${jitter}ms` : "—"}
                         </span>
                       </div>
                       <div className="h-[120px] w-full rounded-lg overflow-hidden bg-black/40">
@@ -2274,7 +2473,7 @@ export default function App() {
               {/* Game Cards Grid */}
               <div className="grid grid-cols-4 gap-5">
                 {filteredGames.map((game) => {
-                  const originalIdx = OFFICIAL_GAMES.findIndex((g) => g.id === game.id);
+                  const originalIdx = games.findIndex((g) => g.id === game.id);
                   const isCurrent = selectedGame.id === game.id;
                   const isCurrentActive = isBoosting && isCurrent;
                   const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
@@ -2301,6 +2500,11 @@ export default function App() {
                         <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/70 backdrop-blur text-[10px] font-brand font-bold text-[#00F0FF] border border-white/10">
                           {game.tag}
                         </span>
+                        {detectedGames[game.id]?.running && (
+                          <span className="absolute top-3 left-3 px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
+                            RUNNING
+                          </span>
+                        )}
                       </div>
 
                       {/* Game Info */}
@@ -2316,7 +2520,7 @@ export default function App() {
                             <>
                               <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                 <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                <span>{Math.round(livePing)} ms</span>
+                                <span>{livePing > 0 ? `${Math.round(livePing)} ms` : "—"}</span>
                               </div>
                               <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                 TUNNEL LIVE
@@ -2328,7 +2532,7 @@ export default function App() {
                                 <span className="text-[#00F0FF]/85 font-medium truncate">{protocolRoute}</span>
                               </div>
                               <span className="text-[10px] font-brand font-semibold text-white/60 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-md group-hover:border-[#00F0FF]/40 group-hover:text-[#00F0FF] transition-colors duration-200">
-                                FastPath Ready
+                                {game.profileAvailable ? "Profile Ready" : "Profile Pending"}
                               </span>
                             </>
                           )}
@@ -2351,13 +2555,13 @@ export default function App() {
                 <div className="max-w-[720px] flex flex-col gap-2">
                   <div className="flex items-center gap-2 text-xs font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
                     <IconSquadUsers className="w-4 h-4" />
-                    <span>SQUAD MULTI-ROUTING SYNC</span>
+                    <span>SQUAD ROSTER</span>
                   </div>
                   <h2 className="font-brand font-extrabold text-2xl text-white">
-                    Synchronize Team Latency & Eliminate Desync
+                    Keep Your Party Together
                   </h2>
                   <p className="text-xs text-white/60 leading-relaxed">
-                    When playing ranked matches in a party, teammates on different regional ISPs and carriers often suffer from disparate routes, desync, and audio jitter. Squad Sync locks all party members into the same high-speed Lagvex Super-Node, keeping latency delta below 1ms.
+                    Squad rooms share a live roster and each member's reported RTT. They do not change relay selection or game routing. Rooms are relayed through the connected relay; without one, a room only exists on this machine.
                   </p>
                 </div>
 
@@ -2387,7 +2591,7 @@ export default function App() {
                         Create a Squad Room
                       </h3>
                       <p className="text-xs text-white/50 leading-relaxed">
-                        Start a new party as Host. You will receive a unique shareable Room Code and 1-click Discord link. All joining teammates will be routed through your node.
+                        Start a party as Host. You get a Room Code to share and everyone who joins appears in the same roster. Squad members still connect through their own relay.
                       </p>
                     </div>
 
@@ -2411,7 +2615,7 @@ export default function App() {
                         Join Teammate's Squad
                       </h3>
                       <p className="text-xs text-white/50 leading-relaxed">
-                        Enter the 8-digit Room Code provided by your party leader to align your WireGuard route with their party node.
+                        Enter the Room Code from your party leader to join their roster. Joining does not change your relay or game route.
                       </p>
                     </div>
 
@@ -2444,39 +2648,19 @@ export default function App() {
                           {currentSquadRoom}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard?.writeText(currentSquadRoom);
-                            notify("Copied Squad Room Code to clipboard!");
-                          }}
-                          className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white font-brand text-xs font-bold flex items-center gap-1.5 cursor-pointer border-none transition-all"
-                        >
-                          <IconCopy className="w-4 h-4" />
-                          <span>Copy Code</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard?.writeText(`lagvex://squad/${currentSquadRoom}`);
-                            notify("Copied Direct Invite Link!");
-                          }}
-                          className="px-3 py-2 rounded-xl bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF] font-brand text-xs font-bold flex items-center gap-1.5 cursor-pointer border-none transition-all"
-                        >
-                          <span>Copy Link</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard?.writeText(currentSquadRoom);
+                          notify("Copied Squad Room Code to clipboard!");
+                        }}
+                        className="px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white font-brand text-xs font-bold flex items-center gap-1.5 cursor-pointer border-none transition-all"
+                      >
+                        <IconCopy className="w-4 h-4" />
+                        <span>Copy Code</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {/* Teammate Demo Join button */}
-                      <button
-                        onClick={handleSimulateTeammateJoin}
-                        className="px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/10 text-white/70 font-brand text-xs font-medium cursor-pointer border border-white/10"
-                        title="Simulate a friend joining with code for test verification"
-                      >
-                        + Demo Teammate Join
-                      </button>
-
                       <button
                         onClick={handleLeaveSquadRoom}
                         className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-brand text-xs font-bold cursor-pointer border border-red-500/20 transition-all"
@@ -2492,13 +2676,9 @@ export default function App() {
                       <h3 className="font-brand font-bold text-base text-white">
                         Squad Party Members ({squadMembers.length}/5)
                       </h3>
-                      <button
-                        onClick={() => notify("⚡ Party routes re-synchronized with Singapore SDR Node!")}
-                        className="flex items-center gap-1.5 text-xs font-brand font-bold text-[#00F0FF] hover:underline cursor-pointer border-none bg-transparent"
-                      >
-                        <IconRefresh className="w-3.5 h-3.5" />
-                        <span>Synchronize Latency</span>
-                      </button>
+                      <span className="text-[10px] font-mono text-white/40">
+                        Reported by each member
+                      </span>
                     </div>
 
                     <div className="flex flex-col gap-2.5">
@@ -2528,19 +2708,19 @@ export default function App() {
                                 )}
                               </div>
                               <span className="text-[10px] text-white/40 font-mono">
-                                {member.isp} &bull; {member.game}
+                                {member.game || "Game not reported"}
+                                {member.isp ? ` \u2022 Gateway ${member.isp}` : ""}
                               </span>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-6">
                             <div className="flex flex-col items-end">
-                              <span className="font-mono font-bold text-xs text-[#10b981]">{member.ping} ms</span>
-                              <span className="text-[9px] text-white/40">Latency</span>
+                              <span className="font-mono font-bold text-xs text-[#10b981]">
+                                {member.ping > 0 ? `${member.ping} ms` : "—"}
+                              </span>
+                              <span className="text-[9px] text-white/40">Reported RTT</span>
                             </div>
-                            <span className="text-[10px] font-brand font-bold text-[#00F0FF] bg-[#00F0FF]/10 px-2.5 py-1 rounded-full border border-[#00F0FF]/20">
-                              {member.status}
-                            </span>
                           </div>
                         </div>
                       ))}
@@ -2565,9 +2745,9 @@ export default function App() {
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-brand font-extrabold text-2xl text-white">Global Routing Infrastructure</h2>
+                  <h2 className="font-brand font-extrabold text-2xl text-white">Relay Nodes</h2>
                   <p className="text-xs text-white/50">
-                    Tier-1 Anycast relay backbone connected directly to Valve SDR, Riot Direct, and AWS Gamelift.
+                    Relays configured in this client. RTT and loss come from the local prober; no public nodes are bundled. Add your own relay endpoint and PSK to begin.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2584,26 +2764,12 @@ export default function App() {
                         const res = await fetch("/api/probe-relays");
                         if (res.ok) {
                           const data = await res.json();
-                          if (Array.isArray(data) && data.length > 0) {
-                            const mapped: RelayNode[] = data.map((item: any) => {
-                              const { title, flag } = cleanNodeDisplayName(item.name || item.endpoint || item.address, item.location || "");
-                              const pMs = item.rttMedianMs !== undefined && item.rttMedianMs > 0
-                                ? Math.round(item.rttMedianMs * 10) / 10
-                                : (item.latencyMs || item.pingMs || 0);
-                              return {
-                                id: item.relayId || item.id || item.endpoint || item.address,
-                                name: item.name || item.endpoint || item.address,
-                                cleanName: title,
-                                address: item.endpoint || item.address,
-                                location: item.location || "Datacenter Node",
-                                country: item.continent || item.country || "GLOBAL",
-                                flag,
-                                pingMs: pMs,
-                                quality: pMs > 0 && pMs < 160 ? 98 : (pMs > 0 ? 88 : 70)
-                              };
-                            });
-                            setRelays(mapped);
-                            notify("✅ All global node latencies refreshed from active socket probes!");
+                          const mapped = mapProbeRelays(data);
+                          setRelays(mapped);
+                          if (mapped.length === 0) {
+                            notify("No relays are configured. Deploy a relay or add a custom node first.");
+                          } else {
+                            notify("✅ Relays reprobed with measured RTT and loss.");
                           }
                         }
                       } catch {
@@ -2651,6 +2817,15 @@ export default function App() {
                 </div>
               </div>
 
+              {filteredRelays.length === 0 && (
+                <div className="p-6 rounded-2xl bg-[#0a0f16] border border-[#1b2636] flex flex-col gap-2">
+                  <h3 className="font-brand font-bold text-sm text-white">No relay nodes configured</h3>
+                  <p className="text-xs text-white/50 leading-relaxed">
+                    Lagvex does not ship public community relays. Deploy your own relay on a Linux VPS, then add its endpoint and PSK with <strong className="text-white">+ Add Custom Node</strong>. On Linux you can also add <strong className="text-white">127.0.0.1:4433</strong> to start the embedded local relay with your own PSK.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 {filteredRelays.map((relay) => {
                   const originalIdx = relays.findIndex((r) => r.id === relay.id);
@@ -2679,14 +2854,39 @@ export default function App() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-white/40 font-mono mt-0.5">{relay.location}</p>
+                          <p className="text-xs text-white/40 font-mono mt-0.5">{relay.location || "No location set"}</p>
                           <p className="text-[10px] text-white/30 font-mono mt-1">{relay.address}</p>
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="font-mono font-black text-xl text-[#00F0FF]">{relay.pingMs} ms</span>
-                        <span className="text-[10px] text-[#10b981] font-semibold">Quality: {relay.quality}%</span>
+                      <div className="flex items-center gap-5">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`font-mono font-black text-xl ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
+                            {relay.reachable && relay.pingMs > 0 ? `${relay.pingMs} ms` : "—"}
+                          </span>
+                          <span className={`text-[10px] font-semibold ${relay.reachable ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                            {relay.reachable
+                              ? `Loss: ${relay.packetLoss.toFixed(1)}%${relay.historySamples > 1 && relay.lossAvgPct > 0 ? ` (avg ${relay.lossAvgPct.toFixed(1)}%)` : ""}`
+                              : "Unreachable"}
+                          </span>
+                          <span className="text-[9px] font-mono text-white/35">
+                            {relay.historySamples > 0 ? `${relay.historySamples} probe${relay.historySamples === 1 ? "" : "s"} kept` : "No probe history yet"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1 w-[110px]">
+                          <span className="text-[9px] font-brand font-bold text-white/30 uppercase tracking-wider">
+                            RTT history
+                          </span>
+                          <RttSparkline samples={relay.rttTrend} />
+                          <span className="text-[9px] font-mono text-white/40">
+                            {relay.historySamples > 1 && relay.rttAvgMs > 0
+                              ? `avg ${relay.rttAvgMs} ms \u00b1${relay.rttStdMs}`
+                              : relay.historySamples === 1
+                                ? "1 sample"
+                                : "\u2014"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2712,7 +2912,7 @@ export default function App() {
                       Router Queue Saturation & Bufferbloat Analysis
                     </h3>
                     <p className="text-xs text-white/60 max-w-[620px]">
-                      Bufferbloat causes sudden ping spikes when background tasks download or upload data. Lagvex tests genuine RTT differential under loaded TCP/UDP socket queues against global CDN edge nodes.
+                      Bufferbloat causes sudden ping spikes when background tasks download or upload data. Lagvex compares idle RTT with RTT during a TCP download burst; the result is reported only when both measurements succeed.
                     </p>
                   </div>
 
@@ -2775,9 +2975,9 @@ export default function App() {
 
               <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0d1624] to-[#0a121e] border border-[#1d2b3d] shadow-xl flex items-center justify-between">
                 <div>
-                  <h2 className="font-brand font-extrabold text-2xl text-white">Windows Network Kernel Tweaks</h2>
+                  <h2 className="font-brand font-extrabold text-2xl text-white">Windows Network Tweaks</h2>
                   <p className="text-xs text-white/60 mt-1 max-w-[600px]">
-                    Bypasses standard Windows packet buffering, optimizes socket TCP/IP stack, and prioritizes gaming UDP packets over background downloads.
+                    Runs supported Windows network commands: DNS cache flush, TCP auto-tuning, and optional MMCSS registry values. The result list shows exactly which commands succeeded. TCP_NODELAY and MTU preferences apply only to Lagvex sockets and its virtual adapter.
                   </p>
                 </div>
                 <button
@@ -2793,25 +2993,25 @@ export default function App() {
                 {[
                   {
                     title: "Disable Nagle's Algorithm (TCP NoDelay)",
-                    desc: "Eliminates TCP packet wait delays by immediately transmitting packets without waiting for full buffers.",
+                    desc: "Saved as a Lagvex preference for TCP sockets owned by the client. It does not change game or system-wide TCP settings.",
                     state: disableNagle,
                     setter: setDisableNagle
                   },
                   {
-                    title: "Multimedia Class Scheduler (MMCSS) Gaming Priority",
-                    desc: "Allocates dedicated CPU clock cycles to game network threads to prevent micro-stuttering.",
+                    title: "Multimedia Class Scheduler (MMCSS) Network Tuning",
+                    desc: "Sets the MMCSS NetworkThrottlingIndex and SystemResponsiveness registry values on Windows (requires administrator). It does not reserve CPU cores for games.",
                     state: mmcssPriority,
                     setter: setMmcssPriority
                   },
                   {
                     title: "Kernel Socket TCP_NODELAY Flag",
-                    desc: "Forces Windows socket layer to transmit real-time telemetry instantly.",
+                    desc: "Saved as a preference; TCP_NODELAY is not a global Windows switch and is applied only to Lagvex-owned sockets.",
                     state: tcpNoDelay,
                     setter: setTcpNoDelay
                   },
                   {
-                    title: "Auto MTU Clamping (1420 Bytes)",
-                    desc: "Prevents packet fragmentation over PPPoE/fiber connections, preventing sudden packet loss spikes.",
+                    title: "MTU Clamping Preference",
+                    desc: "Saved for the virtual adapter. On connect the adapter uses the MTU negotiated with the relay instead of a fixed value.",
                     state: mtuClamping,
                     setter: setMtuClamping
                   }
@@ -2844,13 +3044,15 @@ export default function App() {
               {dnsFlushed && (
                 <div className="p-4 rounded-2xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-center gap-2.5 text-xs text-[#10b981] font-brand font-bold">
                   <IconShieldCheck className="w-4 h-4" />
-                  <span>Windows Winsock stack reset and DNS Cache flushed. Full gaming throughput active.</span>
+                  <span>DNS resolver cache flushed by the local service.</span>
                 </div>
               )}
             </div>
           )}
         </div>
       </main>
+
+      <FloatingHUD />
     </div>
   );
 }

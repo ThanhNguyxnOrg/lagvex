@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-//go:embed index.html style.css app.js assets/* assets/games/*
+//go:embed index.html assets/* assets/games/*
 var EmbeddedFS embed.FS
 
 // GetFileSystem returns http.FileSystem prioritizing disk (if exists) for live editing,

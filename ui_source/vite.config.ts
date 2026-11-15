@@ -13,6 +13,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Static images already live in ../web/assets and are served directly by
+  // the Go binary. The old ui_source/public copy contained Git LFS pointer
+  // stubs and Vite would overwrite the real assets with them on every build.
+  publicDir: false,
   build: {
     outDir: '../web',
     emptyOutDir: false,
