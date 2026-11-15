@@ -67,7 +67,7 @@ Lagvex solves this physical routing limitation by inserting a dedicated high-per
 - 🚀 **Narrows the Transit Path**: Instead of dozens of unpredictable intermediate hops, your traffic travels via a single optimized UDP stream directly to your relay node.
 - 🎯 **Datacenter Proximity**: A relay located in the target region (e.g., Singapore) sits inside a high-bandwidth datacenter with Tier-1 connectivity. The distance from the relay to the game server (AWS `ap-southeast-1`, Valve SDR, or Riot Direct) is virtually negligible (< 1ms to 2ms).
 - 🛡️ **Wire-Speed Kernel NAT**: The Lagvex relay leverages Linux kernel `/dev/net/tun` and hardware IP masquerading, decapsulating packets in microseconds without injecting artificial delay.
-- 💎 **Eliminates Packet Loss**: By bypassing the congested public peering exchanges that domestic ISPs use, packet loss drops to 0%.
+- 💎 **Can Reduce Loss on Bad Routes**: When loss comes from a congested path your ISP uses, a relay on a different path can avoid it. Loss inside the last mile cannot be fixed by any relay; Lagvex reports every loss value it measures instead of promising zero.
 
 ---
 
@@ -77,14 +77,12 @@ Lagvex solves this physical routing limitation by inserting a dedicated high-per
 
 Lagvex is engineered with three clear tiers of access:
 
-1. 🎁 **Tier 1: Built-In Community Public Nodes (Zero Setup)**:  
-   The client ships with **14 pre-configured public community relay endpoints** across 5 continents (Singapore, Tokyo, Hong Kong, Seoul, Sydney, Frankfurt, London, Paris, Helsinki, US-East, US-West, São Paulo, and Bahrain). Casual players simply open the app, pick their game, and click **BOOST NOW**.
-2. 🤝 **Tier 2: The "1 Hosts for the Whole Squad" Model**:  
-   Only **one person** in a gaming team, Discord server, or net cafe needs to deploy a relay. The installer prints a shareable 1-click link:  
-   `lagvex://connect?endpoint=IP:PORT&psk=KEY&name=Squad`  
-   Teammates simply paste this link into the HUD and are connected immediately.
+1. 🧪 **Tier 1: Local Loopback Test (Linux only, zero cost)**:  
+   On Linux you can run the embedded relay on `127.0.0.1:4433` with your own PSK to verify the tunnel end to end. It is a test path, not a faster route.
+2. 🤝 **Tier 2: One Relay for the Whole Squad**:  
+   Only **one person** in a team, Discord server or net cafe needs to deploy a relay. Everyone else adds the same endpoint and PSK in **+ Add Node**. The installer never prints a share link: a link would need to carry the PSK, so the PSK stays out of URLs and snapshots.
 3. 🛠️ **Tier 3: Dedicated Self-Hosters & Cyber Cafes**:  
-   Only competitive players who demand 100% private bandwidth or cyber cafe owners optimizing 50+ LAN PCs need to run their own private relay node.
+   Players who want a private relay, or net cafe owners optimising 50+ LAN PCs, run their own node on a Linux VPS near the game region.
 
 ### ⚡ Ultra-Efficient Server Capacity:
 - 📊 **Resource Footprint**: The relay daemon consumes less than **15 MB of RAM** and negligible CPU overhead (< 2% on a single core).
@@ -127,14 +125,11 @@ Traditional commercial VPN services also use remote servers, but they route **10
 
 Ready to deploy your own relay? It takes under 60 seconds:
 
-- 🐧 **On Linux VPS**:
+- 🐧 **On a Linux VPS (KVM with `/dev/net/tun`)**:
   ```bash
   curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
   ```
-- 🪟 **On Windows 10/11 / Windows Server (PowerShell Admin)**:
-  ```powershell
-  irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
-  ```
+- 🚫 **Windows and macOS**: relay hosting is not supported. `scripts/install-relay.ps1` exits with an explanation; use a Linux VPS instead.
 
 For complete instructions on ports, firewall configuration, systemd services, and Docker Compose deployment, consult the [🚀 VPS Deployment Guide](DEPLOYMENT.md).
 

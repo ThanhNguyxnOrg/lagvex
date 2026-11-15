@@ -7,11 +7,14 @@
 
 ## 1. 📋 Profile Schema (`configs/profiles.json`)
 
-Lagvex utilizes a structured JSON schema to define game metadata, monitored executables, continent categorization, and regional server CIDR blocks:
+> `configs/profiles.json` is the source of truth. The per-game lists further down are
+> illustrative notes and can lag behind the catalog.
+
+Lagvex utilizes a structured JSON schema to define game metadata, monitored executables, continent labels, and regional server CIDR blocks:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "updatedUtc": "2026-09-12T00:00:00Z",
   "games": [
     {
@@ -26,8 +29,8 @@ Lagvex utilizes a structured JSON schema to define game metadata, monitored exec
       ],
       "regions": [
         {
-          "id": "apac-sg",
-          "continent": "apac",
+          "id": "asia-sg",
+          "continent": "Asia-Pacific",
           "name": "Singapore (SEA - Riot Direct & AWS)",
           "source": "Riot Direct AS6507 & AWS ap-southeast-1",
           "cidrs": [
@@ -53,32 +56,22 @@ Lagvex utilizes a structured JSON schema to define game metadata, monitored exec
       ]
     }
   ],
-  "relays": [
-    {
-      "id": "relay-sg-1",
-      "name": "🇸🇬 Singapore #1 [Community Free]",
-      "location": "Singapore, SG",
-      "endpoint": "198.51.100.10:51820",
-      "psk": "community_free_access_sg1"
-    },
-    {
-      "id": "relay-fra-1",
-      "name": "🇩🇪 Frankfurt #1 [Community Free]",
-      "location": "Frankfurt, Germany",
-      "endpoint": "198.51.100.20:51820",
-      "psk": "community_free_access_fra1"
-    }
-  ]
+  "relays": []
 }
 ```
 
+**The relay array must stay empty in the repository.** Lagvex ships no public relays and a
+test fails if a bundled `lagvex.org` node ever reappears. Each user adds their own relay
+endpoint and PSK in the dashboard; those live in the local user config, never in git.
+
 ### 🌍 Continent Identifiers
-The `continent` field in each regional block enables the HUD to group game servers into clean, intuitive `<optgroup>` clusters:
-- `apac`: 🌏 **Asia-Pacific** (Singapore, Tokyo, Hong Kong, Seoul, Sydney, Mumbai, Taiwan)
-- `eu`: 🌍 **Europe** (Frankfurt, London, Paris, Helsinki, Madrid)
-- `na`: 🌎 **North America** (US-East N. Virginia, US-West Oregon/California, US-Central Texas)
-- `sa`: 🌎 **South America** (São Paulo Brazil, Santiago Chile)
-- `mena`: 🌍 **Middle East & Africa** (Bahrain, Dubai, Johannesburg)
+The `continent` field is a display label. The dashboard groups regions by this exact string, so use the same labels as the catalog:
+- 🌏 **Asia-Pacific** (Singapore, Tokyo, Hong Kong, Seoul, Sydney, Mumbai, Taiwan)
+- 🌍 **Europe** (Frankfurt, London, Paris, Stockholm, Madrid)
+- 🌎 **North America** (US-East Virginia, US Central Dallas, US-West San Jose)
+- 🌎 **South America** (São Paulo)
+- 🌏 **Oceania** (Sydney)
+- 🌍 **Middle East & Africa** (Bahrain, Johannesburg)
 
 ---
 

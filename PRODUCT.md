@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Competitive esports gamers playing latency-sensitive multiplayer games (Valorant, Counter-Strike 2, Apex Legends, PUBG: BATTLEGROUNDS, League of Legends, Dota 2, Rainbow Six Siege, Overwatch 2) seeking lower round-trip time (RTT), jitter stabilization, and zero packet loss.
+Competitive esports gamers playing latency-sensitive multiplayer games (Valorant, Counter-Strike 2, Apex Legends, PUBG: BATTLEGROUNDS, League of Legends, Dota 2, Rainbow Six Siege, Overwatch 2) seeking lower round-trip time (RTT), jitter stabilization and measured packet loss — never a made-up number.
 
 ## Product Purpose
 
@@ -27,7 +27,7 @@ Desktop gaming environment (Windows, macOS, Linux). The dashboard runs locally o
 - High-performance Layer-3 virtual adapter (WinTun on Windows, utun on macOS, /dev/net/tun on Linux).
 - Authenticated ChaCha20-Poly1305 AEAD wire protocol with RFC 6479 anti-replay sliding window.
 - Multi-sample latency prober calculating median RTT, jitter, packet loss percentage, and composite gaming scores.
-- 14 global community relays (North America, Europe, Asia-Pacific, South America).
+- Bring-your-own relays: the catalog ships empty and every entry needs a real endpoint plus its PSK; squad rooms share a roster, not routes.
 - In-memory process watcher (`CreateToolhelp32Snapshot`) for instant, anti-cheat safe game detection.
 - Windows native IP Helper API route management and IPv6 leak prevention.
 

@@ -18,8 +18,8 @@ Lagvex was built from the ground up to solve the latency challenges of online ga
    - **Linux / Steam Deck**: Uses native **/dev/net/tun**.
 3. ⚡ **Pure Go Monorepo**:
    - Both the VPS Relay daemon (`lagvex-relay`) and the Client engine (`lagvex-client`) are written in Go. Zero-allocation data pipelines and buffer recycling via `sync.Pool` minimize GC pause times to preserve microsecond-level packet throughput.
-4. 🐧 **High-Performance Kernel-Level NAT (Linux & Windows)**:
-   - The relay server avoids slow user-space packet translation. On Linux, it writes raw IPv4 frames into `/dev/net/tun` (`lagvex0`) where the Linux kernel executes hardware-speed `iptables` NAT MASQUERADE, conntrack, and TCP MSS clamping. On Windows, it leverages NetNat packet masquerading and WinTun.
+4. 🐧 **High-Performance Kernel-Level NAT (Linux relay only)**:
+   - The relay server avoids slow user-space packet translation. It writes raw IPv4 frames into `/dev/net/tun` (`lagvex0`) where the Linux kernel executes hardware-speed `iptables` NAT MASQUERADE, conntrack, and TCP MSS clamping. Relay hosting needs Linux; Windows and macOS clients use WinTun/`utun` for the client side only.
 
 ---
 
@@ -162,7 +162,7 @@ To deliver competitive latency for players worldwide, Lagvex structures its serv
              US-East / US-West        São Paulo / Santiago    Bahrain / Dubai
 ```
 
-- **Optgroup Hierarchical Selectors**: The client UI dynamically parses `continent` attributes in `configs/profiles.json` to organize 105 regional server clusters into continent-based optical groups.
+- **Continent-grouped region selector**: The dashboard groups the catalog's regional server clusters by their `continent` label (Asia-Pacific, Europe, North America, South America, Oceania, Middle East & Africa) and only offers regions that have verified CIDRs.
 - **Relay Proximity Priority**: Built-in relay selection prioritizes geographically proximate nodes, minimizing intermediate undersea hops before entering dedicated game backbones (Riot Direct, Valve SDR, AWS Global Accelerator).
 
 ---

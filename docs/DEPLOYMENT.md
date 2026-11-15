@@ -52,28 +52,16 @@ curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/
 4. 🔑 **Generates Pre-Shared Key (PSK)**: Generates a cryptographically strong 32-character random key stored at `/etc/lagvex/psk.key`.
 5. 📦 **Installs Binary**: Downloads and installs `lagvex-relay` to `/usr/local/bin/lagvex-relay`.
 6. ⚙️ **Registers Systemd Service**: Creates `/etc/systemd/system/lagvex-relay.service` and activates it immediately.
-7. 📋 **Prints Squad Invite Link**: Outputs a ready-to-share link (`lagvex://connect?endpoint=IP:51820&psk=KEY&name=MySquad`) that friends can paste directly into their Lagvex HUD!
+7. 📋 **Prints Connection Details**: Outputs the relay endpoint, UDP port and the generated PSK. Add these in the dashboard with **+ Add Node**; a relay cannot be probed or used without its PSK.
 
 ---
 
-### 🪟 Option B: Host on Windows 10/11 or Windows Server (PowerShell)
+### 🪟 Option B: Windows or macOS hosting — not supported
 
-If you have a Windows PC or Windows Server with a public IP or port-forwarded router:
-
-1. Right-click the **Start Menu** and choose **PowerShell (Admin)** or **Terminal (Admin)**.
-2. Run this command:
-
-```powershell
-irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
-```
-
-**Step-by-step what the Windows installer does automatically:**
-1. 🛡️ **Checks Elevation**: Verifies script runs with local Administrator privileges.
-2. 🔌 **Configures WinTun**: Checks for `wintun.dll` and configures the Layer-3 adapter interface.
-3. ⚡ **Enables Routing**: Executes `Set-NetIPInterface -Forwarding Enabled` across network interfaces.
-4. 🌐 **Configures NetNat**: Provisions Windows NetNat masquerading for `10.88.0.0/24` to route client packets to the Internet.
-5. 🔑 **Generates Security Key**: Creates a 32-character PSK stored securely at `C:\ProgramData\Lagvex\relay.json`.
-6. 📋 **Prints 1-Click Link**: Shows your public IP, Port 51820, and generates your squad share link ready to paste!
+Relay hosting requires a Linux kernel TUN device (`/dev/net/tun`) plus `iptables`/NAT
+forwarding. Windows and macOS cannot host a relay; `scripts/install-relay.ps1` exits with
+an explanation instead of installing a broken service. Use a small Linux VPS (KVM) — see
+the requirements above.
 
 ---
 

@@ -191,17 +191,10 @@ echo -e "  Server IP  : ${BOLD}${PUBLIC_IP}${NC}"
 echo -e "  UDP Port   : ${BOLD}${PORT}${NC}"
 echo -e "  PSK Key    : ${BOLD}${YELLOW}${PSK}${NC}"
 echo ""
-echo -e "${YELLOW}${BOLD}🤝 1-CLICK SQUAD SHARE LINK (Send this link to your teammates/friends):${NC}"
-echo -e "  ${BOLD}${CYAN}lagvex://connect?endpoint=${PUBLIC_IP}:${PORT}&psk=${PSK}&name=SquadRelay${NC}"
-echo -e "  ${WHITE}(Your friends just download Lagvex, click '🤝 Join Squad', and paste this link!)${NC}"
+echo -e "${YELLOW}${BOLD}SECURITY NOTE:${NC} the PSK is a secret. Do not paste it into chat, URLs,"
+echo -e "${YELLOW}screenshots or support tickets, and never commit it to git.${NC}"
 echo ""
-echo -e "${CYAN}Or add manually to configs/profiles.json:${NC}"
-cat << EOF
-{
-  "id": "my-vps-relay",
-  "name": "Custom VPS Relay",
-  "endpoint": "${PUBLIC_IP}:${PORT}",
-  "psk": "${PSK}"
-}
-EOF
+echo -e "${CYAN}Add the relay in the Lagvex dashboard: ${BOLD}Relay Nodes -> + Add Node${NC}"
+echo -e "  Endpoint : ${BOLD}${PUBLIC_IP}:${PORT}${NC}"
+echo -e "  PSK      : printed above (also stored locally at ${CONF_DIR}/psk.key)"
 echo -e "${GREEN}${BOLD}===================================================================${NC}"

@@ -13,7 +13,7 @@
   - [🏢 Step 2.2: Identify ASN & Datacenter Providers](#-step-22-identify-asn--datacenter-providers)
   - [🎯 Step 2.3: Narrow Subnet CIDRs (The Non-Interference Rule)](#-step-23-narrow-subnet-cidrs-the-non-interference-rule)
   - [📋 Step 2.4: Register in `configs/profiles.json`](#-step-24-register-in-configsprofilesjson)
-  - [🎨 Step 2.5: Add Vector SVG Insignia in `web/app.js`](#-step-25-add-vector-svg-insignia-in-webappjs)
+  - [🎨 Step 2.5: Optional Cover Art in the React Dashboard](#-step-25-optional-cover-art-in-the-react-dashboard)
   - [🧪 Step 2.6: Validate with Automated Tests](#-step-26-validate-with-automated-tests)
 - [🌐 3. Step-by-Step: Adding or Updating Relay Nodes](#-3-step-by-step-adding-or-updating-relay-nodes)
 - [🧪 4. Local Development & Quality Gates](#-4-local-development--quality-gates)
@@ -37,7 +37,7 @@ Thank you for contributing to **Lagvex**! Whether you are an open-source contrib
 
 ## 🎮 2. Step-by-Step: How to Add a New Game 🏆
 
-Adding a new game to Lagvex is simple and requires **no low-level driver programming**. You only need to discover the game's server destination CIDRs, update `configs/profiles.json`, and add an SVG emblem to `web/app.js`.
+Adding a new game to Lagvex is simple and requires **no low-level driver programming**. You only need to discover the game's server destination CIDRs and update `configs/profiles.json`; the dashboard renders new catalog entries automatically, with cover art optional.
 
 ```text
   ┌─────────────────────────┐
@@ -53,7 +53,7 @@ Adding a new game to Lagvex is simple and requires **no low-level driver program
   └────────────┬────────────┘
                ▼
   ┌─────────────────────────┐
-  │ 4. Update JSON & SVG    │ ➔ Add to configs/profiles.json and web/app.js
+  │ 4. Update the catalog   │ ➔ Add to configs/profiles.json
   └────────────┬────────────┘
                ▼
   ┌─────────────────────────┐
@@ -166,36 +166,24 @@ Open [`configs/profiles.json`](configs/profiles.json) and append your new game e
 - `icon`: Fallback Unicode emoji.
 - `processNames`: Array of exact executable names. The **Smart Process Watcher** uses these to automatically inject routes when the game starts and remove them when the game exits.
 - `regions`: Regional server groupings. Must include:
-  - `continent`: Valid continent code: `"apac"`, `"eu"`, `"na"`, `"sa"`, or `"mena"`. This organizes the UI server dropdown into clean `<optgroup>` clusters!
+  - `continent`: Label used by the dashboard to group server regions. Use the same labels as the existing catalog: `"Asia-Pacific"`, `"North America"`, `"Europe"`, `"South America"`, `"Oceania"` or `"Middle East & Africa"`.
   - `name`: Clean, human-readable label with city and cloud details.
   - `cidrs`: Array of valid IPv4 CIDR strings.
 
 ---
 
-### 🎨 Step 2.5: Add Vector SVG Insignia in `web/app.js` 🖌️
+### 🎨 Step 2.5: Optional Cover Art in the React Dashboard 🖌️
 
-Lagvex uses crisp, resolution-independent SVG emblems rather than blurry raster bitmaps or generic buttons:
+Profiles need **no UI change**: a game that exists only in the catalog is rendered with the
+Lagvex fallback art. If you want a cover image:
 
-1. Open [`web/app.js`](web/app.js).
-2. Locate the function `getGameLogoSvg(gameId)`.
-3. Add a new `case "game_slug":` block returning your inline SVG markup:
+1. Add the image to [`web/assets/games/`](web/assets/games/) (JPG/PNG, roughly 16:9).
+2. In [`ui_source/src/App.tsx`](ui_source/src/App.tsx), extend the `OFFICIAL_GAMES` entry
+   for the same id with `coverImg: "/assets/games/your-file.jpg"`.
+3. Rebuild the dashboard: `npm --prefix ui_source run build`.
 
-```javascript
-case "game_slug":
-  return `
-    <svg viewBox="0 0 100 100" class="game-svg-logo" aria-label="Game Title">
-      <rect width="100" height="100" rx="14" fill="#0e121a"/>
-      <!-- Clean vector paths here with vibrant accents -->
-      <path d="M50 15 L85 80 L15 80 Z" fill="#00F0FF"/>
-      <text x="50" y="70" text-anchor="middle" font-family="'Outfit', sans-serif" font-weight="900" font-size="16" fill="#FFF">GAME</text>
-    </svg>`;
-```
-
-#### SVG Guidelines:
-- `viewBox`: Always use `0 0 100 100`.
-- Class: Include `class="game-svg-logo"`.
-- Style: Use rounded squircle backgrounds (`rx="14"`) and colors consistent with the cyber/esports palette (`#00F0FF`, `#00FF88`, `#FF0055`, `#DE9B35`, `#FF4655`).
-- Keep markup lightweight (< 1.5 KB per SVG).
+The dashboard merges these curated entries with the backend catalog by id, so a profile
+with no matching entry still works; it simply uses the fallback artwork.
 
 ---
 
@@ -217,31 +205,24 @@ To test with the web dashboard, start the client:
 ```bash
 go run ./cmd/lagvex-client
 ```
-Open `http://127.0.0.1:18888` in your browser. Verify that your game card appears, the SVG renders cleanly, and the server dropdown displays your server regions organized under their respective continent headers.
+Open `http://127.0.0.1:18888` in your browser. Verify that your game card appears and the region selector lists your server regions with the continent labels from the catalog.
 
 ---
 
-## 🌐 3. Step-by-Step: Adding or Updating Relay Nodes 🛰️
+## 🌐 3. Relay Nodes Are Local, Not Committed 🛰️
 
-To contribute a new community relay node or update private endpoints:
+Lagvex does **not** ship or accept community relay entries. Dead or third-party endpoints
+made the dashboard claim nodes were available when they were not, so `configs/profiles.json`
+and `pkg/profiles/embedded/relays.json` stay empty and a test fails if a bundled node ever
+comes back.
 
-1. Open [`configs/profiles.json`](configs/profiles.json).
-2. Find the `"relays"` array.
-3. Add or modify a relay entry:
+Relays are part of each user's local setup:
 
-```json
-{
-  "id": "relay-syd-1",
-  "name": "🇦🇺 Sydney #1 [Community Free]",
-  "location": "Sydney, Australia",
-  "endpoint": "203.0.113.50:51820",
-  "psk": "community_free_access_syd1"
-}
-```
-
-- `endpoint`: Public IP or DDNS hostname with UDP listening port (`IP:PORT`).
-- `psk`: 32-character Pre-Shared Key.
-- `location`: Flag emoji + City, Country.
+1. Deploy a relay (see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)).
+2. In the dashboard, open **Relay Nodes → + Add Node** and enter the endpoint, location
+   and the relay's PSK. The PSK is stored in the local user config only.
+3. **Never put a PSK in a pull request, issue, diagnostics snapshot or screenshot.** The
+   API redacts PSKs and snapshots exclude them, but a manual paste would leak it.
 
 ---
 
@@ -289,7 +270,7 @@ docs(contributing): clarify Wireshark CIDR capture instructions
 ### ✅ PR Submission Checklist
 - [ ] Added game entry to `configs/profiles.json` with valid `processNames` and `continent` tags.
 - [ ] Verified destination CIDRs are narrow (`/18` to `/24`) and confirmed via live match packet captures.
-- [ ] Added vector SVG emblem into `web/app.js` with `viewBox="0 0 100 100"`.
+- [ ] (Optional) Added a cover image under `web/assets/games/` and matched it in `ui_source/src/App.tsx`.
 - [ ] Ran `go test ./...` and confirmed all tests pass.
 - [ ] Ran `golangci-lint run` (or `go vet ./...`) with zero errors.
 - [ ] Added notes in `CHANGELOG.md` under `## [Unreleased]`.

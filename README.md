@@ -5,299 +5,186 @@
 </p>
 
 <p align="center">
-  <img src="assets/banner.jpg" alt="Lagvex Banner" width="100%">
+  <strong>Open-source split-tunnel game latency accelerator</strong><br>
+  <em>🧭 Route-based, not hook-based • 📊 Measured telemetry only • 🛠️ Self-hosted relays</em>
 </p>
 
 <p align="center">
-  <strong>🔥 Open-Source Gaming Latency Reducer & Split-Tunneling Ping Booster 🔥</strong><br>
-  <em>⚡ Ultra-low ping • 🛡️ Zero memory injection • 🌐 Bypasses ISP throttling • 🛡️ Non-invasive kernel routing</em>
-</p>
-
-<p align="center">
-  <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go Version"></a>
+  <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go" alt="Go Version"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml"><img src="https://github.com/ThanhNguyxnOrg/lagvex/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://github.com/ThanhNguyxnOrg/lagvex"><img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform"></a>
   <a href="docs/DISCLAIMER.md"><img src="https://img.shields.io/badge/Anti--Cheat-Non--Invasive%20(No%20Hooks)-brightgreen" alt="Anti-Cheat: Non-Invasive"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.1.0-blueviolet" alt="Changelog"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-v1.2.0-blueviolet" alt="Changelog"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
 ---
 
-> [!CAUTION]
-> ### ⚠️ STRICT LEGAL DISCLAIMER & ZERO-LIABILITY NOTICE ⚠️
-> **PLEASE READ THIS BEFORE DOWNLOADING, BUILDING, OR USING LAGVEX:**
->
-> 🧪 **Academic & Research Purpose**: Lagvex is developed strictly as a free, open-source educational study on Layer-3 virtual network adapters and routing-table split tunneling.  
-> 🚫 **NO Game Tampering**: Lagvex contains **NO** cheats, hacks, or bypass mechanisms. It does not read game memory, hook functions, or inject code into any game process.  
-> ⛔ **ZERO LIABILITY FOR BANS**: Online game publishers (Riot Games, Valve, Krafton, EA, Activision, Ubisoft, etc.) enforce proprietary Terms of Service and automated anti-cheat systems. **Under NO circumstances shall the authors, maintainers, or contributors of Lagvex be held responsible or liable for any account bans, temporary suspensions, HWID penalties, competitive rank resets, or loss of in-game items/purchases resulting from your use of this software.**  
-> 👉 **YOU USE THIS SOFTWARE ENTIRELY AT YOUR OWN RISK.** For the complete legal agreement, see [docs/DISCLAIMER.md](docs/DISCLAIMER.md).
+## 🎯 What Lagvex Is
 
----
+Lagvex is a free, MIT-licensed alternative to commercial game boosters. It puts only
+your game's traffic on a faster route and leaves everything else on your normal
+internet connection:
 
-## 📖 Table of Contents 📑
+1. You deploy a small **relay** on a Linux VPS close to the game server (or run the
+   embedded relay locally on Linux for a loopback test).
+2. The client watches your game's server region **CIDR ranges** (and, optionally, the
+   exact peers your game process talks to) and installs routes for them.
+3. Those packets travel through an authenticated **ChaCha20-Poly1305 encrypted UDP
+   tunnel** to the relay, which forwards them to the game server.
 
-- [🎯 Why Lagvex?](#-why-lagvex)
-- [🎮 Supported Games](#-supported-games--105-global-server-clusters-)
-- [📚 Documentation & Deep Dives](#-documentation--deep-dives)
-- [🏗️ How It Works (Architecture)](#️-how-it-works-architecture)
-- [🚀 Quick Start](#-quick-start)
-  - [☁️ 1. Deploy Relay on VPS (One-Liner)](#️-1-deploy-relay-on-vps-one-liner)
-  - [💻 2. Run Client (Windows, macOS, Linux)](#-2-run-client-windows-macos-linux)
-- [🛠️ Building from Source](#️-building-from-source)
-- [🤝 Contributing & Adding Games](#-contributing--adding-games)
-- [⚖️ Full Disclaimer & Ban Liability Waiver](#️-full-disclaimer--ban-liability-waiver)
-- [📜 License](#-license)
+Lagvex touches **no game memory, injects no DLLs and hooks no sockets**. It works at
+the operating system routing layer, which is why it does not trigger kernel-level
+anti-cheat checks the way socket-hooking boosters can.
 
----
+> **Honesty first:** Lagvex only displays values it actually measured (probe RTT,
+> tunnel echo RTT, packet loss, process findings). Everything it cannot measure is
+> shown as `—` with the reason, never as an invented number.
 
-## 🎯 Why Lagvex? 💡
+## ✨ Features
 
-When playing competitive online games (like **Valorant, CS2, PUBG, or Apex Legends**), standard domestic ISP routing frequently travels over congested submarine fiber corridors, resulting in:
-- 📈 **High latency & ping spikes** (jumping from 30ms to 150ms+).
-- 📉 **Jitter & rubberbanding** during critical clutch rounds.
-- ❌ **Packet loss & choke** during peak evening hours (8:00 PM – 11:00 PM).
+- 🧭 **CIDR split tunneling** — only game server ranges enter the tunnel; browsers,
+  Discord and updates keep using your local ISP path.
+- 🎛️ **Peer routing (opt-in)** — reads the OS socket tables, routes `/32` routes for
+  the public IPs your game process is actually talking to (Linux/macOS observe UDP and
+  TCP; Windows exposes TCP peers only). Off by default.
+- 📊 **Measured node list** — per-relay RTT history: latest, average, standard
+  deviation, loss and a sparkline built from real probe runs.
+- 🗺️ **Route detail** — per-hop measurement (gateway, direct relay probe, live tunnel
+  echo, region cloud anchor) with explicit "not measured" reasons for segments the
+  client cannot observe.
+- 🪟 **Floating HUD** — an always-on-top overlay that reads the same `/api/status`
+  values and shows dashes until a sample exists.
+- 🧾 **Diagnostics snapshot** — export measured state plus non-secret settings for bug
+  reports; import merges them back (relay PSKs are never included).
+- 🛡️ **Adaptive FEC, failover and DSCP marking** — loss recovery and relay failover
+  with honest status reporting.
+- 🖥️ **Windows, macOS and Linux client** — WinTun, native `utun` and `/dev/net/tun`
+  respectively; one Go codebase, one React dashboard.
 
-### 🥊 Traditional Solutions vs. Lagvex
+## 🚀 Quick Start
 
-| Feature | 🌐 Commercial VPNs | 💉 Injected Boosters (WinDivert) | ⚡ **Lagvex (Split-Tunneling)** |
-|---|---|---|---|
-| **Routing Scope** | 🐌 100% of whole PC traffic | 🎮 Process hooked | 🎯 **Only Game Server CIDRs** |
-| **Discord / Browser Speed** | ⚠️ Ruined / Laggy | ✅ Direct | 🚀 **Full Gigabit Direct Speed** |
-| **Anti-Cheat Interaction** | 🟡 Full-tunnel proxy | 🔴 **HIGH RISK (DLL / Socket Hook ban)** | 🟢 **Non-Invasive (Layer-3 Routes Only, [See Terms](docs/DISCLAIMER.md))** |
-| **Memory Injection** | ❌ None | ⚠️ Intercepts sockets / memory | 🛡️ **Zero DLLs / Zero Memory hooks** |
-| **Monthly Subscription** | 💸 $8 – $13 / month | 💸 $7 – $10 / month | 🎁 **100% FREE & Open-Source (MIT)** |
-| **Self-Hostable** | ❌ Proprietary | ❌ Proprietary | ☁️ **1-Command Deploy on any VPS** |
+### 1. Deploy a relay (Linux VPS — required for real acceleration)
 
----
-
-## 🎮 Supported Games & 105 Global Server Clusters 🏆
-
-Lagvex includes pre-verified, narrow CIDR IP pools covering **105 regional server clusters across 5 continents** (Asia-Pacific, Europe, North America, South America, and Middle East / Africa):
-
-| Game Title | 🏷️ Genre | 🌐 Server Regions (5 Continents) | 🛡️ Anti-Cheat Compatibility |
-|---|---|---|---|
-| **Valorant** 🎯 | Tactical FPS | 🌏 APAC (SG, JP, HK, IN, KR, AU) • 🌍 EU (Frankfurt, London, Paris, Madrid) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) • 🌍 MENA (Bahrain) | ✅ Riot Vanguard |
-| **Counter-Strike 2 (CS2)** 💣 | Tactical FPS | 🌏 APAC (Singapore, Tokyo, Hong Kong, Seoul, Sydney) • 🌍 EU (Frankfurt, London, Helsinki, Madrid) • 🌎 NA (Virginia, Oregon) • 🌎 SA (São Paulo) (Valve SDR) | ✅ Valve Anti-Cheat (VAC) |
-| **PUBG: BATTLEGROUNDS** 🪂 | Battle Royale | 🌏 APAC (Singapore, Tokyo, Seoul) • 🌍 EU (Frankfurt, Ireland) • 🌎 NA (Virginia, Oregon) • 🌎 SA (São Paulo) (Azure & AWS) | ✅ BattlEye + Zakynthos |
-| **Apex Legends** ⚡ | Battle Royale | 🌏 APAC (Singapore, Tokyo, Taiwan, Sydney) • 🌍 EU (Frankfurt, London, Amsterdam) • 🌎 NA (Oregon, Virginia, Texas) • 🌎 SA (São Paulo) (EA Multiplay) | ✅ Easy Anti-Cheat |
-| **The Finals** 🏆 | Arena FPS | 🌏 APAC (Singapore, Tokyo) • 🌍 EU (Frankfurt, London) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) | ✅ Easy Anti-Cheat |
-| **Call of Duty: Warzone / MW3** 🎖️ | FPS / BR | 🌏 APAC (Singapore, Tokyo, Sydney) • 🌍 EU (Frankfurt, London) • 🌎 NA (US-East, US-West, Texas) • 🌎 SA (São Paulo) (Demonware) | ✅ RICOCHET Anti-Cheat |
-| **Delta Force: Hawk Ops** 🦅 | Tactical Shooter | 🌏 APAC (Singapore, Hong Kong, Tokyo) • 🌍 EU (Frankfurt) • 🌎 NA (US-East, US-West) (Tencent Cloud / AWS) | ✅ ACE Anti-Cheat |
-| **Overwatch 2** 🛡️ | Hero Shooter | 🌏 APAC (Singapore, Taiwan, Korea, Japan, Australia) • 🌍 EU (Frankfurt, Paris) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) | ✅ Blizzard Defense Matrix |
-| **Rainbow Six Siege** 🧱 | Tactical Shooter | 🌏 APAC (Singapore, Japan, Australia) • 🌍 EU (North EU, West EU) • 🌎 NA (US-East, US-Central, US-West) • 🌎 SA (Brazil South) (Ubisoft Azure) | ✅ BattlEye |
-| **League of Legends (LoL) & TFT** ⚔️ | MOBA / Strategy | 🌏 APAC (Vietnam VNG, Singapore Riot Direct, Taiwan, Korea, Japan) • 🌍 EU (EU-West, EU-Nordic) • 🌎 NA (NA-East) • 🌎 SA (Brazil) | ✅ Riot Vanguard |
-| **Dota 2** 🛡️ | MOBA | 🌏 APAC (Singapore, Japan, Australia) • 🌍 EU (Frankfurt, Stockholm) • 🌎 NA (US-East, US-West) • 🌎 SA (São Paulo) (Valve SDR) | ✅ Valve VAC |
-
-*💡 Need a different game? Click **+ Add Custom Game** in the Web Dashboard to register any game executable and custom server IP range in seconds!*
-
----
-
-## 📚 Documentation & Deep Dives 📑
-
-| 📖 Document | 📝 Description |
-|---|---|
-| 🤝 [**Contributor & Maintainer Guide**](CONTRIBUTING.md) | **Developer handbook**: How to capture game packets, find ASNs, narrow CIDRs, register profiles in `profiles.json`, craft SVG logos, and submit PRs. |
-| 📐 [**Architecture Overview**](docs/ARCHITECTURE.md) | In-depth packet journey, WinTun driver mechanics, Windows routing safety rules, and anti-cheat safety analysis. |
-| 📡 [**Wire Protocol v1 Specification**](docs/PROTOCOL.md) | Binary packet format, HMAC-SHA256 handshake, 9-byte data header, keepalive ping/pong, and MTU arithmetic. |
-| 🚀 [**VPS Deployment Guide**](docs/DEPLOYMENT.md) | Step-by-step VPS operator instructions, automated one-liner script, systemd configuration, and Docker Compose. |
-| 🌐 [**Game Profiles & CIDRs**](docs/PROFILES.md) | Profile JSON schema, cloud provider network maps (Valve SDR, Riot Direct, AWS, Azure), and capturing new games. |
-| 📝 [**Changelog & Release Notes**](CHANGELOG.md) | **Version History**: Full release logs, protocol enhancements, and architectural evolution. |
-| 🌐 [**Why a Relay (VPS) is Required**](docs/WHY_VPS.md) | **Technical FAQ**: Why an intermediate relay server is physically needed, ISP undersea routing limits, squad sharing, and vendor-neutral specs. |
-| 🎯 [**Product Overview & Architecture**](PRODUCT.md) | Core product principles, supported gaming environments, and esports latency benchmarks. |
-| ⚖️ [**Legal Disclaimer & Ban Waiver**](docs/DISCLAIMER.md) | **Crucial reading**: Educational use terms, anti-cheat policy, and zero ban liability agreement. |
-
----
-
-## 🏗️ How It Works (Architecture) ⚙️
-
-```text
-  [ 🎮 Game Client: Valorant / CS2 / PUBG ]
-         │
-         │ Sends UDP/TCP packets to game server (e.g. 13.250.0.0/15)
-         ▼
-  [ 🪟 Windows / macOS / Linux Routing Table ]
-         │
-         ├─► [ 🎯 Game Destination CIDR ] ──► [ 🔌 WinTun / utun Adapter ] (10.88.0.2)
-         │                                               │
-         │                                               ▼
-         │                                    [ ⚡ Lagvex Client Engine ]
-         │                                               │ Encloses with 9-byte header
-         │                                               ▼
-         │                                    [ 📦 UDP Socket to Relay ]
-         │                                               │ (Pinned /32 route forces physical NIC)
-         │                                               ▼
-         └─► [ 🌐 Discord / Browsers / Streaming ] ──► [ 🏡 Default Physical Gateway ] (Direct ISP)
-                                                         │
-  ═══════════════════════════════════════════════════════╪═══════════════════════════════════════════════
-                      International Fiber Backbone      │
-  ═══════════════════════════════════════════════════════╪═══════════════════════════════════════════════
-                                                         │
-                                                         ▼
-                                          [ ☁️ Lagvex Relay Server (Linux VPS) ]
-                                                         │ Strips 9-byte header, anti-spoofing check
-                                                         │ Writes raw IPv4 into /dev/net/tun: lagvex0
-                                                         ▼
-                                          [ 🐧 Linux Kernel (VPS) ]
-                                                         │ iptables NAT MASQUERADE + TCP MSS Clamping
-                                                         ▼
-                                          [ 🎯 Game Server (Singapore / Tokyo / Frankfurt) ]
-```
-
----
-
-## 🚀 Quick Start 🏁
-
-Choose the experience that fits you:
-
-### 🎮 Option A: For Gamers — 100% Plug-and-Play (Zero Setup, No VPS Needed!) ⚡
-
-You **do NOT need to rent or configure any server** to use Lagvex. Pre-configured **Free Public Community Nodes** are built right in:
-
-1. 📦 **Download**: Grab the latest `lagvex-client` for your OS from [Releases](https://github.com/ThanhNguyxnOrg/lagvex/releases).
-   - 🪟 **Windows 10/11**: Run `lagvex-client.exe` as Administrator *(launches dedicated Desktop App Window)*.
-   - 🐧 **Linux & Steam Deck**: Run `sudo ./lagvex-client-linux-amd64`.
-   - 🍎 **macOS (Apple Silicon)**: Run `sudo ./lagvex-client-darwin-arm64`.
-2. 🎯 **Select Game**: Click on your game (Valorant, CS2, LoL & TFT, Apex, PUBG, etc.).
-3. 🌐 **Choose Server**: Pick a built-in free community node (e.g. `🇸🇬 Singapore #1 [Community Free]`).
-4. ⚡ **Click BOOST NOW**: Launch your game and enjoy stable, low-jitter gameplay!
-
----
-
-### 🤝 Option B: For Squads & LAN Parties — 1-Click Invite Link 🔗
-
-Playing with a team or at a cyber cafe? Only **one person** in your squad needs a relay:
-1. The squad leader hosts a relay node and shares their **1-Click Squad Link**:  
-   `lagvex://connect?endpoint=123.45.67.89:4433&psk=xyz&name=MySquad`
-2. Teammates click **🤝 Join Squad / Paste Code** on their Lagvex HUD, paste the link, and immediately share the dedicated private tunnel!
-
----
-
-### ☁️ Option C: For Power Users & Server Hosts — Deploy Private Relay (60 Seconds) 🛠️
-
-Want your own 100% dedicated private relay? You can deploy on a Linux VPS or host directly on Windows:
-
-#### 🐧 1. On Linux VPS (Ubuntu, Debian, CentOS, Rocky, Arch)
-Run this one-liner as root on your cloud VPS:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.sh | sudo bash
 ```
-**What it does automatically:**
-- 🔧 Tunes kernel `sysctl` (`ip_forward=1`, `rp_filter=2`, 8MB UDP buffers).
-- 🛡️ Sets up persistent `iptables` NAT MASQUERADE and TCP MSS clamping.
-- 🔑 Generates a cryptographically secure 32-character Pre-Shared Key (PSK).
-- ⚙️ Registers and starts the `lagvex-relay.service` systemd daemon.
-- 📋 Generates your **1-Click Squad Share Link** ready to paste to your friends!
 
-*(Prefer Docker? Run `docker compose up -d`)*
+The installer prints the relay endpoint, the UDP port (default `51820`) and a generated
+**PSK**. Keep the PSK: the client refuses to connect without it. Relay hosting requires a
+Linux VPS with `/dev/net/tun` (KVM, not OpenVZ). Windows and macOS cannot host relays; the
+installer fails fast there instead of pretending.
 
-#### 🪟 2. On Windows 10/11 or Windows Server (Native PowerShell)
-Open PowerShell as **Administrator** and run:
-```powershell
-irm https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/install-relay.ps1 | iex
-```
-**What it does automatically:**
-- 🛡️ Verifies Administrator elevation and installs WireGuard WinTun driver.
-- ⚡ Enables Windows IP forwarding (`Set-NetIPInterface -Forwarding Enabled`).
-- 🌐 Configures Windows NetNat masquerade and port forwarding.
-- 🔑 Generates a 32-character random PSK and saves to `C:\ProgramData\Lagvex\relay.json`.
-- 📋 Prints your **1-Click Squad Share Link** (`lagvex://connect?...`) to share with friends!
-
----
-
-### 💻 Supported Client Operating Systems 🎮
-
-| Platform | ⚙️ Driver Mechanism | 🎯 Ideal Use Case | 🚀 How to Run |
-|---|---|---|---|
-| **Windows 10/11** 🪟 | Official `wintun.dll` Layer-3 ring buffer | Valorant, CS2, PUBG, Apex, The Finals, Warzone, Delta Force | `lagvex-client.exe` *(opens Standalone Desktop Window HUD)* |
-| **Linux & Steam Deck** 🐧 | Linux Kernel `/dev/net/tun` + `ip route` | Steam Deck (SteamOS), Proton gaming, CS2 native, Dota 2, Apex | `sudo ./lagvex-client-linux-amd64` |
-| **macOS (Apple Silicon)** 🍎 | Darwin native `utun` + BSD `route` | League of Legends & TFT (Mac native), Dota 2, Apple GPTK2 games | `sudo ./lagvex-client-darwin-arm64` |
-
-> [!TIP]
-> **First-time Launch Notice:**
-> - **Windows (SmartScreen)**: If warned by Windows Defender, click **"More info"** ➔ **"Run anyway"**.
-> - **macOS (Gatekeeper)**: If binary is quarantined, run `xattr -cr lagvex-client-darwin-arm64` before executing.
-
-
-#### 🌟 Advanced CLI Headless Launch:
-```bash
-# Connect immediately via command line without opening HUD:
-lagvex-client.exe -connect -relay 123.45.67.89:4433 -psk your_secret_psk -game valorant -region asia-sg
-```
-
----
-
-## 🛠️ Building from Source 🔨
-
-Requires **Go 1.22+**:
+### 2. Build and run the client
 
 ```bash
-# 📥 1. Clone repository
-git clone https://github.com/ThanhNguyxnOrg/lagvex.git
-cd lagvex
-
-# 🧪 2. Run unit tests
-make test
-
-# ☁️ 3. Build Linux VPS Relay binary
-make relay
-
-# 🪟 4. Build Windows Client executable
-make client
-
-# 🍎 5. Build macOS Apple Silicon Client
-make client-mac
-
-# 🐧 6. Build Linux / Steam Deck Client
-make client-linux
+go build -o lagvex-client ./cmd/lagvex-client
+./lagvex-client                 # opens the dashboard at http://127.0.0.1:18888
 ```
 
----
+**Add node** → enter the relay `host:port` **and its PSK** → pick your game and server
+region → **BOOST**. The dashboard shows probes and tunnel state as they are measured.
 
-## 🤝 Contributing & Adding Games 🚀
+### 3. Squad rooms
 
-Want to add your favorite game, update server IP clusters, or contribute new features? We welcome community pull requests!
+Squad rooms share a **roster** (who is in the room plus each member's reported RTT) so a
+party can see each other in one place. A room does not change anyone's relay or routes.
+Rooms are relayed through the connected relay's signaling endpoint; with no relay
+connected, a room exists only on that machine.
 
-- 🎮 **Add a New Game in 15 Minutes**: Discover destination UDP server CIDRs via Resource Monitor or Wireshark, add the profile to `configs/profiles.json`, and insert an SVG logo into `web/app.js`.
-- 🛰️ **Add Community Relays**: Expand global coverage across APAC, EU, NA, SA, or MENA.
-- 🧪 **Zero-Fuss Testing**: Automated Go tests verify JSON integrity and CIDR arithmetic instantly.
+## 🖥️ Supported Systems
 
-👉 **Read the complete step-by-step developer guide:** [**🤝 CONTRIBUTING.md**](CONTRIBUTING.md)
+| OS | Virtual adapter | Notes |
+|---|---|---|
+| **Windows 10/11** | WinTun (`wintun.dll`) | Elevation needed to create the adapter |
+| **macOS 12+** | native `utun` | DNS diagnostics read via `scutil` |
+| **Linux / Steam Deck** | `/dev/net/tun` | Also the only OS that can host the embedded local relay |
 
----
+## 🏗️ How It Works
 
-## ⚖️ Full Disclaimer & Ban Liability Waiver ⚠️
+```text
+ Game process               Lagvex client                    Your relay (Linux VPS)         Game server
+┌──────────────┐   routes  ┌──────────────────────┐  AEAD UDP  ┌──────────────────┐  UDP   ┌────────────┐
+│ VALORANT.exe │ ────────▶ │ WinTun / utun / tun  │ ─────────▶ │ lagvex-relay     │ ─────▶ │ Riot / AWS │
+└──────────────┘  (CIDR +  │ ChaCha20-Poly1305    │            │ /dev/net/tun      │        └────────────┘
+                  peers)   │ split tunnel + FEC   │            └──────────────────┘
+                           └──────────────────────┘
+```
 
-> [!WARNING]
-> ### 🛑 EXPRESS WAIVER OF LIABILITY CONCERNING ACCOUNT SUSPENSIONS / BANS 🛑
-> 
-> 1. **🔬 Research & Educational Demonstration**:  
->    Lagvex is distributed strictly for technical research into network routing protocols and user-space virtual network adapters. It is **not** designed, intended, or marketed to bypass game bans, avoid region locks, or violate intellectual property rights.
-> 
-> 2. **🚫 Absolute Absence of Cheats / Exploits**:  
->    Lagvex does **NOT** read, manipulate, or write to any game memory space. It does **NOT** inject DLLs, alter game files, or modify gameplay packets. All packet diversion occurs externally via the host operating system's kernel routing table.
-> 
-> 3. **📜 Terms of Service & Anti-Cheat Autonomy**:  
->    Game publishers (e.g. Riot Games, Valve, Krafton, EA, Activision, Ubisoft) and proprietary anti-cheat engines (Vanguard, VAC, BattlEye, EAC, RICOCHET) retain absolute discretion to flag or penalize accounts utilizing proxies, VPNs, or unauthorized software as outlined in their respective End User License Agreements (EULA).
-> 
-> 4. **🛡️ ZERO DEVELOPER RESPONSIBILITY FOR ACCOUNT ACTIONS**:  
->    **BY DOWNLOADING, COMPILING, OR RUNNING LAGVEX, YOU EXPRESSLY AGREE THAT THE AUTHORS, CONTRIBUTORS, AND REPOSITORY OWNERS SHALL NOT BE LIABLE FOR ANY DAMAGES, SANCTIONS, TEMPORARY SUSPENSIONS, PERMANENT ACCOUNT BANS, HARDWARE ID (HWID) BLACKLISTING, LOSS OF IN-GAME ASSETS, OR FINANCIAL LOSSES OF ANY KIND.**  
->
-> 5. **🤝 User Discretion**:  
->    You accept full, sole, and exclusive responsibility for any consequences arising from running this software alongside third-party games. If you do not agree with these terms, do not download, compile, or use this software.
->
-> 📄 Read the complete legal text: [docs/DISCLAIMER.md](docs/DISCLAIMER.md)
+- The client connects to the relay with a PSK handshake, receives an inner IP and installs
+  routes only for the selected game region and — if enabled — observed peers.
+- The relay forwards packets between the tunnel and the internet, and hosts squad
+  signaling plus health endpoints.
+- See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the packet journey, and
+  [`docs/PROTOCOL.md`](docs/PROTOCOL.md) for the wire format.
 
----
+## 📚 Documentation
 
-## 🏷️ Trademark & Intellectual Property Notice ⚖️
+| Doc | Contents |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Component layout, routing design, anti-cheat safety |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Relay VPS installation, hardening and operations |
+| [`docs/PROFILES.md`](docs/PROFILES.md) | Game profile schema and how to add a game |
+| [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Packet format, handshake and FEC |
+| [`docs/WHY_VPS.md`](docs/WHY_VPS.md) | Why a relay is needed and what it can/cannot fix |
+| [`docs/DISCLAIMER.md`](docs/DISCLAIMER.md) | Legal disclaimer and anti-cheat position |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, adding games, UI builds |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release notes |
 
-All game titles, publisher/developer names, trade dress, and associated insignias (including *Valorant*, *Counter-Strike 2*, *PUBG*, *Apex Legends*, *League of Legends*, *The Finals*, *Call of Duty*, *Delta Force*, *Overwatch 2*, *Rainbow Six Siege*, *Dota 2*, and their respective marks belonging to Valve, Riot Games, Electronic Arts, Krafton, Activision, Ubisoft, and TiMi Studio Group) are trademarks or registered trademarks of their respective legal copyright holders.
+## 🛠️ Building from Source
 
-Lagvex is an independent open-source network protocol research tool and kernel latency accelerator. It is **not** endorsed by, affiliated with, sponsored by, or associated with any game developer or publisher. All vector marks in this repository and web UI are reproduced strictly under **Nominative Fair Use** solely to identify game executables and destination routing clusters for end-user network optimization.
+```bash
+# Go backend (client + relay)
+go build ./cmd/lagvex-client
+go build ./cmd/lagvex-relay
 
----
+# React dashboard (required after UI changes; outputs into web/)
+npm --prefix ui_source install
+npm --prefix ui_source run build
 
-## 📜 License 📄
+# Tests
+go test ./...
+npx --prefix ui_source tsc --noEmit
+```
 
-Lagvex is open-source software licensed under the **[MIT License](LICENSE)**. Feel free to fork, customize, and self-host! 🎉
+The dashboard is a React/Vite app in `ui_source/`; the build writes hashed bundles into
+`web/assets/`, which the Go binary embeds. There is no separate legacy HTML/JS UI.
+
+## ⚠️ Known Limits (read this)
+
+- **No public relays are bundled.** The relay list starts empty; you bring your own
+  endpoint and PSK. Catalog entries for dead or third-party nodes are deliberately gone.
+- **Relay hosting is Linux-only.** The relay needs `/dev/net/tun`; on other systems the
+  local relay refuses to start with a clear error.
+- **Windows cannot see another process's UDP peers.** Peer routing on Windows works with
+  TCP observations only; the UI says so. Game traffic is mostly UDP, so keep the region
+  CIDRs enabled there.
+- **The relay does not probe on its own yet.** The "relay → game server" hop is reported
+  as unmeasured rather than guessed.
+- **No region/device spoofing, no DLL/LSP injection, no anti-cheat evasion.** Those are
+  out of scope by design.
+
+## 🤝 Contributing
+
+- 🎮 Add a game profile: capture the destination CIDRs, edit `configs/profiles.json`,
+  and run the tests. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- 🐛 Found a bug? Export a **diagnostics snapshot** from the Tweaker tab and attach it —
+  it contains measured values and no secrets.
+- 🧪 Run `go test ./...` and `npx --prefix ui_source tsc --noEmit` before opening a PR.
+
+## ⚖️ Disclaimer
+
+Lagvex is a network routing research tool. It does not read, modify or inject into any
+game. Game publishers and anti-cheat vendors set their own rules about VPNs and proxies;
+you remain responsible for how you use this software. Read the full text in
+[`docs/DISCLAIMER.md`](docs/DISCLAIMER.md).
+
+## 🏷️ Trademarks
+
+All game titles and publisher names are trademarks of their respective owners. Lagvex is
+not affiliated with or endorsed by any game developer or publisher. Game artwork bundled
+in the dashboard is used nominatively to identify game executables and server regions.
+
+## 📜 License
+
+MIT — see [`LICENSE`](LICENSE).
