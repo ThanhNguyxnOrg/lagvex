@@ -938,9 +938,9 @@ func (u *UIServer) handleOptimizeProfile(w http.ResponseWriter, r *http.Request)
 		details = append(details, "Systematic FEC is currently disabled.")
 	}
 	if runtime.GOOS == "windows" {
-		details = append(details, "DSCP EF marking is available through the Windows QoS policy.")
+		details = append(details, "DSCP EF marking is requested through the Windows QoS API.")
 	} else {
-		details = append(details, "DSCP EF marking is not applied on this platform.")
+		details = append(details, "DSCP EF marking is requested with the IP_TOS socket option (best effort).")
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -954,7 +954,7 @@ func (u *UIServer) handleOptimizeProfile(w http.ResponseWriter, r *http.Request)
 		"regionCount":  len(game.Regions),
 		"fecEnabled":   fecEnabled,
 		"fecBlockSize": fecBlockSize,
-		"qosSupported": runtime.GOOS == "windows",
+		"qosSupported": true, // the relay socket is tagged on every supported OS
 		"details":      details,
 	})
 }
@@ -1107,6 +1107,30 @@ func detectDNSServer() string {
 		if err == nil {
 			if dns := strings.TrimSpace(string(out)); dns != "" {
 				return dns
+			}
+		}
+		return ""
+	}
+
+	if runtime.GOOS == "darwin" {
+		// macOS does not use /etc/resolv.conf; scutil reads the live
+		// SystemConfiguration resolver list.
+		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "scutil", "--dns").Output()
+		if err != nil {
+			return ""
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			line = strings.TrimSpace(line)
+			// Lines look like: nameserver[0] : 192.168.1.1
+			if !strings.HasPrefix(line, "nameserver[") {
+				continue
+			}
+			if _, value, found := strings.Cut(line, ":"); found {
+				if dns := strings.TrimSpace(value); dns != "" {
+					return dns
+				}
 			}
 		}
 		return ""
