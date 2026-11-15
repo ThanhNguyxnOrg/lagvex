@@ -580,6 +580,7 @@ func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code string `json:"code"`
 		Name string `json:"name"`
+		Host string `json:"host"`
 		Game string `json:"game"`
 		Ping int    `json:"ping"`
 		ISP  string `json:"isp"`
@@ -589,12 +590,17 @@ func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Name == "" {
+		req.Name = req.Host
+	}
+	req.Name = strings.TrimSpace(req.Name)
 	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	if req.Name == "" {
+		http.Error(w, `{"error":"host name is required"}`, http.StatusBadRequest)
+		return
+	}
 	if req.Code == "" {
 		req.Code = fmt.Sprintf("LGVX-%d", time.Now().UnixNano()%9000+1000)
-	}
-	if req.ISP == "" {
-		req.ISP = "Broadband"
 	}
 
 	room := &RelaySquadRoom{
@@ -610,7 +616,7 @@ func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 		ISP:      req.ISP,
 		Ping:     req.Ping,
 		Game:     req.Game,
-		Status:   "Party Host 👑",
+		Status:   "In room",
 		LastSeen: time.Now(),
 	}
 
@@ -649,33 +655,33 @@ func (s *Server) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Code == "" {
+		http.Error(w, `{"error":"room code is required"}`, http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, `{"error":"player name is required"}`, http.StatusBadRequest)
+		return
+	}
+
 	s.squadRoomsMu.Lock()
 	room, ok := s.squadRooms[req.Code]
-	if !ok {
-		// Auto-create room if teammate entered non-existent code
-		room = &RelaySquadRoom{
-			Code:      req.Code,
-			Host:      req.Name,
-			Game:      req.Game,
-			Members:   make(map[string]*RelaySquadMember),
-			CreatedAt: time.Now(),
-		}
-		s.squadRooms[req.Code] = room
-	}
 	s.squadRoomsMu.Unlock()
+	if !ok {
+		http.Error(w, `{"error":"room not found; the host must create it first"}`, http.StatusNotFound)
+		return
+	}
 
 	room.mu.Lock()
 	if len(room.Members) >= 5 && room.Members[req.Name] == nil {
 		room.mu.Unlock()
-		http.Error(w, `{"error":"Squad room is full (5/5 players)"}`, http.StatusConflict)
+		http.Error(w, `{"error":"squad room is full (5/5 players)"}`, http.StatusConflict)
 		return
 	}
 	role := "Member"
 	if req.Name == room.Host {
 		role = "Host"
-	}
-	if req.ISP == "" {
-		req.ISP = "Broadband"
 	}
 	room.Members[req.Name] = &RelaySquadMember{
 		Name:     req.Name,
@@ -683,7 +689,7 @@ func (s *Server) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
 		ISP:      req.ISP,
 		Ping:     req.Ping,
 		Game:     req.Game,
-		Status:   "Synced ⚡",
+		Status:   "In room",
 		LastSeen: time.Now(),
 	}
 
@@ -755,10 +761,9 @@ func (s *Server) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Code   string `json:"code"`
-		Name   string `json:"name"`
-		Ping   int    `json:"ping"`
-		Status string `json:"status"`
+		Code string `json:"code"`
+		Name string `json:"name"`
+		Ping int    `json:"ping"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -774,12 +779,8 @@ func (s *Server) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) {
 		room.mu.Lock()
 		if m, exists := room.Members[req.Name]; exists {
 			m.LastSeen = time.Now()
-			if req.Ping > 0 {
-				m.Ping = req.Ping
-			}
-			if req.Status != "" {
-				m.Status = req.Status
-			}
+			// Zero means "no live RTT sample", so clear stale readings.
+			m.Ping = req.Ping
 		}
 		room.mu.Unlock()
 	}
