@@ -31,7 +31,29 @@ type ProbeResult struct {
 	IsOptimal   bool    `json:"isOptimal"`
 	Samples     int     `json:"samples"`
 	Error       string  `json:"error,omitempty"`
+
+	// Retained measurements from earlier probe runs for the same endpoint. They
+	// let the dashboard show an average, spread and trend that a single sweep
+	// cannot provide. All values are measured locally by this client.
+	RTTAvgMs       float64   `json:"rttAvgMs,omitempty"`
+	RTTStdMs       float64   `json:"rttStdMs,omitempty"`
+	LossAvgPct     float64   `json:"lossAvgPct,omitempty"`
+	RTTTrend       []float64 `json:"rttTrend,omitempty"`
+	HistorySamples int       `json:"historySamples,omitempty"`
+	LastProbeAt    string    `json:"lastProbeAt,omitempty"`
 }
+
+// probeHistoryEntry is one completed probe run for an endpoint.
+type probeHistoryEntry struct {
+	RTTMs   float64
+	Loss    float64
+	Reached bool
+	At      time.Time
+}
+
+// probeHistoryCap bounds retained probe runs per endpoint so long sessions do
+// not grow without limit (60 runs x 3 samples each at default settings).
+const probeHistoryCap = 60
 
 // ProberConfig defines configuration options for probing relay health and latency.
 type ProberConfig struct {
@@ -54,6 +76,9 @@ func DefaultProberConfig() ProberConfig {
 // Prober evaluates relay endpoints via active UDP handshakes and AEAD ping exchanges.
 type Prober struct {
 	cfg ProberConfig
+
+	histMu  sync.Mutex
+	history map[string][]probeHistoryEntry
 }
 
 // NewProber initializes a Prober with default configuration.
@@ -79,12 +104,12 @@ func NewProberWithConfig(cfg ProberConfig) *Prober {
 }
 
 // ProbeEndpoint tests an individual relay node and returns detailed telemetry.
-func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint, samples int) ProbeResult {
+func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint, samples int) (result ProbeResult) {
 	if samples <= 0 {
 		samples = p.cfg.DefaultSamples
 	}
 
-	result := ProbeResult{
+	result = ProbeResult{
 		RelayID:   relay.ID,
 		Name:      relay.Name,
 		Endpoint:  relay.Endpoint,
@@ -94,6 +119,9 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 		Samples:   samples,
 		Score:     999999.0,
 	}
+	// Every completed run feeds the per-endpoint history used for average,
+	// spread and trend values in the dashboard.
+	defer func() { p.finishProbe(&result) }()
 
 	udpAddr, err := net.ResolveUDPAddr("udp4", relay.Endpoint)
 	if err != nil {
@@ -109,10 +137,12 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 	}
 	defer func() { _ = conn.Close() }()
 
-	psk := []byte(relay.PSK)
-	if len(psk) == 0 {
-		psk = []byte("lagvex-community-us-free-public-psk-2026")
+	if relay.PSK == "" {
+		result.Error = "relay PSK is required"
+		result.PacketLoss = 100.0
+		return result
 	}
+	psk := []byte(relay.PSK)
 
 	var rtts []float64
 
@@ -174,7 +204,7 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 
 		// Remaining samples: Ping / Pong RTT over established AEAD session
 		pingBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
-		sampleLoop:
+	sampleLoop:
 		for s := 1; s < samples; s++ {
 			select {
 			case <-ctx.Done():
@@ -236,6 +266,86 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 	result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs)+(result.PacketLoss*50.0), 2)
 
 	return result
+}
+
+// finishProbe records a completed probe run and fills the history-derived
+// average, spread and trend fields from earlier runs to the same endpoint.
+func (p *Prober) finishProbe(result *ProbeResult) {
+	// A missing PSK is a configuration error, not a network measurement, so it
+	// must not pollute the endpoint's loss history.
+	if result.Error == "relay PSK is required" {
+		return
+	}
+
+	entry := probeHistoryEntry{
+		RTTMs:   result.RTTMedianMs,
+		Loss:    result.PacketLoss,
+		Reached: result.Reachable,
+		At:      time.Now().UTC(),
+	}
+
+	p.histMu.Lock()
+	if p.history == nil {
+		p.history = make(map[string][]probeHistoryEntry)
+	}
+	key := strings.ToLower(result.Endpoint)
+	entries := append(p.history[key], entry)
+	if len(entries) > probeHistoryCap {
+		entries = entries[len(entries)-probeHistoryCap:]
+	}
+	stored := make([]probeHistoryEntry, len(entries))
+	copy(stored, entries)
+	p.history[key] = stored
+	p.histMu.Unlock()
+
+	var rtts, lossPcts []float64
+	trend := make([]float64, 0, len(stored))
+	lastAt := time.Time{}
+	for _, e := range stored {
+		if e.Reached && e.RTTMs > 0 {
+			rtts = append(rtts, e.RTTMs)
+			trend = append(trend, roundTo(e.RTTMs, 2))
+		}
+		lossPcts = append(lossPcts, e.Loss)
+		if e.At.After(lastAt) {
+			lastAt = e.At
+		}
+	}
+
+	result.HistorySamples = len(stored)
+	result.LastProbeAt = lastAt.Format(time.RFC3339)
+	if len(rtts) > 0 {
+		result.RTTAvgMs = roundTo(calculateMean(rtts), 2)
+		result.RTTStdMs = roundTo(calculateStdDev(rtts), 2)
+		result.RTTTrend = trend
+	}
+	if len(lossPcts) > 0 {
+		result.LossAvgPct = roundTo(calculateMean(lossPcts), 1)
+	}
+}
+
+func calculateMean(vals []float64) float64 {
+	if len(vals) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range vals {
+		sum += v
+	}
+	return sum / float64(len(vals))
+}
+
+func calculateStdDev(vals []float64) float64 {
+	if len(vals) <= 1 {
+		return 0
+	}
+	mean := calculateMean(vals)
+	var sq float64
+	for _, v := range vals {
+		d := v - mean
+		sq += d * d
+	}
+	return math.Sqrt(sq / float64(len(vals)))
 }
 
 // ProbeAll concurrently probes all provided relays and returns sorted results.
@@ -545,15 +655,13 @@ func (p *Prober) ProbeDirectGateway(ctx context.Context, hostPort string) (float
 	return roundTo(medianRTT, 1), roundTo(lossPct, 1), nil
 }
 
-
-
 // probeTCPGateway measures real microsecond round-trip TCP connect latency to a target host.
 func probeTCPGateway(ctx context.Context, hostPort string, samples int) ([]float64, error) {
 	if samples <= 0 {
 		samples = 3
 	}
 	var rtts []float64
-	probeLoop:
+probeLoop:
 	for i := 0; i < samples; i++ {
 		select {
 		case <-ctx.Done():
@@ -576,4 +684,3 @@ func probeTCPGateway(ctx context.Context, hostPort string, samples int) ([]float
 	}
 	return rtts, nil
 }
-

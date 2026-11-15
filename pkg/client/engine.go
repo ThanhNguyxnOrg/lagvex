@@ -109,6 +109,7 @@ type Engine struct {
 	fecController    *protocol.AdaptiveFECController
 	fecEnabled       atomic.Bool
 	packetsRecovered atomic.Uint64
+	lastRecoveryAt   atomic.Int64 // Unix nanoseconds of the last FEC recovery
 	fecParitySent    atomic.Uint64
 	fecParityRecv    atomic.Uint64
 	l4FilterEnabled  atomic.Bool
@@ -207,6 +208,31 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 	e.state = StateConnecting
 	e.mu.Unlock()
+
+	// A game connect is only meaningful when its server region resolves to at
+	// least one verified CIDR. Refuse early instead of reporting a connected
+	// tunnel that would carry no game traffic.
+	var cidrs []string
+	if gameID != "" {
+		if regionID == "" {
+			e.resetState()
+			return recordErr(fmt.Errorf("game %q requires a server region", gameID))
+		}
+		if e.profileMgr == nil {
+			e.resetState()
+			return recordErr(fmt.Errorf("game profiles are unavailable"))
+		}
+		resolved, err := e.profileMgr.GetRegionCIDRs(gameID, regionID)
+		if err != nil {
+			e.resetState()
+			return recordErr(err)
+		}
+		if len(resolved) == 0 {
+			e.resetState()
+			return recordErr(fmt.Errorf("region %q for game %q has no verified CIDRs", regionID, gameID))
+		}
+		cidrs = resolved
+	}
 
 	log.Printf("[Engine] Connecting to relay %s (Game: %s, Region: %s)...", relayEndpoint, gameID, regionID)
 
@@ -307,14 +333,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		}
 	}
 
-	// 7. Resolve Game CIDRs
-	var cidrs []string
-	if gameID != "" && regionID != "" {
-		resolved, err := e.profileMgr.GetRegionCIDRs(gameID, regionID)
-		if err == nil {
-			cidrs = resolved
-		}
-	}
+	// 7. Game CIDRs were resolved and validated before the handshake.
 
 	var relayID, relayName string
 	if e.profileMgr != nil {
@@ -376,6 +395,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		e.fecDecoder.Reset()
 	}
 	e.packetsRecovered.Store(0)
+	e.lastRecoveryAt.Store(0)
 	e.fecParitySent.Store(0)
 	e.fecParityRecv.Store(0)
 	e.bytesUp.Store(0)
@@ -391,12 +411,13 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 
 	// 8. Start I/O pumps
-	e.wg.Add(5)
+	e.wg.Add(6)
 	go e.pumpWinTunToUDP(ctx)
 	go e.pumpUDPToWinTun(ctx, conn)
 	go e.loopKeepalive(ctx)
 	go e.loopBitrateMeter(ctx)
 	go e.loopFailoverMonitor(ctx)
+	go e.loopFECFlush(ctx)
 
 	// 9. Start Process Watcher
 	if gameID != "" {
@@ -540,8 +561,10 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
-			// Multi-Path Packet Hedging: when loss is detected and FEC active, hedge critical gaming inputs (<=256B)
-			if isGameTick && e.fecEnabled.Load() && e.packetsRecovered.Load() > 0 && n <= 256 {
+			// Packet hedging is bounded to a short window after the last FEC
+			// recovery, so a single historical loss cannot duplicate every
+			// game tick for the rest of the session.
+			if isGameTick && e.fecEnabled.Load() && n <= 256 && e.shouldHedge() {
 				_, _ = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 			}
 		}
@@ -623,6 +646,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 						_ = wt.WritePacket(recovered)
 						e.bytesDown.Add(uint64(len(recovered)))
 						e.packetsRecovered.Add(1)
+						e.lastRecoveryAt.Store(time.Now().UnixNano())
 					}
 				}
 			}
@@ -645,6 +669,56 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			return
 		}
 	}
+}
+
+// loopFECFlush emits parity for partially filled FEC blocks once the encoder's
+// flush interval elapses. Without this, a block that never reaches its group
+// size would never produce parity.
+func (e *Engine) loopFECFlush(ctx context.Context) {
+	defer e.wg.Done()
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	fecPktBuf := make([]byte, protocol.MaxPacketSize)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if !e.fecEnabled.Load() || e.fecEncoder == nil {
+				continue
+			}
+			payload, ok := e.fecEncoder.CheckFlush(now)
+			if !ok {
+				continue
+			}
+
+			e.mu.Lock()
+			crypto := e.crypto
+			sessID := e.sessionID
+			conn := e.udpConn
+			rAddr := e.relayAddr
+			e.mu.Unlock()
+
+			if crypto == nil || conn == nil {
+				continue
+			}
+			fecPkt := crypto.EncodeFEC(fecPktBuf, sessID, payload)
+			if _, err := conn.WriteToUDP(fecPkt, net.UDPAddrFromAddrPort(rAddr)); err == nil {
+				e.fecParitySent.Add(1)
+			}
+		}
+	}
+}
+
+// shouldHedge reports whether packet duplication is currently warranted. It
+// stays active only for a short window after the most recent FEC recovery.
+func (e *Engine) shouldHedge() bool {
+	last := e.lastRecoveryAt.Load()
+	if last == 0 {
+		return false
+	}
+	return time.Since(time.Unix(0, last)) < 2*time.Second
 }
 
 func (e *Engine) loopKeepalive(ctx context.Context) {
@@ -1049,6 +1123,15 @@ func (e *Engine) SetFECEnabled(enabled bool) {
 // IsFECEnabled reports whether FEC is currently enabled.
 func (e *Engine) IsFECEnabled() bool {
 	return e.fecEnabled.Load()
+}
+
+// FECBlockSize returns the current number of data packets per parity packet,
+// or 0 when FEC is disabled or no encoder is configured.
+func (e *Engine) FECBlockSize() int {
+	if !e.fecEnabled.Load() || e.fecEncoder == nil {
+		return 0
+	}
+	return e.fecEncoder.BlockSize()
 }
 
 // SetL4FilterEnabled toggles L4 smart game tick filtering on or off.

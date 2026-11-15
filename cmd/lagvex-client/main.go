@@ -108,7 +108,7 @@ func main() {
 		if profilePath == "" {
 			modeStr = "embedded zero-config"
 		}
-		log.Printf("[Profiles] Loaded %d game profiles & %d community relays (%s)", len(cat.Games), len(cat.Relays), modeStr)
+		log.Printf("[Profiles] Loaded %d game profiles & %d configured relays (%s)", len(cat.Games), len(cat.Relays), modeStr)
 	}
 
 	engine, err := client.NewEngine(pm)

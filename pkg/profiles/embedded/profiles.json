@@ -131,7 +131,7 @@
         {
           "id": "sa-saopaulo",
           "continent": "South America",
-          "name": "Brazil (São Paulo - Riot Direct)",
+          "name": "Brazil (S\u00e3o Paulo - Riot Direct)",
           "cidrs": [
             "104.160.152.0/24",
             "177.54.144.0/20",
@@ -266,7 +266,7 @@
         {
           "id": "sa-saopaulo",
           "continent": "South America",
-          "name": "Brazil (São Paulo Valve SDR)",
+          "name": "Brazil (S\u00e3o Paulo Valve SDR)",
           "cidrs": [
             "205.185.194.0/24",
             "155.133.236.0/24"
@@ -386,7 +386,7 @@
         {
           "id": "sa-saopaulo",
           "continent": "South America",
-          "name": "Brazil (São Paulo Valve SDR)",
+          "name": "Brazil (S\u00e3o Paulo Valve SDR)",
           "cidrs": [
             "205.185.194.0/24",
             "155.133.236.0/24"
@@ -481,7 +481,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (São Paulo AWS)",
+          "name": "South America (S\u00e3o Paulo AWS)",
           "cidrs": [
             "18.228.0.0/15"
           ]
@@ -575,7 +575,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (São Paulo Multiplay)",
+          "name": "South America (S\u00e3o Paulo Multiplay)",
           "cidrs": [
             "18.228.0.0/15"
           ]
@@ -669,7 +669,7 @@
         {
           "id": "br",
           "continent": "South America",
-          "name": "Brazil (BR - São Paulo Riot Direct)",
+          "name": "Brazil (BR - S\u00e3o Paulo Riot Direct)",
           "cidrs": [
             "104.160.152.0/24",
             "177.54.144.0/20"
@@ -726,7 +726,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (São Paulo GCP)",
+          "name": "South America (S\u00e3o Paulo GCP)",
           "cidrs": [
             "34.95.0.0/16"
           ]
@@ -812,7 +812,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (São Paulo Demonware)",
+          "name": "South America (S\u00e3o Paulo Demonware)",
           "cidrs": [
             "103.245.116.0/23"
           ]
@@ -955,7 +955,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (São Paulo Battle.net)",
+          "name": "South America (S\u00e3o Paulo Battle.net)",
           "cidrs": [
             "54.232.0.0/16"
           ]
@@ -1045,7 +1045,7 @@
         {
           "id": "sa-br",
           "continent": "South America",
-          "name": "South America (Brazil South - São Paulo)",
+          "name": "South America (Brazil South - S\u00e3o Paulo)",
           "cidrs": [
             "20.201.0.0/16"
           ]
@@ -1069,126 +1069,5 @@
       ]
     }
   ],
-  "relays": [
-    {
-      "id": "local-dev-1",
-      "name": "💻 Local Relay Server (127.0.0.1:4433 - Loopback Test)",
-      "continent": "Local",
-      "location": "Local Machine",
-      "endpoint": "127.0.0.1:4433",
-      "psk": "lagvex-community-us-free-public-psk-2026"
-    },
-    {
-      "id": "us-east-1",
-      "name": "🇺🇸 North America East (US East - Virginia #1)",
-      "continent": "North America",
-      "location": "Ashburn, VA",
-      "endpoint": "us-east.lagvex.org:4433",
-      "psk": "lagvex-community-us-free-public-psk-2026"
-    },
-    {
-      "id": "us-central-1",
-      "name": "🇺🇸 North America Central (Dallas / Texas)",
-      "continent": "North America",
-      "location": "Dallas, TX",
-      "endpoint": "us-central.lagvex.org:4433",
-      "psk": "lagvex-community-us-free-public-psk-2026"
-    },
-    {
-      "id": "us-west-1",
-      "name": "🇺🇸 North America West (Silicon Valley / California)",
-      "continent": "North America",
-      "location": "San Jose, CA",
-      "endpoint": "us-west.lagvex.org:4433",
-      "psk": "lagvex-community-us-free-public-psk-2026"
-    },
-    {
-      "id": "eu-central-1",
-      "name": "🇩🇪 Europe Central (Frankfurt / Germany #1)",
-      "continent": "Europe",
-      "location": "Frankfurt, Germany",
-      "endpoint": "eu-central.lagvex.org:4433",
-      "psk": "lagvex-community-eu-free-public-psk-2026"
-    },
-    {
-      "id": "eu-west-1",
-      "name": "🇬🇧 Europe West (London / United Kingdom #1)",
-      "continent": "Europe",
-      "location": "London, UK",
-      "endpoint": "eu-west.lagvex.org:4433",
-      "psk": "lagvex-community-eu-free-public-psk-2026"
-    },
-    {
-      "id": "eu-north-1",
-      "name": "🇸🇪 Europe North (Stockholm / Sweden #1)",
-      "continent": "Europe",
-      "location": "Stockholm, Sweden",
-      "endpoint": "eu-north.lagvex.org:4433",
-      "psk": "lagvex-community-eu-free-public-psk-2026"
-    },
-    {
-      "id": "asia-sg-1",
-      "name": "🇸🇬 Southeast Asia #1 (Singapore - Equinix SG1)",
-      "continent": "Asia-Pacific",
-      "location": "Singapore",
-      "endpoint": "sg1.lagvex.org:4433",
-      "psk": "lagvex-community-sg-free-public-psk-2026"
-    },
-    {
-      "id": "asia-sg-2",
-      "name": "🇸🇬 Southeast Asia #2 (Singapore - Direct Fiber)",
-      "continent": "Asia-Pacific",
-      "location": "Singapore",
-      "endpoint": "sg2.lagvex.org:4433",
-      "psk": "lagvex-community-sg-free-public-psk-2026"
-    },
-    {
-      "id": "asia-jp-1",
-      "name": "🇯🇵 East Asia (Tokyo / Japan #1)",
-      "continent": "Asia-Pacific",
-      "location": "Tokyo, Japan",
-      "endpoint": "jp1.lagvex.org:4433",
-      "psk": "lagvex-community-jp-free-public-psk-2026"
-    },
-    {
-      "id": "asia-kr-1",
-      "name": "🇰🇷 East Asia (Seoul / South Korea #1)",
-      "continent": "Asia-Pacific",
-      "location": "Seoul, South Korea",
-      "endpoint": "kr1.lagvex.org:4433",
-      "psk": "lagvex-community-kr-free-public-psk-2026"
-    },
-    {
-      "id": "asia-hk-1",
-      "name": "🇭🇰 East Asia (Hong Kong #1)",
-      "continent": "Asia-Pacific",
-      "location": "Hong Kong",
-      "endpoint": "hk1.lagvex.org:4433",
-      "psk": "lagvex-community-hk-free-public-psk-2026"
-    },
-    {
-      "id": "oc-syd-1",
-      "name": "🇦🇺 Oceania (Sydney / Australia #1)",
-      "continent": "Oceania",
-      "location": "Sydney, Australia",
-      "endpoint": "syd1.lagvex.org:4433",
-      "psk": "lagvex-community-oc-free-public-psk-2026"
-    },
-    {
-      "id": "sa-br-1",
-      "name": "🇧🇷 South America (São Paulo / Brazil #1)",
-      "continent": "South America",
-      "location": "São Paulo, Brazil",
-      "endpoint": "br1.lagvex.org:4433",
-      "psk": "lagvex-community-sa-free-public-psk-2026"
-    },
-    {
-      "id": "me-dxb-1",
-      "name": "🇦🇪 Middle East (Dubai / UAE #1)",
-      "continent": "Middle East",
-      "location": "Dubai, UAE",
-      "endpoint": "dxb1.lagvex.org:4433",
-      "psk": "lagvex-community-me-free-public-psk-2026"
-    }
-  ]
+  "relays": []
 }

@@ -3,6 +3,7 @@
 package tun
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -16,13 +17,12 @@ type Device struct {
 	ch     chan []byte
 }
 
-// Open creates a userspace virtual tunnel device.
+// Open fails on non-Linux platforms. A userspace stub used to accept the TUN
+// handle and silently discard every relayed packet, which made the relay look
+// healthy while forwarding nothing. Hosting a relay requires a Linux TUN
+// interface for kernel forwarding.
 func Open(name string) (*Device, error) {
-	return &Device{
-		name: name,
-		mtu:  1400,
-		ch:   make(chan []byte, 1024),
-	}, nil
+	return nil, errors.New("relay packet forwarding requires Linux /dev/net/tun; Windows and macOS relay hosting is not implemented")
 }
 
 func (d *Device) Name() string { return d.name }
@@ -62,4 +62,3 @@ func (d *Device) Configure(cidr string, mtu int) error {
 	d.mtu = mtu
 	return nil
 }
-

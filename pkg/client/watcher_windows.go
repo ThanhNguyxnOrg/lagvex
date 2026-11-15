@@ -39,3 +39,38 @@ func findRunningProcess(targets []string) (bool, string, int) {
 
 	return false, "", 0
 }
+
+// findRunningProcesses returns every watched target that is currently running,
+// mapped to the first PID seen for it. One Toolhelp32 snapshot serves all
+// targets, unlike findRunningProcess which stops at the first match.
+func findRunningProcesses(targets []string) map[string]int {
+	matches := make(map[string]int)
+	if len(targets) == 0 {
+		return matches
+	}
+
+	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return matches
+	}
+	defer windows.CloseHandle(snapshot)
+
+	var entry windows.ProcessEntry32
+	entry.Size = uint32(unsafe.Sizeof(entry))
+
+	err = windows.Process32First(snapshot, &entry)
+	for err == nil {
+		procName := strings.ToLower(syscall.UTF16ToString(entry.ExeFile[:]))
+		for _, target := range targets {
+			if _, seen := matches[target]; seen {
+				continue
+			}
+			if strings.EqualFold(procName, target) || strings.EqualFold(procName, strings.TrimSuffix(target, ".exe")) {
+				matches[target] = int(entry.ProcessID)
+			}
+		}
+		err = windows.Process32Next(snapshot, &entry)
+	}
+
+	return matches
+}

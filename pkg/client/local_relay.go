@@ -20,8 +20,9 @@ var (
 )
 
 // EnsureLocalRelayRunning checks if a relay is already listening on listenAddr (e.g. "127.0.0.1:4433").
-// If no server is listening, it launches an embedded in-process Relay server using the userspace TUN device.
-// This allows gamers to run and test acceleration instantly without needing a remote VPS.
+// If no server is listening, it launches an embedded in-process relay on the
+// Linux kernel TUN device. This allows gamers to test acceleration without a
+// remote VPS; Windows and macOS cannot host the relay.
 func EnsureLocalRelayRunning(listenAddr string, psk []byte) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("embedded relay server requires Linux kernel TUN support (unsupported on %s)", runtime.GOOS)
@@ -38,7 +39,7 @@ func EnsureLocalRelayRunning(listenAddr string, psk []byte) error {
 		listenAddr = "127.0.0.1:4433"
 	}
 	if len(psk) == 0 {
-		psk = []byte("lagvex-community-us-free-public-psk-2026")
+		return fmt.Errorf("local relay requires a PSK; add the local relay with the PSK you want to use")
 	}
 
 	// 1. Check if an external relay (or previous instance) is already listening

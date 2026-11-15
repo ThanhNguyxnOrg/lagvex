@@ -72,3 +72,23 @@ func TestProcessWatcherLifecycle(t *testing.T) {
 	watcher.UpdateTargets([]string{"updated_target.exe"})
 	time.Sleep(100 * time.Millisecond)
 }
+
+func TestFindRunningProcessesSelf(t *testing.T) {
+	exePath, err := os.Executable()
+	if err != nil {
+		t.Skipf("cannot get executable path: %v", err)
+	}
+	exeName := filepath.Base(exePath)
+
+	matches := findRunningProcesses([]string{exeName, "nonexistent_proc_98765.exe"})
+	if _, ok := matches["nonexistent_proc_98765.exe"]; ok {
+		t.Errorf("a nonexistent process must not match")
+	}
+	pid, ok := matches[exeName]
+	if !ok {
+		t.Skipf("self executable %s not matched in this environment", exeName)
+	}
+	if pid <= 0 {
+		t.Errorf("expected a positive PID for %s, got %d", exeName, pid)
+	}
+}

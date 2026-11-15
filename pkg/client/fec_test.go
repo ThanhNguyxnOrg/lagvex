@@ -252,3 +252,65 @@ func TestEngineFECToggleAndStats(t *testing.T) {
 		t.Errorf("expected FECRatio 'Off' when disabled, got %s", stats.FECRatio)
 	}
 }
+
+func TestFECCheckFlushEmitsPartialBlock(t *testing.T) {
+	encoder := NewFECEncoder(FECEncoderConfig{
+		DefaultBlockSize: 6,
+		FlushInterval:    5 * time.Millisecond,
+	})
+
+	p0 := []byte{0x45, 0x00, 0x00, 0x20, 0x01, 0x02, 0x03, 0x04}
+	p1 := []byte{0x45, 0x00, 0x00, 0x24, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a}
+
+	if _, emitted := encoder.AddPacket(100, p0); emitted {
+		t.Fatal("partial block must not emit before the group is full")
+	}
+	if _, emitted := encoder.AddPacket(101, p1); emitted {
+		t.Fatal("partial block must not emit before the group is full")
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	encoded, emitted := encoder.CheckFlush(time.Now())
+	if !emitted || len(encoded) == 0 {
+		t.Fatal("CheckFlush must emit parity for an aged partial block")
+	}
+
+	payload, err := protocol.DecodeFECPayload(encoded)
+	if err != nil {
+		t.Fatalf("decode flushed parity: %v", err)
+	}
+	if payload.Count != 2 || payload.BaseSeq != 100 {
+		t.Fatalf("unexpected flushed payload: count=%d base=%d", payload.Count, payload.BaseSeq)
+	}
+
+	decoder := NewFECDecoder(32)
+	decoder.RecordPacket(100, p0)
+	seq, recovered, ok := decoder.ProcessParity(payload)
+	if !ok || seq != 101 {
+		t.Fatalf("expected recovery of packet 101, got seq=%d ok=%v", seq, ok)
+	}
+	if !bytes.Equal(recovered, p1) {
+		t.Fatalf("recovered payload mismatch: got %x want %x", recovered, p1)
+	}
+}
+
+func TestHedgingIsBoundedToRecentRecovery(t *testing.T) {
+	engine, err := NewEngine(nil)
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+
+	if engine.shouldHedge() {
+		t.Fatal("hedging must be inactive before any loss recovery")
+	}
+
+	engine.lastRecoveryAt.Store(time.Now().Add(-3 * time.Second).UnixNano())
+	if engine.shouldHedge() {
+		t.Fatal("hedging must expire shortly after the last recovery")
+	}
+
+	engine.lastRecoveryAt.Store(time.Now().UnixNano())
+	if !engine.shouldHedge() {
+		t.Fatal("hedging must activate right after a recovery")
+	}
+}

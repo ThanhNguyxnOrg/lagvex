@@ -66,3 +66,63 @@ func findRunningProcess(targets []string) (bool, string, int) {
 
 	return false, "", 0
 }
+
+// findRunningProcesses returns every watched target that is currently running,
+// mapped to the first PID seen for it. One process-table scan serves all
+// targets, unlike findRunningProcess which stops at the first match.
+func findRunningProcesses(targets []string) map[string]int {
+	matches := make(map[string]int)
+	if len(targets) == 0 {
+		return matches
+	}
+
+	match := func(procName string, pid int) {
+		lowered := strings.ToLower(strings.TrimSpace(procName))
+		for _, target := range targets {
+			if _, seen := matches[target]; seen {
+				continue
+			}
+			if strings.EqualFold(lowered, target) || strings.EqualFold(lowered, strings.TrimSuffix(target, ".exe")) {
+				matches[target] = pid
+			}
+		}
+	}
+
+	if runtime.GOOS == "darwin" {
+		out, err := exec.Command("ps", "-A", "-c", "-o", "pid=,comm=").Output()
+		if err != nil {
+			return matches
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			fields := strings.Fields(strings.TrimSpace(line))
+			if len(fields) < 2 {
+				continue
+			}
+			pid, _ := strconv.Atoi(fields[0])
+			match(strings.Join(fields[1:], " "), pid)
+		}
+		return matches
+	}
+
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return matches
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pid, err := strconv.Atoi(entry.Name())
+		if err != nil {
+			continue
+		}
+		commBytes, err := os.ReadFile(filepath.Join("/proc", entry.Name(), "comm"))
+		if err != nil {
+			continue
+		}
+		match(string(commBytes), pid)
+	}
+
+	return matches
+}

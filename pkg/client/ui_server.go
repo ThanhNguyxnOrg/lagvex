@@ -20,7 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
 	"github.com/ThanhNguyxnOrg/lagvex/web"
@@ -83,6 +82,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	// API Routes
 	mux.HandleFunc("/api/status", u.handleStatus)
 	mux.HandleFunc("/api/games", u.handleGames)
+	mux.HandleFunc("/api/detected-processes", u.handleDetectedProcesses)
 	mux.HandleFunc("/api/relays", u.handleRelays)
 	mux.HandleFunc("/api/probe-relays", u.handleProbeRelays)
 	mux.HandleFunc("/api/best-relay", u.handleBestRelay)
@@ -179,10 +179,63 @@ func (u *UIServer) handleGames(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(catalog.Games)
 }
 
+// handleDetectedProcesses reports which configured game processes are running
+// right now, using a single local process-table scan. It is a detection aid
+// only: it does not change routing and does not attach to any game process.
+func (u *UIServer) handleDetectedProcesses(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	catalog := u.profileMgr.Catalog()
+
+	type gameProcessStatus struct {
+		GameID         string   `json:"gameId"`
+		Name           string   `json:"name"`
+		Processes      []string `json:"processes"`
+		Running        bool     `json:"running"`
+		MatchedProcess string   `json:"matchedProcess,omitempty"`
+		PID            int      `json:"pid,omitempty"`
+	}
+
+	var targets []string
+	for _, g := range catalog.Games {
+		targets = append(targets, g.ProcessNames...)
+	}
+	matches := findRunningProcesses(targets)
+
+	statuses := make([]gameProcessStatus, 0, len(catalog.Games))
+	for _, g := range catalog.Games {
+		status := gameProcessStatus{
+			GameID:    g.ID,
+			Name:      g.Name,
+			Processes: g.ProcessNames,
+		}
+		for _, p := range g.ProcessNames {
+			if pid, ok := matches[p]; ok {
+				status.Running = true
+				status.MatchedProcess = p
+				status.PID = pid
+				break
+			}
+		}
+		statuses = append(statuses, status)
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"scannedAt": time.Now().UTC().Format(time.RFC3339),
+		"games":     statuses,
+	})
+}
+
 func (u *UIServer) handleRelays(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	catalog := u.profileMgr.Catalog()
-	_ = json.NewEncoder(w).Encode(catalog.Relays)
+	// Never expose relay pre-shared keys to the browser. The engine resolves
+	// them from the local catalog when a connection is requested.
+	relays := make([]profiles.RelayEndpoint, len(catalog.Relays))
+	copy(relays, catalog.Relays)
+	for i := range relays {
+		relays[i].PSK = ""
+	}
+	_ = json.NewEncoder(w).Encode(relays)
 }
 
 func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
@@ -264,6 +317,21 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		req.RelayEndpoint = req.RelayAddr
 	}
 
+	if req.GameID != "" {
+		if req.RegionID == "" {
+			writeJSONError(w, http.StatusBadRequest, "regionId is required when gameId is set")
+			return
+		}
+		if u.profileMgr == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "game profile catalog is unavailable")
+			return
+		}
+		if _, err := u.profileMgr.GetRegionCIDRs(req.GameID, req.RegionID); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	catalog := u.profileMgr.Catalog()
 
 	// Auto Node Selection if requested or endpoint is "auto"
@@ -282,7 +350,7 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Printf("[Dashboard] Auto-selected optimal relay: %s (%s, score=%.1f)", best.Name, best.Endpoint, best.Score)
 		} else {
-			http.Error(w, "No reachable relays found in catalog", http.StatusServiceUnavailable)
+			writeJSONError(w, http.StatusServiceUnavailable, "no reachable relays found in catalog")
 			return
 		}
 	} else if req.PSK == "" {
@@ -293,36 +361,60 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		if req.PSK == "" {
-			req.PSK = "lagvex-community-us-free-public-psk-2026"
-		}
 	}
 
 	if req.RelayEndpoint == "" {
-		http.Error(w, "relayEndpoint is required", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "relayEndpoint is required")
+		return
+	}
+	if req.PSK == "" {
+		writeJSONError(w, http.StatusBadRequest, "relay PSK is required; add the relay with its PSK before connecting")
 		return
 	}
 
 	if strings.Contains(req.RelayEndpoint, "127.0.0.1") || strings.Contains(req.RelayEndpoint, "localhost") {
-		_ = EnsureLocalRelayRunning(req.RelayEndpoint, []byte(req.PSK))
+		if err := EnsureLocalRelayRunning(req.RelayEndpoint, []byte(req.PSK)); err != nil {
+			writeJSONError(w, http.StatusBadGateway, err.Error())
+			return
+		}
 	}
 
 	if u.engine == nil {
-		http.Error(w, "Engine not initialized", http.StatusInternalServerError)
+		writeJSONError(w, http.StatusServiceUnavailable, "engine not initialized")
 		return
 	}
 
-	go func() {
-		if err := u.engine.Connect(req.RelayEndpoint, []byte(req.PSK), req.GameID, req.RegionID, req.ForceNow); err != nil {
-			log.Printf("[Dashboard] Connect error: %v", err)
-		}
-	}()
+	// Connect synchronously so the dashboard only shows an active boost after
+	// the relay handshake, TUN setup and route validation actually succeeded.
+	if err := u.engine.Connect(req.RelayEndpoint, []byte(req.PSK), req.GameID, req.RegionID, req.ForceNow); err != nil {
+		log.Printf("[Dashboard] Connect error: %v", err)
+		writeJSONError(w, http.StatusBadGateway, err.Error())
+		return
+	}
 
+	stats := u.engine.Stats()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"success":  true,
-		"status":   "connecting",
-		"endpoint": req.RelayEndpoint,
+		"success":     true,
+		"status":      "connected",
+		"state":       stats.State,
+		"endpoint":    req.RelayEndpoint,
+		"gameId":      stats.ActiveGame,
+		"regionId":    stats.ActiveRegion,
+		"routeCount":  stats.RouteCount,
+		"gameRunning": stats.GameRunning,
+		"pingMs":      stats.PingMs,
+		"driverMode":  stats.DriverMode,
+	})
+}
+
+func writeJSONError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success": false,
+		"status":  "error",
+		"error":   message,
 	})
 }
 
@@ -426,8 +518,42 @@ func (u *UIServer) handleAddGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if game.ID == "" || game.Name == "" {
-		http.Error(w, "id and name are required", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "id and name are required")
 		return
+	}
+	if len(game.Regions) == 0 {
+		writeJSONError(w, http.StatusBadRequest, "at least one game region with CIDRs is required")
+		return
+	}
+	for ri := range game.Regions {
+		region := &game.Regions[ri]
+		region.ID = strings.TrimSpace(region.ID)
+		region.Name = strings.TrimSpace(region.Name)
+		if region.ID == "" || region.Name == "" {
+			writeJSONError(w, http.StatusBadRequest, "each region needs an id and name")
+			return
+		}
+		if len(region.CIDRs) == 0 {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("region %q has no CIDRs", region.ID))
+			return
+		}
+		valid := make([]string, 0, len(region.CIDRs))
+		for _, raw := range region.CIDRs {
+			cidr := strings.TrimSpace(raw)
+			if cidr == "" {
+				continue
+			}
+			if _, err := netip.ParsePrefix(cidr); err != nil {
+				writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("invalid CIDR %q", cidr))
+				return
+			}
+			valid = append(valid, cidr)
+		}
+		if len(valid) == 0 {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("region %q has no valid CIDRs", region.ID))
+			return
+		}
+		region.CIDRs = valid
 	}
 
 	if err := u.profileMgr.AddGame(game); err != nil {
@@ -462,7 +588,8 @@ func (u *UIServer) handleAddRelay(w http.ResponseWriter, r *http.Request) {
 		relay.Name = relay.Endpoint
 	}
 	if relay.PSK == "" {
-		relay.PSK = "lagvex-community-us-free-public-psk-2026"
+		http.Error(w, "psk is required", http.StatusBadRequest)
+		return
 	}
 	if relay.Tier == "" {
 		relay.Tier = "custom"
@@ -476,8 +603,10 @@ func (u *UIServer) handleAddRelay(w http.ResponseWriter, r *http.Request) {
 		u.configStore.AddCustomRelay(relay)
 	}
 
+	publicRelay := relay
+	publicRelay.PSK = ""
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "relay": relay})
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "relay": publicRelay})
 }
 
 type tweakReq struct {
@@ -499,76 +628,92 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	applied := []string{}
+	failed := []string{}
+	preferences := []string{}
 
 	switch runtime.GOOS {
 	case "windows":
 		// 1. Flush DNS cache
 		if err := exec.Command("ipconfig", "/flushdns").Run(); err == nil {
-			applied = append(applied, "DNS Resolver Cache Flushed")
+			applied = append(applied, "DNS resolver cache flushed")
+		} else {
+			failed = append(failed, "DNS resolver cache flush")
 		}
 
 		// 2. TCP Window Auto-Tuning
-		_ = exec.Command("netsh", "int", "tcp", "set", "global", "autotuninglevel=normal").Run()
-		applied = append(applied, "TCP Window Auto-Tuning Configured")
+		if err := exec.Command("netsh", "int", "tcp", "set", "global", "autotuninglevel=normal").Run(); err == nil {
+			applied = append(applied, "TCP window auto-tuning set to normal")
+		} else {
+			failed = append(failed, "TCP window auto-tuning (requires administrator)")
+		}
 
 		// 3. MMCSS Gaming Priority & Network Throttling
 		if req.MMCSSPriority {
-			_ = exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "NetworkThrottlingIndex", "/t", "REG_DWORD", "/d", "0xffffffff", "/f").Run()
-			_ = exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "SystemResponsiveness", "/t", "REG_DWORD", "/d", "0", "/f").Run()
-			applied = append(applied, "MMCSS Network Throttling Disabled (Gaming Priority)")
-		}
-
-		// 4. TCP NoDelay & Ack Frequency
-		if req.TCPNoDelay || req.DisableNagle {
-			applied = append(applied, "TCP_NODELAY & Immediate Packet Dispatch Enabled")
-		}
-
-		// 5. MTU Boundary Clamping
-		if req.MTUClamping {
-			applied = append(applied, "MTU Clamped to 1400-byte Frame Boundary")
+			throttleErr := exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "NetworkThrottlingIndex", "/t", "REG_DWORD", "/d", "0xffffffff", "/f").Run()
+			responseErr := exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "SystemResponsiveness", "/t", "REG_DWORD", "/d", "0", "/f").Run()
+			if throttleErr == nil && responseErr == nil {
+				applied = append(applied, "MMCSS network throttling disabled")
+			} else {
+				failed = append(failed, "MMCSS registry tuning (requires administrator)")
+			}
 		}
 	case "darwin":
-		// macOS Network Tweaks
-		_ = exec.Command("dscacheutil", "-flushcache").Run()
+		if err := exec.Command("dscacheutil", "-flushcache").Run(); err == nil {
+			applied = append(applied, "macOS DNS cache flushed")
+		} else {
+			failed = append(failed, "macOS DNS cache flush")
+		}
 		_ = exec.Command("killall", "-HUP", "mDNSResponder").Run()
-		applied = append(applied, "macOS DNS Resolver Cache Flushed")
 
 		if req.TCPNoDelay || req.DisableNagle {
-			_ = exec.Command("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run()
-			applied = append(applied, "TCP Delayed ACK Disabled (net.inet.tcp.delayed_ack=0)")
+			if err := exec.Command("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run(); err == nil {
+				applied = append(applied, "TCP delayed ACK disabled")
+			} else {
+				failed = append(failed, "TCP delayed ACK change (requires root)")
+			}
 		}
-
-		if req.MTUClamping {
-			applied = append(applied, "MTU Frame Boundary Clamped to 1400 Bytes")
-		}
-		applied = append(applied, "macOS Kernel Network Buffers Tuned")
 	case "linux":
-		// Linux Network Tweaks
 		if resolvePath, err := exec.LookPath("resolvectl"); err == nil {
-			_ = exec.Command(resolvePath, "flush-caches").Run()
-			applied = append(applied, "Linux systemd-resolved DNS Cache Flushed")
+			if err := exec.Command(resolvePath, "flush-caches").Run(); err == nil {
+				applied = append(applied, "systemd-resolved DNS cache flushed")
+			} else {
+				failed = append(failed, "systemd-resolved DNS cache flush")
+			}
 		} else if resolvePath, err := exec.LookPath("systemd-resolve"); err == nil {
-			_ = exec.Command(resolvePath, "--flush-caches").Run()
-			applied = append(applied, "Linux systemd-resolve DNS Cache Flushed")
+			if err := exec.Command(resolvePath, "--flush-caches").Run(); err == nil {
+				applied = append(applied, "systemd-resolve DNS cache flushed")
+			} else {
+				failed = append(failed, "systemd-resolve DNS cache flush")
+			}
 		}
 
 		if req.TCPNoDelay || req.DisableNagle {
-			_ = exec.Command("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
-			_ = exec.Command("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
-			applied = append(applied, "Linux TCP Low Latency Mode Activated")
+			lowLatencyErr := exec.Command("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
+			slowStartErr := exec.Command("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
+			if lowLatencyErr == nil && slowStartErr == nil {
+				applied = append(applied, "Linux TCP low-latency sysctls applied")
+			} else {
+				failed = append(failed, "Linux TCP sysctls (requires root)")
+			}
 		}
+	}
 
-		if req.MTUClamping {
-			applied = append(applied, "MTU Frame Boundary Clamped to 1400 Bytes")
-		}
-		applied = append(applied, "Linux Kernel Socket Buffers Tuned")
+	// TCP_NODELAY and MTU clamping are not global OS switches. Record them as
+	// preferences and describe exactly where they take effect.
+	if req.TCPNoDelay || req.DisableNagle {
+		preferences = append(preferences, "TCP_NODELAY preference saved; it applies to TCP sockets owned by the client, not system-wide.")
+	}
+	if req.MTUClamping {
+		preferences = append(preferences, "MTU clamping preference saved; the virtual adapter uses the relay-negotiated MTU when a tunnel connects.")
 	}
 
 	if u.engine != nil {
 		u.engine.SetL4FilterEnabled(req.SmartL4Filter)
-	}
-	if req.SmartL4Filter {
-		applied = append(applied, "Smart L4 Game Tick Filter Activated (UDP Prioritized)")
+		if req.SmartL4Filter {
+			applied = append(applied, "Smart L4 game-tick filter enabled (UDP prioritized)")
+		} else {
+			applied = append(applied, "Smart L4 game-tick filter disabled")
+		}
 	}
 
 	if u.configStore != nil {
@@ -581,10 +726,24 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	status := "No changes requested"
+	switch {
+	case len(applied) > 0 && len(failed) == 0:
+		status = "Optimizations applied"
+	case len(applied) > 0:
+		status = "Partially applied"
+	case len(preferences) > 0:
+		status = "Preferences saved; no system commands succeeded"
+	case len(failed) > 0:
+		status = "No system command succeeded"
+	}
+
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"success": true,
-		"applied": applied,
-		"status":  "Optimizations Applied",
+		"success":          true,
+		"status":           status,
+		"applied":          applied,
+		"failed":           failed,
+		"savedPreferences": preferences,
 	})
 }
 
@@ -663,10 +822,10 @@ func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
 	directRTT, directLoss, err := u.prober.ProbeDirectGateway(ctx, targetHost)
 	if err != nil || directRTT <= 0 {
 		directRTT, directLoss, _ = u.prober.ProbeDirectGateway(ctx, "1.1.1.1:53")
-		if directRTT <= 0 {
-			directRTT = 35.0
-			directLoss = 0.0
-		}
+	}
+	if directRTT <= 0 {
+		http.Error(w, `{"error":"direct route probe failed; no advice can be produced without a measured RTT"}`, http.StatusServiceUnavailable)
+		return
 	}
 
 	advice := CalculateRouteAdvice(directRTT, directLoss, bestRelay)
@@ -737,58 +896,64 @@ func (u *UIServer) handleFECToggle(w http.ResponseWriter, r *http.Request) {
 
 func (u *UIServer) handleOptimizeProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	gameID := r.URL.Query().Get("gameId")
+	if u.profileMgr == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "game profile catalog is unavailable")
+		return
+	}
+
+	gameID := strings.TrimSpace(r.URL.Query().Get("gameId"))
 	if gameID == "" {
-		gameID = "valorant"
+		writeJSONError(w, http.StatusBadRequest, "gameId is required")
+		return
 	}
 
 	game, ok := u.profileMgr.FindGameByID(gameID)
-	gameTitle := gameID
-	if gameID != "" {
-		firstRune, size := utf8.DecodeRuneInString(gameID)
-		gameTitle = strings.ToUpper(string(firstRune)) + gameID[size:]
-	}
-	genre := "FPS"
-	subnetsCount := 8
-
-	if ok {
-		gameTitle = game.Name
-		genre = game.Category
-		totalCIDRs := 0
-		for _, reg := range game.Regions {
-			totalCIDRs += len(reg.CIDRs)
-		}
-		if totalCIDRs > 0 {
-			subnetsCount = totalCIDRs
-		}
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, fmt.Sprintf("game %q is not in the profile catalog", gameID))
+		return
 	}
 
-	fecRatio := "6:1"
-	if strings.Contains(strings.ToLower(genre), "battle royale") || strings.Contains(strings.ToLower(gameID), "apex") || strings.Contains(strings.ToLower(gameID), "pubg") {
-		fecRatio = "4:1"
-	} else if strings.Contains(strings.ToLower(genre), "moba") || strings.Contains(strings.ToLower(gameID), "dota") || strings.Contains(strings.ToLower(gameID), "lol") {
-		fecRatio = "8:1"
+	subnetsCount := 0
+	for _, reg := range game.Regions {
+		subnetsCount += len(reg.CIDRs)
 	}
 
-	res := map[string]any{
-		"gameId":       gameID,
-		"gameTitle":    gameTitle,
-		"genre":        genre,
-		"mtu":          1400,
-		"dscp":         "Expedited Forwarding (DSCP EF-46)",
-		"fecRatio":     fecRatio,
+	fecEnabled := false
+	fecBlockSize := 0
+	if u.engine != nil {
+		fecEnabled = u.engine.IsFECEnabled()
+		fecBlockSize = u.engine.FECBlockSize()
+	}
+
+	details := []string{
+		fmt.Sprintf("%d CIDR subnets across %d region(s) will be routed through the tunnel on connect.", subnetsCount, len(game.Regions)),
+		"The tunnel MTU is negotiated with the relay and applied to the virtual adapter during connect.",
+	}
+	if fecEnabled && fecBlockSize > 0 {
+		details = append(details, fmt.Sprintf("Systematic FEC is enabled with %d data packets per parity packet.", fecBlockSize))
+	} else {
+		details = append(details, "Systematic FEC is currently disabled.")
+	}
+	if runtime.GOOS == "windows" {
+		details = append(details, "DSCP EF marking is available through the Windows QoS policy.")
+	} else {
+		details = append(details, "DSCP EF marking is not applied on this platform.")
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"gameId":       game.ID,
+		"gameTitle":    game.Name,
+		"genre":        game.Category,
+		"status":       "preview",
+		"applied":      false,
+		"note":         "Nothing is changed by this request. Connect to install routes and start the tunnel.",
 		"subnetsCount": subnetsCount,
-		"optimizedAt":  time.Now().Format("15:04:05"),
-		"status":       "success",
-		"details": []string{
-			"Packet MTU clamped to 1400 bytes (Zero UDP packet fragmentation)",
-			"DSCP QoS packet priority marked Expedited Forwarding (Class 46)",
-			fmt.Sprintf("Zero-RTT FEC configured to %s systematic parity ratio", fecRatio),
-			fmt.Sprintf("%d official game server CIDR subnets pre-warmed into route cache", subnetsCount),
-		},
-	}
-
-	_ = json.NewEncoder(w).Encode(res)
+		"regionCount":  len(game.Regions),
+		"fecEnabled":   fecEnabled,
+		"fecBlockSize": fecBlockSize,
+		"qosSupported": runtime.GOOS == "windows",
+		"details":      details,
+	})
 }
 
 func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
@@ -854,44 +1019,27 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 func (u *UIServer) handleNetworkDiagnostics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// 1. Measure real RTT to Cloudflare DNS 1.1.1.1:53 via TCP dial
-	t0 := time.Now()
-	conn, err := net.DialTimeout("tcp", "1.1.1.1:53", 1200*time.Millisecond)
+	// 1. Measure real RTT to public DNS resolvers via TCP dial.
 	var ispPingMs float64
-	if err == nil {
-		ispPingMs = float64(time.Since(t0).Microseconds()) / 1000.0
-		_ = conn.Close()
-	} else {
-		// Fallback to 8.8.8.8:53
-		t1 := time.Now()
-		conn2, err2 := net.DialTimeout("tcp", "8.8.8.8:53", 1200*time.Millisecond)
-		if err2 == nil {
-			ispPingMs = float64(time.Since(t1).Microseconds()) / 1000.0
-			_ = conn2.Close()
-		} else {
-			ispPingMs = 24.0
+	for _, target := range []string{"1.1.1.1:53", "8.8.8.8:53"} {
+		t0 := time.Now()
+		conn, err := net.DialTimeout("tcp", target, 1200*time.Millisecond)
+		if err == nil {
+			ispPingMs = float64(time.Since(t0).Microseconds()) / 1000.0
+			_ = conn.Close()
+			break
 		}
 	}
 
-	// 2. Measure real gateway LAN RTT
-	gateway := "192.168.1.1"
-	if u.engine != nil {
-		gw := u.engine.Stats().GatewayIP
-		if gw != "" && gw != "invalid IP" && gw != "<nil>" && gw != "0.0.0.0" {
-			gateway = gw
-		}
-	}
-
-	tG := time.Now()
-	gConn, gErr := net.DialTimeout("tcp", gateway+":80", 400*time.Millisecond)
+	// 2. Measure the real default-gateway LAN RTT. No fabricated fallback.
+	gateway := detectDefaultGateway()
 	var lanPingMs float64
-	if gErr == nil {
-		lanPingMs = float64(time.Since(tG).Microseconds()) / 1000.0
-		_ = gConn.Close()
-	} else {
-		lanPingMs = float64(time.Since(tG).Microseconds()) / 1000.0
-		if lanPingMs > 5.0 {
-			lanPingMs = 1.2
+	if gateway != "" {
+		tG := time.Now()
+		gConn, gErr := net.DialTimeout("tcp", net.JoinHostPort(gateway, "80"), 400*time.Millisecond)
+		if gErr == nil {
+			lanPingMs = float64(time.Since(tG).Microseconds()) / 1000.0
+			_ = gConn.Close()
 		}
 	}
 
@@ -899,19 +1047,135 @@ func (u *UIServer) handleNetworkDiagnostics(w http.ResponseWriter, r *http.Reque
 		"gateway":     gateway,
 		"lanPingMs":   math.Round(lanPingMs*10) / 10,
 		"ispPingMs":   math.Round(ispPingMs*10) / 10,
-		"packetLoss":  0.0,
-		"dnsServer":   "1.1.1.1 (Cloudflare Anycast)",
-		"networkType": "Broadband / Fiber",
+		"dnsServer":   detectDNSServer(),
+		"networkType": "",
+		"measured":    ispPingMs > 0,
 	}
 	_ = json.NewEncoder(w).Encode(res)
 }
 
+// detectDefaultGateway returns the host's LAN default gateway, or "" when it
+// cannot be determined. It never invents an address.
+func detectDefaultGateway() string {
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	defer cancel()
+
+	switch runtime.GOOS {
+	case "linux":
+		out, err := exec.CommandContext(ctx, "ip", "route", "show", "default").Output()
+		if err == nil {
+			fields := strings.Fields(string(out))
+			for i, field := range fields {
+				if field == "via" && i+1 < len(fields) {
+					return fields[i+1]
+				}
+			}
+		}
+	case "darwin":
+		out, err := exec.CommandContext(ctx, "route", "-n", "get", "default").Output()
+		if err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "gateway:") {
+					return strings.TrimSpace(strings.TrimPrefix(line, "gateway:"))
+				}
+			}
+		}
+	case "windows":
+		out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+			"(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1).NextHop").Output()
+		if err == nil {
+			gw := strings.TrimSpace(string(out))
+			if net.ParseIP(gw) != nil {
+				return gw
+			}
+		}
+	}
+	return ""
+}
+
+// detectDNSServer reads the configured resolver without assuming a provider.
+func detectDNSServer() string {
+	if runtime.GOOS == "windows" {
+		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+			"(Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses } | Select-Object -First 1).ServerAddresses[0]").Output()
+		if err == nil {
+			if dns := strings.TrimSpace(string(out)); dns != "" {
+				return dns
+			}
+		}
+		return ""
+	}
+
+	data, err := os.ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "nameserver" {
+			return fields[1]
+		}
+	}
+	return ""
+}
+
+type RegionTelemetry struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Anchor      string  `json:"anchor,omitempty"`
+	DirectRTTMs float64 `json:"directRttMs"`
+	Measured    bool    `json:"measured"`
+}
+
 type GameTelemetryItem struct {
-	GameID       string  `json:"gameId"`
-	Region       string  `json:"region"`
-	BaselinePing float64 `json:"baselinePing"`
-	AccelPing    float64 `json:"accelPing"`
-	Trend        string  `json:"trend"`
+	GameID       string            `json:"gameId"`
+	Region       string            `json:"region"`
+	BaselinePing float64           `json:"baselinePing"`
+	AccelPing    float64           `json:"accelPing"`
+	Trend        string            `json:"trend"`
+	Measured     bool              `json:"measured"`
+	Source       string            `json:"source,omitempty"`
+	Anchor       string            `json:"anchor,omitempty"`
+	Regions      []RegionTelemetry `json:"regions,omitempty"`
+}
+
+type telemetryAnchor struct {
+	id     string
+	label  string
+	target string
+	keys   []string
+}
+
+// telemetryAnchors are public cloud endpoints used only as direct-route RTT
+// references. They are not game servers, so the API never presents their RTT
+// as a game-server ping.
+var telemetryAnchors = []telemetryAnchor{
+	{"sg", "Singapore", "ec2.ap-southeast-1.amazonaws.com:443", []string{"singapore", "asia-sg", "sg-"}},
+	{"jp", "Tokyo", "ec2.ap-northeast-1.amazonaws.com:443", []string{"tokyo", "japan", "asia-jp"}},
+	{"kr", "Seoul", "ec2.ap-northeast-2.amazonaws.com:443", []string{"seoul", "korea", "asia-kr"}},
+	{"hk", "Hong Kong", "ec2.ap-east-1.amazonaws.com:443", []string{"hong kong", "hongkong", "asia-hk"}},
+	{"in", "Mumbai", "ec2.ap-south-1.amazonaws.com:443", []string{"mumbai", "india", "asia-mumbai"}},
+	{"au", "Sydney", "ec2.ap-southeast-2.amazonaws.com:443", []string{"sydney", "oceania", "oc-"}},
+	{"us-east", "US East", "ec2.us-east-1.amazonaws.com:443", []string{"us-east", "virginia", "chicago", "na-us-east", "na-chicago"}},
+	{"us-west", "US West", "ec2.us-west-1.amazonaws.com:443", []string{"us-west", "california", "na-us-west"}},
+	{"eu", "Frankfurt", "ec2.eu-central-1.amazonaws.com:443", []string{"frankfurt", "london", "stockholm", "europe", "eu-"}},
+	{"sa", "Sao Paulo", "ec2.sa-east-1.amazonaws.com:443", []string{"sao paulo", "são paulo", "brazil", "south america", "sa-"}},
+	{"af", "Johannesburg", "ec2.af-south-1.amazonaws.com:443", []string{"johannesburg", "africa", "af-"}},
+}
+
+func matchTelemetryAnchor(regionID, regionName string) (telemetryAnchor, bool) {
+	haystack := strings.ToLower(regionID + " " + regionName)
+	for _, anchor := range telemetryAnchors {
+		for _, key := range anchor.keys {
+			if strings.Contains(haystack, key) {
+				return anchor, true
+			}
+		}
+	}
+	return telemetryAnchor{}, false
 }
 
 var (
@@ -922,6 +1186,10 @@ var (
 
 func (u *UIServer) handleGameTelemetry(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if u.profileMgr == nil {
+		_ = json.NewEncoder(w).Encode(map[string]GameTelemetryItem{})
+		return
+	}
 
 	gameTelemMu.Lock()
 	if time.Since(gameTelemTime) < 30*time.Second && len(gameTelemCache) > 0 {
@@ -932,18 +1200,7 @@ func (u *UIServer) handleGameTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 	gameTelemMu.Unlock()
 
-	// Measure global cloud gaming datacenter anchors concurrently
-	regions := map[string]string{
-		"sg":      "ec2.ap-southeast-1.amazonaws.com:443", // Singapore
-		"jp":      "ec2.ap-northeast-1.amazonaws.com:443", // Tokyo
-		"kr":      "ec2.ap-northeast-2.amazonaws.com:443", // Seoul
-		"hk":      "ec2.ap-east-1.amazonaws.com:443",      // Hong Kong
-		"us-east": "ec2.us-east-1.amazonaws.com:443",      // US East
-		"us-west": "ec2.us-west-1.amazonaws.com:443",      // US West
-		"eu":      "ec2.eu-central-1.amazonaws.com:443",   // Europe Frankfurt
-		"global":  "1.1.1.1:53",                           // Global Direct Anycast
-	}
-
+	// Measure direct-route RTT to public regional anchors concurrently.
 	rtts := make(map[string]float64)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -951,131 +1208,112 @@ func (u *UIServer) handleGameTelemetry(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2500*time.Millisecond)
 	defer cancel()
 
-	for reg, target := range regions {
+	for _, anchor := range telemetryAnchors {
 		wg.Add(1)
-		go func(rg, tgt string) {
+		go func(a telemetryAnchor) {
 			defer wg.Done()
-			vals, err := probeTCPGateway(ctx, tgt, 2)
+			vals, err := probeTCPGateway(ctx, a.target, 2)
 			if err == nil && len(vals) > 0 {
 				median := calculateMedian(vals)
 				mu.Lock()
-				rtts[rg] = math.Round(median*10) / 10
+				rtts[a.id] = math.Round(median*10) / 10
 				mu.Unlock()
 			}
-		}(reg, target)
+		}(anchor)
 	}
 	wg.Wait()
 
-	// Real measured anchors with safe network fallbacks
-	sgRTT := rtts["sg"]
-	if sgRTT <= 0 {
-		sgRTT = 38.5
-	}
-	jpRTT := rtts["jp"]
-	if jpRTT <= 0 {
-		jpRTT = 62.4
-	}
-	krRTT := rtts["kr"]
-	if krRTT <= 0 {
-		krRTT = 68.1
-	}
-	hkRTT := rtts["hk"]
-	if hkRTT <= 0 {
-		hkRTT = 42.0
-	}
-	globalRTT := rtts["global"]
-	if globalRTT <= 0 {
-		globalRTT = 18.2
-	}
-
-	catalog := u.profileMgr.Catalog()
 	var engineStats TunnelStats
 	if u.engine != nil {
 		engineStats = u.engine.Stats()
 	}
 
-	// Probe nearest community relay for real comparison
-	var bestRelayRTT float64 = 0
-	if len(catalog.Relays) > 0 {
-		relayProbeCtx, probeCancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
-		bestResult, _ := u.prober.SelectBest(relayProbeCtx, catalog.Relays)
-		probeCancel()
-		if bestResult != nil && bestResult.Reachable && bestResult.RTTMedianMs > 0 {
-			bestRelayRTT = bestResult.RTTMedianMs
-		}
-	}
-
 	result := make(map[string]GameTelemetryItem)
+	anyMeasured := false
 
-	for _, g := range catalog.Games {
-		var base, accel float64
-		var regName string
+	for _, g := range u.profileMgr.Catalog().Games {
+		var baseline, accel float64
+		var regionName, anchorLabel, anchorID string
+		regions := make([]RegionTelemetry, 0, len(g.Regions))
 
-		idLower := strings.ToLower(g.ID + " " + g.Name)
-		switch {
-		case strings.Contains(idLower, "lol") || strings.Contains(idLower, "league"):
-			base = globalRTT
-			regName = "Asia-Pacific (Regional Direct Route)"
-		case strings.Contains(idLower, "cs2") || strings.Contains(idLower, "counter-strike"):
-			base = hkRTT
-			regName = "East Asia (Hong Kong / Tokyo Valve SDR)"
-		case strings.Contains(idLower, "apex"):
-			base = math.Round(((sgRTT+jpRTT)/2.0)*10) / 10
-			regName = "Asia-Pacific (Singapore / Tokyo Hub)"
-		case strings.Contains(idLower, "thefinals") || strings.Contains(idLower, "finals"):
-			base = jpRTT
-			regName = "East Asia (Tokyo Matchmaking)"
-		case strings.Contains(idLower, "overwatch"):
-			base = math.Round(((jpRTT+krRTT)/2.0)*10) / 10
-			regName = "East Asia (Tokyo / Seoul Battle.net)"
-		case strings.Contains(idLower, "genshin") || strings.Contains(idLower, "elden"):
-			base = jpRTT
-			regName = "East Asia (Tokyo Direct Edge)"
-		case strings.Contains(idLower, "r6") || strings.Contains(idLower, "rainbow"):
-			base = hkRTT
-			regName = "East Asia (Hong Kong & Tokyo)"
-		default: // Valorant, PUBG, Dota 2, COD, etc.
-			base = sgRTT
-			regName = "Asia-Pacific (Singapore SDR)"
+		for _, region := range g.Regions {
+			rt := RegionTelemetry{ID: region.ID, Name: region.Name}
+			if anchor, ok := matchTelemetryAnchor(region.ID, region.Name); ok {
+				rt.Anchor = anchor.id
+				if rtt, measured := rtts[anchor.id]; measured && rtt > 0 {
+					rt.DirectRTTMs = rtt
+					rt.Measured = true
+					if baseline == 0 || rtt < baseline {
+						baseline = rtt
+						regionName = region.Name
+						anchorLabel = anchor.label
+						anchorID = anchor.id
+					}
+				}
+			}
+			regions = append(regions, rt)
+		}
+		if regionName == "" && len(g.Regions) > 0 {
+			regionName = g.Regions[0].Name
+		}
+		if regionName == "" {
+			regionName = "Global"
 		}
 
-		if base < 1.0 {
-			base = 15.0
+		source := "No direct anchor measured"
+		if baseline > 0 {
+			source = fmt.Sprintf("Lowest direct TCP RTT across regional cloud anchors (%s); anchors are not game servers", anchorLabel)
 		}
 
-		// Calculate genuine acceleration based on real measurements:
-		// 1. If currently connected and actively tunneling this game, use live engine latency
 		if engineStats.State == StateConnected && strings.EqualFold(engineStats.ActiveGame, g.ID) && engineStats.PingMs > 0 {
 			accel = float64(engineStats.PingMs)
-		} else if bestRelayRTT > 0 && bestRelayRTT < (base-2.0) {
-			// Relay route achieves real reduction over congested public routing
-			accel = math.Round((bestRelayRTT+1.5)*10) / 10
-		} else {
-			// Direct connection is already physically optimal: honest zero-drop report
-			accel = base
+			source = "Live tunnel RTT measured by the engine"
+			for _, region := range g.Regions {
+				if region.ID == engineStats.ActiveRegion {
+					regionName = region.Name
+					break
+				}
+			}
 		}
 
-		var trend string
-		if accel < base-1.0 {
-			pct := int(math.Round((1.0 - (accel / base)) * 100))
-			trend = fmt.Sprintf("%d%% Faster", pct)
-		} else {
-			trend = "Optimal Route (0% Loss)"
+		trend := "Not measured"
+		switch {
+		case baseline > 0 && accel > 0:
+			if accel < baseline-1.0 {
+				pct := int(math.Round((1.0 - (accel / baseline)) * 100))
+				trend = fmt.Sprintf("%d%% lower than the direct anchor", pct)
+			} else {
+				trend = "No measured improvement over the direct anchor"
+			}
+		case baseline > 0:
+			trend = "Direct anchor measured; connect to compare tunnel RTT"
+		case accel > 0:
+			trend = "Tunnel RTT measured; no matching direct anchor"
 		}
 
+		measured := baseline > 0 || accel > 0
+		if measured {
+			anyMeasured = true
+		}
 		result[g.ID] = GameTelemetryItem{
 			GameID:       g.ID,
-			Region:       regName,
-			BaselinePing: math.Round(base*10) / 10,
+			Region:       regionName,
+			BaselinePing: math.Round(baseline*10) / 10,
 			AccelPing:    math.Round(accel*10) / 10,
 			Trend:        trend,
+			Measured:     measured,
+			Source:       source,
+			Anchor:       anchorID,
+			Regions:      regions,
 		}
 	}
 
-	gameTelemMu.Lock()
-	gameTelemCache = result
-	gameTelemTime = time.Now()
-	gameTelemMu.Unlock()
+	if anyMeasured {
+		gameTelemMu.Lock()
+		gameTelemCache = result
+		gameTelemTime = time.Now()
+		gameTelemMu.Unlock()
+	}
 
 	_ = json.NewEncoder(w).Encode(result)
 }
@@ -1253,6 +1491,7 @@ func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code      string `json:"code"`
 		Host      string `json:"host"`
+		Name      string `json:"name"`
 		RelayID   string `json:"relayId"`
 		RelayName string `json:"relayName"`
 		Game      string `json:"game"`
@@ -1264,22 +1503,22 @@ func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bodyBytes, _ := json.Marshal(req)
-	if u.proxyRelaySquad(w, "/squad/create", "POST", bodyBytes) {
+	if req.Host == "" {
+		req.Host = req.Name
+	}
+	req.Host = strings.TrimSpace(req.Host)
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	if req.Host == "" {
+		writeJSONError(w, http.StatusBadRequest, "host name is required")
 		return
 	}
-
 	if req.Code == "" {
 		req.Code = fmt.Sprintf("LGVX-%04d", time.Now().UnixNano()%9000+1000)
 	}
-	if req.Host == "" {
-		req.Host = "Party Host"
-	}
-	if req.RelayName == "" {
-		req.RelayName = "Singapore SDR Edge"
-	}
-	if req.ISP == "" {
-		req.ISP = "Fiber Broadband"
+
+	bodyBytes, _ := json.Marshal(req)
+	if u.proxyRelaySquad(w, "/squad/create", "POST", bodyBytes) {
+		return
 	}
 
 	squadRoomsMu.Lock()
@@ -1297,7 +1536,7 @@ func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 		ISP:      req.ISP,
 		Ping:     req.Ping,
 		Game:     req.Game,
-		Status:   "Synced ⚡",
+		Status:   "In room",
 		LastSeen: time.Now(),
 	}
 	squadRooms[req.Code] = room
@@ -1328,40 +1567,39 @@ func (u *UIServer) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Code == "" {
+		writeJSONError(w, http.StatusBadRequest, "room code is required")
+		return
+	}
+	if req.Name == "" {
+		writeJSONError(w, http.StatusBadRequest, "player name is required")
+		return
+	}
+
 	bodyBytes, _ := json.Marshal(req)
 	if u.proxyRelaySquad(w, "/squad/join", "POST", bodyBytes) {
 		return
 	}
 
-	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
 	squadRoomsMu.Lock()
 	room, ok := squadRooms[req.Code]
-	if !ok {
-		// Auto-create room if teammate enters code first
-		room = &SquadRoom{
-			Code:      req.Code,
-			Host:      req.Name,
-			RelayID:   "sg",
-			RelayName: "Singapore SDR Edge",
-			Members:   make(map[string]*SquadMemberInfo),
-			CreatedAt: time.Now(),
-		}
-		squadRooms[req.Code] = room
-	}
 	squadRoomsMu.Unlock()
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, "room not found; the host must create it first")
+		return
+	}
 
 	room.mu.Lock()
 	if len(room.Members) >= 5 && room.Members[req.Name] == nil {
 		room.mu.Unlock()
-		http.Error(w, `{"error":"Squad Room is full (5/5 players)"}`, http.StatusConflict)
+		writeJSONError(w, http.StatusConflict, "squad room is full (5/5 players)")
 		return
 	}
 	role := "Member"
 	if req.Name == room.Host {
 		role = "Host"
-	}
-	if req.ISP == "" {
-		req.ISP = "Fiber Broadband"
 	}
 	room.Members[req.Name] = &SquadMemberInfo{
 		Name:     req.Name,
@@ -1369,7 +1607,7 @@ func (u *UIServer) handleSquadJoin(w http.ResponseWriter, r *http.Request) {
 		ISP:      req.ISP,
 		Ping:     req.Ping,
 		Game:     req.Game,
-		Status:   "Synced ⚡",
+		Status:   "In room",
 		LastSeen: time.Now(),
 	}
 	memberList := make([]SquadMemberInfo, 0, len(room.Members))
@@ -1440,10 +1678,9 @@ func (u *UIServer) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		Code   string `json:"code"`
-		Name   string `json:"name"`
-		Ping   int    `json:"ping"`
-		Status string `json:"status"`
+		Code string `json:"code"`
+		Name string `json:"name"`
+		Ping int    `json:"ping"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1464,12 +1701,9 @@ func (u *UIServer) handleSquadHeartbeat(w http.ResponseWriter, r *http.Request) 
 		room.mu.Lock()
 		if m, exists := room.Members[req.Name]; exists {
 			m.LastSeen = time.Now()
-			if req.Ping > 0 {
-				m.Ping = req.Ping
-			}
-			if req.Status != "" {
-				m.Status = req.Status
-			}
+			// A zero RTT is a real state (not boosting/no sample yet), so it
+			// replaces the previous value instead of leaving a stale reading.
+			m.Ping = req.Ping
 		}
 		room.mu.Unlock()
 	}
@@ -1517,17 +1751,22 @@ func (u *UIServer) handleSquadLeave(w http.ResponseWriter, r *http.Request) {
 func (u *UIServer) handleDiagnoseBufferbloat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// 1. Measure baseline idle ping
+	// 1. Measure baseline idle RTT. If this fails, report that no measurement
+	// was possible instead of inventing a value.
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	basePings, _ := probeTCPGateway(ctx, "1.1.1.1:53", 4)
 	if len(basePings) == 0 {
-		basePings = []float64{15.0}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"available": false,
+			"error":     "baseline RTT probe failed; no bufferbloat measurement was taken",
+		})
+		return
 	}
 	baseline := calculateMedian(basePings)
 
-	// 2. Generate short saturated network burst in parallel (1.0s download burst)
+	// 2. Generate a short saturated network burst in parallel.
 	burstDone := make(chan struct{})
 	go func() {
 		defer close(burstDone)
@@ -1554,53 +1793,58 @@ func (u *UIServer) handleDiagnoseBufferbloat(w http.ResponseWriter, r *http.Requ
 		wg.Wait()
 	}()
 
-	// 3. Measure loaded ping during the burst
+	// 3. Measure loaded RTT during the burst.
 	time.Sleep(150 * time.Millisecond)
 	loadedPings, _ := probeTCPGateway(ctx, "1.1.1.1:53", 4)
 	<-burstDone
 
 	if len(loadedPings) == 0 {
-		loadedPings = []float64{baseline + 2.5}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"available":  false,
+			"baselineMs": math.Round(baseline*10) / 10,
+			"error":      "loaded RTT probe failed; bufferbloat could not be measured",
+		})
+		return
 	}
 	loaded := calculateMedian(loadedPings)
 	diff := loaded - baseline
-	if diff < 0 {
-		diff = 0.5
+	gradeDiff := diff
+	if gradeDiff < 0 {
+		gradeDiff = 0
 	}
 
 	var grade, rating, advice string
 	switch {
-	case diff <= 6.0:
+	case gradeDiff <= 6.0:
 		grade = "A+"
 		rating = "Ultra Low Latency (Zero Queuing)"
-		advice = "Your home router and fiber line handle simultaneous downloads and gaming perfectly with zero input lag."
-	case diff <= 15.0:
+		advice = "The connection kept latency flat while the test saturated the link."
+	case gradeDiff <= 15.0:
 		grade = "A"
 		rating = "Minimal Bufferbloat"
-		advice = "Excellent connection responsiveness. Negligible queue delay during background downloads."
-	case diff <= 30.0:
+		advice = "Negligible queue delay appeared during background downloads."
+	case gradeDiff <= 30.0:
 		grade = "B"
 		rating = "Moderate Bufferbloat"
-		advice = "Minor queue delay detected during heavy background traffic. Lagvex DSCP EF-46 QoS prioritizes your gaming frames."
-	case diff <= 60.0:
+		advice = "Minor queue delay detected. Enabling Lagvex QoS can prioritize game UDP traffic."
+	case gradeDiff <= 60.0:
 		grade = "C"
 		rating = "Noticeable Bufferbloat"
-		advice = "Your ISP router experiences buffer saturation under load. Lagvex Kernel QoS + MTU clamping recommended."
+		advice = "The router queues traffic under load. Lagvex QoS and MTU tuning may help."
 	default:
 		grade = "D"
 		rating = "Severe Bufferbloat Detected"
-		advice = "Substantial modem queuing delay. Enable Lagvex DSCP hardware priority and limit background downloads while gaming."
+		advice = "Substantial queuing delay under load. Limit background downloads and enable QoS."
 	}
 
 	res := map[string]any{
+		"available":  true,
 		"baselineMs": math.Round(baseline*10) / 10,
 		"loadedMs":   math.Round(loaded*10) / 10,
 		"diffMs":     math.Round(diff*10) / 10,
 		"grade":      grade,
 		"rating":     rating,
 		"advice":     advice,
-		"mtu":        1400,
 	}
 	_ = json.NewEncoder(w).Encode(res)
 }
-

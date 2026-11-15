@@ -306,3 +306,63 @@ func TestCalculateRouteAdvice(t *testing.T) {
 		t.Errorf("expected VerdictDirect when relay is unreachable, got %s", advice.Verdict)
 	}
 }
+
+func TestProbeHistoryAccumulates(t *testing.T) {
+	psk := []byte("test-psk-prober-secret-123")
+	_, endpoint := startMockRelayUDPServer(t, psk, 5*time.Millisecond)
+
+	prober := NewProberWithConfig(ProberConfig{
+		DefaultSamples: 2,
+		SampleTimeout:  1 * time.Second,
+		SampleInterval: 5 * time.Millisecond,
+	})
+	relay := profiles.RelayEndpoint{
+		ID:       "history-relay",
+		Name:     "History Relay",
+		Endpoint: endpoint,
+		PSK:      string(psk),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	first := prober.ProbeEndpoint(ctx, relay, 2)
+	if first.HistorySamples != 1 {
+		t.Fatalf("expected 1 history sample after first probe, got %d", first.HistorySamples)
+	}
+	if first.RTTAvgMs <= 0 {
+		t.Fatalf("expected a positive average RTT, got %f", first.RTTAvgMs)
+	}
+	if len(first.RTTTrend) != 1 {
+		t.Fatalf("expected 1 trend point, got %d", len(first.RTTTrend))
+	}
+	if first.LastProbeAt == "" {
+		t.Fatalf("expected lastProbeAt to be set")
+	}
+
+	second := prober.ProbeEndpoint(ctx, relay, 2)
+	if second.HistorySamples != 2 {
+		t.Fatalf("expected 2 history samples after second probe, got %d", second.HistorySamples)
+	}
+	if len(second.RTTTrend) != 2 {
+		t.Fatalf("expected 2 trend points, got %d", len(second.RTTTrend))
+	}
+	if second.RTTStdMs < 0 {
+		t.Fatalf("expected a non-negative RTT standard deviation, got %f", second.RTTStdMs)
+	}
+}
+
+func TestProbeHistorySkipsMissingPSK(t *testing.T) {
+	prober := NewProberWithConfig(ProberConfig{
+		DefaultSamples: 1,
+		SampleTimeout:  50 * time.Millisecond,
+		SampleInterval: 5 * time.Millisecond,
+	})
+	result := prober.ProbeEndpoint(context.Background(), profiles.RelayEndpoint{
+		ID:       "no-psk",
+		Endpoint: "127.0.0.1:59997",
+	}, 1)
+	if result.HistorySamples != 0 {
+		t.Fatalf("a missing PSK must not be recorded as a network sample, got %d", result.HistorySamples)
+	}
+}
