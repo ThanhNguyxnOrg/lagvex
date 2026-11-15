@@ -7,6 +7,72 @@ All notable changes to the **Lagvex** project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> Note: tags `v1.1.1`–`v1.1.3` were created without changelog entries; their contents are
+> not reconstructed here. The v1.2.0 section below describes everything shipped since
+> v1.1.0.
+
+---
+
+## [1.2.0] - 2026-11-15
+
+### 🧭 Honest telemetry overhaul (breaking behavior changes)
+
+- Connect now validates the selected game region against real CIDRs and **requires a
+  relay PSK**; there is no fallback key anywhere in the client, the UI or the prober.
+- Diagnostics, advisor, bufferbloat and game-telemetry responses only contain measured
+  values. Probes that fail return explicit errors instead of placeholder numbers.
+- Tweak results list only the changes that actually applied.
+
+### 📊 Measured node history
+
+- The prober retains up to 60 probe runs per endpoint and reports measured average RTT,
+  standard deviation, average loss and a trend series.
+- The Nodes tab renders a sparkline, latest/avg RTT, loss and the retained sample count.
+
+### 🧭 Route detail (`GET /api/route-detail`)
+
+- Measures the local gateway, a direct relay probe (plus retained avg/std), the live
+  tunnel echo and loss, and a public cloud anchor for the selected region.
+- The relay → game-server segment is reported as unmeasured instead of guessed, and the
+  tunnel overhead appears only when both same-endpoint measurements exist.
+
+### 🔌 Game process awareness
+
+- `GET /api/detected-processes` scans the process table once per poll and the UI marks
+  running games; the boost view names the detected executable.
+- `GET /api/game-connections` lists the sockets held by running game processes on
+  Windows, macOS and Linux (read-only OS socket tables; no injection).
+- `POST /api/peer-routing/toggle` (off by default) installs `/32` routes for the public
+  peers the game actually talks to, with a 64-route cap and stale-route cleanup.
+
+### 🧾 Diagnostics snapshot
+
+- `GET /api/diagnostics/export` writes measured state plus non-secret settings; relay
+  PSKs are never included. `POST /api/diagnostics/import` merges settings back and
+  reports skipped entries as warnings.
+
+### 🛡️ Reliability and platform fixes
+
+- FEC parity flushes on schedule, hedging is bounded and failover races are fixed.
+- Non-Linux relay hosts fail fast instead of silently dropping packets.
+- macOS DNS diagnostics read the live resolver list via `scutil --dns`.
+- QoS wording matches reality: the relay socket is tagged with the Windows QoS API or
+  `IP_TOS` (best effort) depending on the platform.
+
+### 🖥️ Dashboard
+
+- The legacy `web/app.js` / `web/style.css` frontend was removed; the React/Vite app in
+  `ui_source/` builds into `web/` and is embedded in the binary.
+- Added the draggable Floating HUD, honest empty states (`—` plus the reason) and a
+  single-copy squad room UI without invented Discord links or route sharing.
+- Squad rooms now require a host/player name, reject unknown room codes with 404, clear
+  stale RTT on heartbeat and use a neutral "In room" status.
+
+### 🗂️ Catalog and relay behavior
+
+- The bundled relay catalog is empty; tests fail if a `lagvex.org` relay ever reappears.
+- Relay PSKs are redacted from every API response and never leave the machine.
+
 ---
 
 ## [1.1.0] - 2026-10-07
