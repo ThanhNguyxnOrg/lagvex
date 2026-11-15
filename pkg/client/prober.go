@@ -348,6 +348,35 @@ type ProbeHistoryReport struct {
 	RTTTrend       []float64 `json:"rttTrend,omitempty"`
 }
 
+// HistoryFor returns the retained measured history for one endpoint.
+func (p *Prober) HistoryFor(endpoint string) (ProbeHistoryReport, bool) {
+	key := strings.ToLower(endpoint)
+
+	p.histMu.Lock()
+	entries, ok := p.history[key]
+	if !ok {
+		p.histMu.Unlock()
+		return ProbeHistoryReport{}, false
+	}
+	stored := make([]probeHistoryEntry, len(entries))
+	copy(stored, entries)
+	p.histMu.Unlock()
+
+	avgMs, stdMs, lossAvgPct, trend, lastAt := summarizeHistory(stored)
+	report := ProbeHistoryReport{
+		Endpoint:       key,
+		RTTAvgMs:       avgMs,
+		RTTStdMs:       stdMs,
+		LossAvgPct:     lossAvgPct,
+		HistorySamples: len(stored),
+		RTTTrend:       trend,
+	}
+	if !lastAt.IsZero() {
+		report.LastProbeAt = lastAt.Format(time.RFC3339)
+	}
+	return report, true
+}
+
 // HistorySnapshot returns a copy of the measured history for every endpoint
 // this prober has probed, without performing any new probes.
 func (p *Prober) HistorySnapshot() []ProbeHistoryReport {

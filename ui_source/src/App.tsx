@@ -468,6 +468,39 @@ export type GameConnectionReport = {
   games: GameConnectionStatus[];
 };
 
+export type RouteHop = {
+  id: string;
+  label: string;
+  target?: string;
+  rttMs?: number;
+  rttAvgMs?: number;
+  rttStdMs?: number;
+  lossPct?: number;
+  samples?: number;
+  measured: boolean;
+  reason?: string;
+  note?: string;
+};
+
+export type RouteAnchor = {
+  id: string;
+  label: string;
+  target: string;
+  rttMs?: number;
+  measured: boolean;
+  note?: string;
+};
+
+export type RouteDetail = {
+  measuredAt: string;
+  regionName?: string;
+  connected: boolean;
+  hops: RouteHop[];
+  overheadMs: number;
+  anchor: RouteAnchor;
+  notes: string[];
+};
+
 function cleanNodeDisplayName(rawName: string, loc: string): { title: string; subtitle: string; flag: string } {
   // Preserve the operator-provided name instead of rewriting it into a
   // marketing label. Only strip a leading bracketed region prefix.
@@ -737,6 +770,8 @@ export default function App() {
   const [detectedGames, setDetectedGames] = useState<Record<string, DetectedGame>>({});
   const [gameConnections, setGameConnections] = useState<GameConnectionReport | null>(null);
   const [isScanningConnections, setIsScanningConnections] = useState(false);
+  const [routeDetail, setRouteDetail] = useState<RouteDetail | null>(null);
+  const [isMeasuringRoute, setIsMeasuringRoute] = useState(false);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -1066,6 +1101,40 @@ export default function App() {
     }
   };
 
+  // Route detail: measure each hop the client can observe (on demand)
+  const handleMeasureRouteDetail = async (silent = false) => {
+    if (!silent) setIsMeasuringRoute(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedGame.profileAvailable) params.set("gameId", selectedGame.id);
+      if (selectedRegion?.id) params.set("regionId", selectedRegion.id);
+      if (selectedRelay.address) params.set("relayEndpoint", selectedRelay.address);
+
+      const res = await fetch(`/api/route-detail?${params.toString()}`);
+      if (!res.ok) {
+        if (!silent) notify(`Route measurement failed (${res.status}).`);
+        return;
+      }
+      const data = await res.json();
+      setRouteDetail({
+        measuredAt: typeof data.measuredAt === "string" ? data.measuredAt : "",
+        regionName: typeof data.regionName === "string" ? data.regionName : "",
+        connected: data.connected === true,
+        hops: Array.isArray(data.hops) ? data.hops : [],
+        overheadMs: typeof data.overheadMs === "number" ? data.overheadMs : 0,
+        anchor:
+          data.anchor && typeof data.anchor === "object"
+            ? data.anchor
+            : { id: "", label: "", target: "", measured: false },
+        notes: Array.isArray(data.notes) ? data.notes : []
+      });
+    } catch {
+      if (!silent) notify("Failed to reach the local Lagvex service.");
+    } finally {
+      if (!silent) setIsMeasuringRoute(false);
+    }
+  };
+
   // Save nickname
   const handleSaveNickname = () => {
     const trimmed = tempNickname.trim();
@@ -1214,6 +1283,13 @@ export default function App() {
       clearInterval(timer);
     };
   }, [isBoosting]);
+
+  // Keep the route detail fresh while the routing view is open.
+  useEffect(() => {
+    if (activeTab !== "boost" || boostSubTab !== "routing") return;
+    void handleMeasureRouteDetail(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, boostSubTab, selectedGame.id, selectedRegion?.id, selectedRelay.address, isBoosting]);
 
   // Ping History Oscilloscope Chart Loop (renders only real engine samples)
   useEffect(() => {
@@ -2529,6 +2605,117 @@ export default function App() {
                             </span>
                           )}
                         </div>
+                      </div>
+
+                      {/* ROUTE DETAIL (MEASURED) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                              ROUTE DETAIL (MEASURED)
+                            </span>
+                            <span className="text-[10px] text-white/40">
+                              Every value is measured locally. Segments the client cannot observe say why.
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {routeDetail?.measuredAt && (
+                              <span className="text-[10px] font-mono text-white/35">
+                                measured {new Date(routeDetail.measuredAt).toLocaleTimeString()}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => void handleMeasureRouteDetail()}
+                              disabled={isMeasuringRoute}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-brand font-bold cursor-pointer border-none transition-all ${
+                                isMeasuringRoute
+                                  ? "bg-white/10 text-white/40 cursor-wait"
+                                  : "bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF]"
+                              }`}
+                            >
+                              {isMeasuringRoute ? "Measuring…" : "Measure route"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {routeDetail && (
+                          <>
+                            <div className="flex flex-col gap-1.5">
+                              {routeDetail.hops.map((hop) => (
+                                <div
+                                  key={hop.id}
+                                  className="flex items-center justify-between gap-3 p-2 rounded-lg bg-white/[0.02]"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className={`w-2 h-2 rounded-full shrink-0 ${
+                                        hop.measured ? "bg-[#10b981]" : "bg-white/20"
+                                      }`}
+                                    />
+                                    <span className="text-xs font-brand font-bold text-white shrink-0">
+                                      {hop.label}
+                                    </span>
+                                    {hop.target && (
+                                      <span className="text-[10px] font-mono text-white/35 truncate">
+                                        {hop.target}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-end shrink-0">
+                                    <span
+                                      className={`font-mono text-xs font-bold ${
+                                        hop.measured ? "text-[#00F0FF]" : "text-white/30"
+                                      }`}
+                                    >
+                                      {hop.measured && hop.rttMs ? `${hop.rttMs} ms` : "—"}
+                                    </span>
+                                    {hop.measured ? (
+                                      <span className="text-[9px] text-white/40 font-mono text-right">
+                                        {hop.note || ""}
+                                        {hop.samples ? ` • ${hop.samples} sample(s)` : ""}
+                                        {hop.rttAvgMs
+                                          ? ` • avg ${hop.rttAvgMs}±${hop.rttStdMs ?? 0}`
+                                          : ""}
+                                        {typeof hop.lossPct === "number" && hop.lossPct > 0
+                                          ? ` • loss ${hop.lossPct}%`
+                                          : ""}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] text-[#f59e0b]/80 font-mono text-right max-w-[340px]">
+                                        {hop.reason || "not measured"}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {routeDetail.overheadMs !== 0 && (
+                                <span className="text-[10px] font-mono text-white/60 bg-white/[0.04] px-2 py-1 rounded">
+                                  Tunnel overhead vs direct probe:{" "}
+                                  {routeDetail.overheadMs > 0 ? "+" : ""}
+                                  {routeDetail.overheadMs} ms
+                                </span>
+                              )}
+                              {routeDetail.anchor.target && (
+                                <span className="text-[10px] font-mono text-white/60 bg-white/[0.04] px-2 py-1 rounded">
+                                  {routeDetail.anchor.label} anchor (direct):{" "}
+                                  {routeDetail.anchor.measured && routeDetail.anchor.rttMs
+                                    ? `${routeDetail.anchor.rttMs} ms`
+                                    : "—"}{" "}
+                                  — {routeDetail.anchor.note}
+                                </span>
+                              )}
+                            </div>
+
+                            {routeDetail.notes.map((note, idx) => (
+                              <span key={idx} className="text-[9px] text-white/30">
+                                {note}
+                              </span>
+                            ))}
+                          </>
+                        )}
                       </div>
                     </div>
                   ) : (
