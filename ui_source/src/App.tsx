@@ -444,6 +444,30 @@ export type DetectedGame = {
   running: boolean;
 };
 
+export type GameConnection = {
+  protocol: string;
+  family: string;
+  local: string;
+  remote: string;
+  state?: string;
+};
+
+export type GameConnectionStatus = {
+  gameId: string;
+  name: string;
+  running: boolean;
+  process?: string;
+  pid?: number;
+  connections: GameConnection[];
+};
+
+export type GameConnectionReport = {
+  supported: boolean;
+  note: string;
+  scannedAt: string;
+  games: GameConnectionStatus[];
+};
+
 function cleanNodeDisplayName(rawName: string, loc: string): { title: string; subtitle: string; flag: string } {
   // Preserve the operator-provided name instead of rewriting it into a
   // marketing label. Only strip a leading bracketed region prefix.
@@ -711,6 +735,8 @@ export default function App() {
 
   // Detected game processes (measured by one local process-table scan)
   const [detectedGames, setDetectedGames] = useState<Record<string, DetectedGame>>({});
+  const [gameConnections, setGameConnections] = useState<GameConnectionReport | null>(null);
+  const [isScanningConnections, setIsScanningConnections] = useState(false);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -746,6 +772,7 @@ export default function App() {
   const selectedRegion =
     (selectedGame.regions || []).find((region) => region.id === selectedRegionId) ||
     (selectedGame.regions || [])[0];
+  const selectedGameConnections = gameConnections?.games.find((g) => g.gameId === selectedGame.id);
 
   // Filtered games for Library Tab
   const filteredGames = useMemo(() => {
@@ -1016,6 +1043,29 @@ export default function App() {
     }
   };
 
+  // Game server connections: read-only scan of the local OS socket tables
+  const handleScanGameConnections = async (silent = false) => {
+    if (!silent) setIsScanningConnections(true);
+    try {
+      const res = await fetch("/api/game-connections");
+      if (!res.ok) {
+        if (!silent) notify(`Connection scan failed (${res.status}).`);
+        return;
+      }
+      const data = await res.json();
+      setGameConnections({
+        supported: data.supported === true,
+        note: typeof data.note === "string" ? data.note : "",
+        scannedAt: typeof data.scannedAt === "string" ? data.scannedAt : "",
+        games: Array.isArray(data.games) ? data.games : []
+      });
+    } catch {
+      if (!silent) notify("Failed to reach the local Lagvex service.");
+    } finally {
+      if (!silent) setIsScanningConnections(false);
+    }
+  };
+
   // Save nickname
   const handleSaveNickname = () => {
     const trimmed = tempNickname.trim();
@@ -1138,6 +1188,32 @@ export default function App() {
       clearInterval(timer);
     };
   }, []);
+
+  // While a tunnel is up, keep the socket view fresh (read-only scan).
+  useEffect(() => {
+    if (!isBoosting) return;
+    let stopped = false;
+    const scan = async () => {
+      try {
+        const res = await fetch("/api/game-connections");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped) return;
+        setGameConnections({
+          supported: data.supported === true,
+          note: typeof data.note === "string" ? data.note : "",
+          scannedAt: typeof data.scannedAt === "string" ? data.scannedAt : "",
+          games: Array.isArray(data.games) ? data.games : []
+        });
+      } catch {}
+    };
+    scan();
+    const timer = setInterval(scan, 10000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [isBoosting]);
 
   // Ping History Oscilloscope Chart Loop (renders only real engine samples)
   useEffect(() => {
@@ -2470,6 +2546,103 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                  {/* GAME SERVER CONNECTIONS (MEASURED, READ-ONLY) */}
+                  <div className="mt-4 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                          GAME SERVER CONNECTIONS
+                        </span>
+                        <span className="text-[10px] text-white/40">
+                          Read from the local OS socket tables. Nothing is injected into {selectedGame.name}.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {gameConnections?.scannedAt && (
+                          <span className="text-[10px] font-mono text-white/35">
+                            scanned {new Date(gameConnections.scannedAt).toLocaleTimeString()}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => void handleScanGameConnections()}
+                          disabled={isScanningConnections}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-brand font-bold cursor-pointer border-none transition-all ${
+                            isScanningConnections
+                              ? "bg-white/10 text-white/40 cursor-wait"
+                              : "bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 text-[#00F0FF]"
+                          }`}
+                        >
+                          {isScanningConnections ? "Scanning…" : "Scan now"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {gameConnections && !gameConnections.supported && (
+                      <span className="text-[11px] text-[#f59e0b]">
+                        {gameConnections.note || "Socket enumeration is unavailable on this system."}
+                      </span>
+                    )}
+
+                    {gameConnections?.supported && (!selectedGameConnections || !selectedGameConnections.running) && (
+                      <span className="text-[11px] text-white/40">
+                        Game process not detected. Launch the game or join a match, then scan again.
+                      </span>
+                    )}
+
+                    {gameConnections?.supported && selectedGameConnections?.running && (
+                      <>
+                        <span className="text-[10px] font-mono text-white/40">
+                          {selectedGameConnections.process} (PID {selectedGameConnections.pid}) &bull;{" "}
+                          {selectedGameConnections.connections.length} unique endpoint(s)
+                        </span>
+                        {selectedGameConnections.connections.length === 0 ? (
+                          <span className="text-[11px] text-white/40">
+                            No connected sockets seen yet. Enter a match and scan again.
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-1.5 font-mono text-xs text-white/80 max-h-[140px] overflow-y-auto">
+                            {selectedGameConnections.connections.map((conn, idx) => (
+                              <div
+                                key={`${conn.protocol}-${conn.remote || conn.local}-${idx}`}
+                                className="flex items-center justify-between gap-3 p-1.5 rounded bg-white/[0.02]"
+                              >
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`text-[9px] font-brand font-bold px-1.5 py-0.5 rounded ${
+                                      conn.protocol === "udp"
+                                        ? "bg-[#00F0FF]/15 text-[#00F0FF]"
+                                        : "bg-[#7E42FF]/15 text-[#a78bfa]"
+                                    }`}
+                                  >
+                                    {conn.protocol.toUpperCase()}
+                                  </span>
+                                  <span className="truncate">
+                                    {conn.remote || `${conn.local} (local only)`}
+                                  </span>
+                                  {conn.state && <span className="text-[9px] text-white/30">{conn.state}</span>}
+                                </span>
+                                {conn.remote && (
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(conn.remote);
+                                      notify(`Copied ${conn.remote}`);
+                                    }}
+                                    className="text-[10px] text-white/40 hover:text-white bg-transparent border-none cursor-pointer shrink-0"
+                                  >
+                                    Copy
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {gameConnections.note && (
+                          <span className="text-[9px] text-white/30">{gameConnections.note}</span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

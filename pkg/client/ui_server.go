@@ -83,6 +83,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/status", u.handleStatus)
 	mux.HandleFunc("/api/games", u.handleGames)
 	mux.HandleFunc("/api/detected-processes", u.handleDetectedProcesses)
+	mux.HandleFunc("/api/game-connections", u.handleGameConnections)
 	mux.HandleFunc("/api/relays", u.handleRelays)
 	mux.HandleFunc("/api/probe-relays", u.handleProbeRelays)
 	mux.HandleFunc("/api/best-relay", u.handleBestRelay)
