@@ -772,6 +772,9 @@ export default function App() {
   const [isScanningConnections, setIsScanningConnections] = useState(false);
   const [routeDetail, setRouteDetail] = useState<RouteDetail | null>(null);
   const [isMeasuringRoute, setIsMeasuringRoute] = useState(false);
+  const [peerRouting, setPeerRouting] = useState(false);
+  const [peerRouteCount, setPeerRouteCount] = useState(0);
+  const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -1135,6 +1138,32 @@ export default function App() {
     }
   };
 
+  // Peer routing: opt-in /32 routes for the peers the game actually talks to
+  const handleTogglePeerRouting = async () => {
+    try {
+      const res = await fetch("/api/peer-routing/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !peerRouting })
+      });
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Could not change peer routing: ${message.trim()}`);
+        return;
+      }
+      const data = await res.json();
+      setPeerRouting(data.enabled === true);
+      setPeerRouteCount(Array.isArray(data.peerRoutes) ? data.peerRoutes.length : 0);
+      notify(
+        data.enabled
+          ? "Peer routing enabled: observed game peers get a /32 route."
+          : "Peer routing disabled; peer routes removed."
+      );
+    } catch {
+      notify("Failed to reach the local Lagvex service.");
+    }
+  };
+
   // Save nickname
   const handleSaveNickname = () => {
     const trimmed = tempNickname.trim();
@@ -1370,6 +1399,10 @@ export default function App() {
         const data = await res.json();
         if (stopped) return;
 
+        setPeerRouting(data.peerRouting === true);
+        if (Array.isArray(data.peerRoutes)) setPeerRoutes(data.peerRoutes);
+        if (typeof data.peerRouteCount === "number") setPeerRouteCount(data.peerRouteCount);
+
         if (data.state === "connected") {
           setIsBoosting(true);
           setConnectionError(null);
@@ -1377,6 +1410,8 @@ export default function App() {
           if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
         } else if (data.state === "disconnected" || data.state === "error") {
           setIsBoosting(false);
+          setPeerRoutes([]);
+          setPeerRouteCount(0);
           if (data.lastError) setConnectionError(data.lastError);
         }
       } catch {}
@@ -2716,6 +2751,48 @@ export default function App() {
                             ))}
                           </>
                         )}
+                      </div>
+
+                      {/* PEER ROUTING (OBSERVED PROCESS TRAFFIC) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                              PEER ROUTING (OBSERVED PROCESS TRAFFIC)
+                            </span>
+                            <span className="text-[10px] text-white/40">
+                              Routes only the public IPs the detected game process actually talks to, read from the OS
+                              socket tables. Off by default; stale peers are removed automatically.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => void handleTogglePeerRouting()}
+                            className={`h-[34px] px-4 rounded-xl text-[10px] font-brand font-bold cursor-pointer border-none transition-all shrink-0 ${
+                              peerRouting
+                                ? "bg-[#10b981] text-black shadow-md shadow-[#10b981]/20"
+                                : "bg-white/[0.08] text-white/60 hover:bg-white/15"
+                            }`}
+                          >
+                            {peerRouting ? "PEER ROUTING: ON" : "PEER ROUTING: OFF"}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-[10px] font-mono text-white/60 bg-white/[0.04] px-2 py-1 rounded">
+                            Active peer routes: {peerRouteCount}
+                          </span>
+                          {peerRoutes.length > 0 && (
+                            <span className="text-[10px] font-mono text-white/45 truncate max-w-[560px]">
+                              {peerRoutes.slice(0, 8).join(", ")}
+                              {peerRoutes.length > 8 ? ` +${peerRoutes.length - 8} more` : ""}
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-[9px] text-white/30">
+                          On Windows only TCP peers are visible to the OS; UDP peers are not observed there, so peer
+                          routing may need the region CIDRs as well.
+                        </span>
                       </div>
                     </div>
                   ) : (

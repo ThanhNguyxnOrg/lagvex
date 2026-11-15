@@ -65,3 +65,32 @@ func (u *UIServer) handleGameConnections(w http.ResponseWriter, r *http.Request)
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+// handlePeerRoutingToggle enables or disables opt-in /32 routing for the
+// public peers a running game process is observed talking to.
+func (u *UIServer) handlePeerRoutingToggle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if u.engine == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "engine is not running")
+		return
+	}
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	u.engine.SetPeerRouting(req.Enabled)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success":    true,
+		"enabled":    u.engine.PeerRoutingEnabled(),
+		"peerRoutes": u.engine.ActivePeerRoutes(),
+	})
+}

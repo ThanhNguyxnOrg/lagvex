@@ -112,3 +112,28 @@ func TestMergeConnectionsDedupes(t *testing.T) {
 		t.Fatalf("unexpected merge result: %+v", merged)
 	}
 }
+
+func TestFilterPublicPeerIPs(t *testing.T) {
+	conns := []ProcessConnection{
+		{Protocol: "udp", Remote: "203.0.113.7:8080"},
+		{Protocol: "udp", Remote: "203.0.113.7:9090"}, // duplicate peer, different port
+		{Protocol: "tcp", Remote: "198.51.100.4:443"},
+		{Protocol: "udp", Remote: "192.168.1.10:5000"}, // private
+		{Protocol: "udp", Remote: "127.0.0.1:5353"},    // loopback
+		{Protocol: "udp", Remote: "100.64.1.2:1234"},   // CGNAT
+		{Protocol: "udp", Remote: "169.254.1.1:1"},     // link-local
+		{Protocol: "tcp", Remote: "[2001:db8::1]:443"}, // IPv6
+		{Protocol: "udp", Local: "127.0.0.1:3000"},     // local-only, no peer
+	}
+
+	got := filterPublicPeerIPs(conns)
+	want := []string{"198.51.100.4", "203.0.113.7"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}

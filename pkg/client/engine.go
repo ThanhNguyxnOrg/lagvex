@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -58,6 +59,12 @@ type TunnelStats struct {
 	PacketLossPct    float64        `json:"packetLossPct"`
 	DriverMode       string         `json:"driverMode,omitempty"`
 	LastError        string         `json:"lastError,omitempty"`
+
+	// Peer routing: opt-in /32 routes for the public IPs the detected game
+	// process actually talks to, read from the OS socket tables.
+	PeerRouting    bool     `json:"peerRouting"`
+	PeerRouteCount int      `json:"peerRouteCount"`
+	PeerRouteIPs   []string `json:"peerRoutes,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -114,6 +121,11 @@ type Engine struct {
 	fecParityRecv    atomic.Uint64
 	l4FilterEnabled  atomic.Bool
 	lossPctBits      atomic.Uint64
+
+	peerRoutingEnabled atomic.Bool
+	peerMu             sync.Mutex
+	peerRoutes         map[string]time.Time // peer IP -> last time it was observed
+	peerLoopCancel     context.CancelFunc
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -132,6 +144,7 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 		fecEncoder:    protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
 		fecDecoder:    protocol.NewFECDecoder(128),
 		fecController: protocol.NewAdaptiveFECController(),
+		peerRoutes:    make(map[string]time.Time),
 	}
 	e.autoFailoverEnabled.Store(true)
 	e.fecEnabled.Store(true)
@@ -159,6 +172,7 @@ func (e *Engine) Stats() TunnelStats {
 	}
 
 	loss := math.Float64frombits(e.lossPctBits.Load())
+	peerIPs := e.peerRouteIPs()
 
 	return TunnelStats{
 		State:            e.state,
@@ -188,6 +202,160 @@ func (e *Engine) Stats() TunnelStats {
 		PacketLossPct:    loss,
 		DriverMode:       e.driverMode,
 		LastError:        lastErrStr,
+		PeerRouting:      e.peerRoutingEnabled.Load(),
+		PeerRouteCount:   len(peerIPs),
+		PeerRouteIPs:     peerIPs,
+	}
+}
+
+const (
+	peerRouteInterval = 5 * time.Second
+	peerRouteTTL      = 3 * time.Minute
+	maxPeerRoutes     = 64
+)
+
+// SetPeerRouting enables or disables /32 routing for the public peers a
+// running game process is observed talking to. Disabling removes them at once.
+func (e *Engine) SetPeerRouting(enabled bool) {
+	e.peerRoutingEnabled.Store(enabled)
+	if !enabled {
+		e.stopPeerRouting()
+		return
+	}
+
+	e.mu.Lock()
+	connected := e.state == StateConnected
+	e.mu.Unlock()
+	if connected {
+		e.startPeerRouting()
+	}
+}
+
+// PeerRoutingEnabled reports whether observed-peer routing is on.
+func (e *Engine) PeerRoutingEnabled() bool {
+	return e.peerRoutingEnabled.Load()
+}
+
+// ActivePeerRoutes returns the currently routed peer IPs, sorted.
+func (e *Engine) ActivePeerRoutes() []string {
+	return e.peerRouteIPs()
+}
+
+func (e *Engine) peerRouteIPs() []string {
+	e.peerMu.Lock()
+	defer e.peerMu.Unlock()
+	ips := make([]string, 0, len(e.peerRoutes))
+	for ip := range e.peerRoutes {
+		ips = append(ips, ip)
+	}
+	sort.Strings(ips)
+	return ips
+}
+
+func (e *Engine) startPeerRouting() {
+	if !e.peerRoutingEnabled.Load() {
+		return
+	}
+
+	e.peerMu.Lock()
+	if e.peerLoopCancel != nil {
+		e.peerMu.Unlock()
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	e.peerLoopCancel = cancel
+	e.peerMu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(peerRouteInterval)
+		defer ticker.Stop()
+
+		e.syncPeerRoutes()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				e.syncPeerRoutes()
+			}
+		}
+	}()
+}
+
+func (e *Engine) stopPeerRouting() {
+	e.peerMu.Lock()
+	cancel := e.peerLoopCancel
+	e.peerLoopCancel = nil
+	stale := make([]string, 0, len(e.peerRoutes))
+	for ip := range e.peerRoutes {
+		stale = append(stale, ip)
+	}
+	e.peerRoutes = make(map[string]time.Time)
+	e.peerMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	if len(stale) > 0 {
+		e.routeManager.RemovePeerRoutes(stale)
+	}
+}
+
+// syncPeerRoutes reads the running game process's sockets and keeps a /32
+// route installed for every public peer it is talking to. Peers that have not
+// been seen for peerRouteTTL are removed again.
+func (e *Engine) syncPeerRoutes() {
+	if !e.peerRoutingEnabled.Load() {
+		return
+	}
+
+	e.mu.Lock()
+	connected := e.state == StateConnected
+	var pid int
+	if e.watcher != nil {
+		pid = e.watcher.ActivePID()
+	}
+	e.mu.Unlock()
+	if !connected || pid <= 0 {
+		return
+	}
+
+	conns, supported := scanProcessConnections(pid)
+	if !supported {
+		return
+	}
+	observed := filterPublicPeerIPs(conns)
+
+	now := time.Now()
+	var added, removed []string
+
+	e.peerMu.Lock()
+	for _, ip := range observed {
+		if _, exists := e.peerRoutes[ip]; exists {
+			e.peerRoutes[ip] = now
+			continue
+		}
+		if len(e.peerRoutes) >= maxPeerRoutes {
+			continue
+		}
+		e.peerRoutes[ip] = now
+		added = append(added, ip)
+	}
+	for ip, lastSeen := range e.peerRoutes {
+		if now.Sub(lastSeen) > peerRouteTTL {
+			delete(e.peerRoutes, ip)
+			removed = append(removed, ip)
+		}
+	}
+	e.peerMu.Unlock()
+
+	if len(added) > 0 {
+		log.Printf("[Engine] Peer routing: adding %d observed peer route(s)", len(added))
+		e.routeManager.AddPeerRoutes(added)
+	}
+	if len(removed) > 0 {
+		log.Printf("[Engine] Peer routing: removing %d stale peer route(s)", len(removed))
+		e.routeManager.RemovePeerRoutes(removed)
 	}
 }
 
@@ -430,6 +598,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 				cList := e.gameCIDRs
 				e.mu.Unlock()
 				e.routeManager.InstallGameRoutes(cList)
+				e.startPeerRouting()
 			}
 			e.watcher.OnGameStopped = func(proc string) {
 				log.Printf("[Engine] Game process %q exited. Removing game routes...", proc)
@@ -437,6 +606,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 				e.isGameActive = false
 				e.mu.Unlock()
 				e.routeManager.RemoveGameRoutes()
+				e.stopPeerRouting()
 			}
 			go e.watcher.Start(ctx, 2*time.Second)
 		}
@@ -477,6 +647,7 @@ func (e *Engine) Disconnect() error {
 	}
 
 	// Clean up routes first while interface still exists
+	e.stopPeerRouting()
 	e.routeManager.RemoveAll()
 
 	if adapter != nil {

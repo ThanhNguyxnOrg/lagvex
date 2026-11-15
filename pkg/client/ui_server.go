@@ -85,6 +85,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/detected-processes", u.handleDetectedProcesses)
 	mux.HandleFunc("/api/game-connections", u.handleGameConnections)
 	mux.HandleFunc("/api/route-detail", u.handleRouteDetail)
+	mux.HandleFunc("/api/peer-routing/toggle", u.handlePeerRoutingToggle)
 	mux.HandleFunc("/api/relays", u.handleRelays)
 	mux.HandleFunc("/api/probe-relays", u.handleProbeRelays)
 	mux.HandleFunc("/api/best-relay", u.handleBestRelay)
@@ -173,6 +174,9 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"smartL4Filter":    stats.SmartL4Filter,
 		"packetLoss":       stats.PacketLoss,
 		"packetLossPct":    stats.PacketLossPct,
+		"peerRouting":      stats.PeerRouting,
+		"peerRouteCount":   stats.PeerRouteCount,
+		"peerRoutes":       stats.PeerRouteIPs,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }

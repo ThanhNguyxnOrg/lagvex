@@ -24,6 +24,7 @@ type RouteManager struct {
 
 	tunIfIndex         uint32
 	installedGameCIDRs []string
+	installedPeers     []string
 	pinnedRelayRoute   string
 	pinnedPhysIndex    uint32
 }
@@ -175,12 +176,87 @@ func (r *RouteManager) RemoveGameRoutes() {
 	r.installedGameCIDRs = r.installedGameCIDRs[:0]
 }
 
+// AddPeerRoutes installs /32 routes for individual observed peer IPs and
+// returns the prefixes that were newly installed.
+func (r *RouteManager) AddPeerRoutes(ips []string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.tunIfIndex == 0 {
+		return nil
+	}
+
+	added := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		prefix := ip + "/32"
+		already := false
+		for _, existing := range r.installedPeers {
+			if existing == prefix {
+				already = true
+				break
+			}
+		}
+		if already {
+			continue
+		}
+		_ = runNetsh(fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
+			prefix, r.tunIfIndex))
+		cmd := fmt.Sprintf("interface ipv4 add route prefix=%s interface=%d metric=1 store=active",
+			prefix, r.tunIfIndex)
+		if err := runNetsh(cmd); err == nil {
+			r.installedPeers = append(r.installedPeers, prefix)
+			added = append(added, prefix)
+		} else {
+			log.Printf("[Route] Failed to add peer route %s: %v", prefix, err)
+		}
+	}
+	return added
+}
+
+// RemovePeerRoutes removes previously installed peer /32 routes.
+func (r *RouteManager) RemovePeerRoutes(ips []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.tunIfIndex == 0 || len(ips) == 0 {
+		return
+	}
+	wanted := make(map[string]bool, len(ips))
+	for _, ip := range ips {
+		wanted[strings.TrimSpace(ip)] = true
+	}
+	kept := r.installedPeers[:0]
+	for _, prefix := range r.installedPeers {
+		if wanted[strings.TrimSuffix(prefix, "/32")] {
+			_ = runNetsh(fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
+				prefix, r.tunIfIndex))
+			continue
+		}
+		kept = append(kept, prefix)
+	}
+	r.installedPeers = kept
+}
+
+func (r *RouteManager) removeAllPeersLocked() {
+	for _, prefix := range r.installedPeers {
+		_ = runNetsh(fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
+			prefix, r.tunIfIndex))
+	}
+	r.installedPeers = r.installedPeers[:0]
+}
+
 // RemoveAll cleans all game routes and unpins the relay route.
 func (r *RouteManager) RemoveAll() {
 	r.RemoveGameRoutes()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	r.removeAllPeersLocked()
 
 	if r.pinnedRelayRoute != "" && r.pinnedPhysIndex != 0 {
 		cmd := fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
@@ -196,7 +272,7 @@ func (r *RouteManager) RemoveAll() {
 func (r *RouteManager) ActiveRouteCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	count := len(r.installedGameCIDRs)
+	count := len(r.installedGameCIDRs) + len(r.installedPeers)
 	if r.pinnedRelayRoute != "" {
 		count++
 	}

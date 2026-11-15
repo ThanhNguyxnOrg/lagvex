@@ -18,6 +18,7 @@ type RouteManager struct {
 	mu             sync.Mutex
 	tunName        string
 	installedCIDRs []string
+	installedPeers []string
 	pinnedRelay    string
 	pinnedDev      string
 }
@@ -143,11 +144,78 @@ func (r *RouteManager) RemoveGameRoutes() {
 	r.installedCIDRs = r.installedCIDRs[:0]
 }
 
+// AddPeerRoutes installs /32 routes for individual observed peer IPs and
+// returns the prefixes that were newly installed.
+func (r *RouteManager) AddPeerRoutes(ips []string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.tunName == "" {
+		return nil
+	}
+
+	added := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip == "" {
+			continue
+		}
+		prefix := ip + "/32"
+		already := false
+		for _, existing := range r.installedPeers {
+			if existing == prefix {
+				already = true
+				break
+			}
+		}
+		if already {
+			continue
+		}
+		if err := exec.Command("ip", "route", "replace", prefix, "dev", r.tunName).Run(); err == nil {
+			r.installedPeers = append(r.installedPeers, prefix)
+			added = append(added, prefix)
+		}
+	}
+	return added
+}
+
+// RemovePeerRoutes removes previously installed peer /32 routes.
+func (r *RouteManager) RemovePeerRoutes(ips []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(ips) == 0 {
+		return
+	}
+	wanted := make(map[string]bool, len(ips))
+	for _, ip := range ips {
+		wanted[strings.TrimSpace(ip)] = true
+	}
+	kept := r.installedPeers[:0]
+	for _, prefix := range r.installedPeers {
+		if wanted[strings.TrimSuffix(prefix, "/32")] {
+			_ = exec.Command("ip", "route", "del", prefix).Run()
+			continue
+		}
+		kept = append(kept, prefix)
+	}
+	r.installedPeers = kept
+}
+
+func (r *RouteManager) removeAllPeersLocked() {
+	for _, prefix := range r.installedPeers {
+		_ = exec.Command("ip", "route", "del", prefix).Run()
+	}
+	r.installedPeers = r.installedPeers[:0]
+}
+
 func (r *RouteManager) RemoveAll() {
 	r.RemoveGameRoutes()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	r.removeAllPeersLocked()
 
 	if r.pinnedRelay != "" {
 		_ = exec.Command("ip", "route", "del", r.pinnedRelay).Run()
@@ -158,7 +226,7 @@ func (r *RouteManager) RemoveAll() {
 func (r *RouteManager) ActiveRouteCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	count := len(r.installedCIDRs)
+	count := len(r.installedCIDRs) + len(r.installedPeers)
 	if r.pinnedRelay != "" {
 		count++
 	}

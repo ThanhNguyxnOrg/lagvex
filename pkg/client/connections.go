@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net"
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,6 +49,40 @@ func mergeConnections(existing, extra []ProcessConnection) []ProcessConnection {
 		}
 		return out[i].Protocol < out[j].Protocol
 	})
+	return out
+}
+
+// filterPublicPeerIPs keeps remote addresses that are safe to route: public,
+// global-unicast IPv4 endpoints held by the observed process. Private,
+// loopback, link-local, multicast, CGNAT and IPv6 addresses are skipped.
+func filterPublicPeerIPs(conns []ProcessConnection) []string {
+	seen := make(map[string]struct{}, len(conns))
+	out := make([]string, 0, len(conns))
+	for _, conn := range conns {
+		host, _, err := net.SplitHostPort(conn.Remote)
+		if err != nil {
+			continue
+		}
+		ip, err := netip.ParseAddr(host)
+		if err != nil || !ip.Is4() {
+			continue
+		}
+		if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		// Exclude carrier-grade NAT space (100.64.0.0/10): never a game server.
+		octets := ip.As4()
+		if octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127 {
+			continue
+		}
+		text := ip.String()
+		if _, ok := seen[text]; ok {
+			continue
+		}
+		seen[text] = struct{}{}
+		out = append(out, text)
+	}
+	sort.Strings(out)
 	return out
 }
 

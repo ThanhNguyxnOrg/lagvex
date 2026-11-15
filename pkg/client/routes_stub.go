@@ -27,6 +27,10 @@ func (r *RouteManager) InstallGameRoutes(cidrs []string) {}
 
 func (r *RouteManager) RemoveGameRoutes() {}
 
+func (r *RouteManager) AddPeerRoutes(ips []string) []string { return nil }
+
+func (r *RouteManager) RemovePeerRoutes(ips []string) {}
+
 func (r *RouteManager) RemoveAll() {}
 
 func (r *RouteManager) ActiveRouteCount() int { return 0 }
