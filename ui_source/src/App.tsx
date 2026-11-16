@@ -434,6 +434,10 @@ export type RelayNode = {
   rttTrend: number[];
   historySamples: number;
   lastProbeAt: string;
+  /** Relay's own RTT to the region anchor (measured by the relay). */
+  relayAnchorRttMs: number;
+  /** client→relay + relay→anchor, the measured path estimate used for ranking. */
+  totalEstimateMs: number;
 };
 
 export type DetectedGame = {
@@ -544,7 +548,9 @@ const EMPTY_RELAY: RelayNode = {
   lossAvgPct: 0,
   rttTrend: [],
   historySamples: 0,
-  lastProbeAt: ""
+  lastProbeAt: "",
+  relayAnchorRttMs: 0,
+  totalEstimateMs: 0
 };
 
 function mapProbeRelays(data: unknown): RelayNode[] {
@@ -581,7 +587,9 @@ function mapProbeRelays(data: unknown): RelayNode[] {
           ? item.rttTrend.filter((v: unknown): v is number => typeof v === "number")
           : [],
         historySamples: typeof item.historySamples === "number" ? item.historySamples : 0,
-        lastProbeAt: typeof item.lastProbeAt === "string" ? item.lastProbeAt : ""
+        lastProbeAt: typeof item.lastProbeAt === "string" ? item.lastProbeAt : "",
+        relayAnchorRttMs: typeof item.relayAnchorRttMs === "number" ? item.relayAnchorRttMs : 0,
+        totalEstimateMs: typeof item.totalEstimateMs === "number" ? item.totalEstimateMs : 0
       };
     });
 }
@@ -3410,15 +3418,25 @@ export default function App() {
                   </button>
                   <button
                     onClick={async () => {
-                      notify("⚡ Probing global routing nodes in real-time...");
+                      notify(
+                        selectedRegion?.id
+                          ? "⚡ Probing relays (client RTT + relay → region anchor)..."
+                          : "⚡ Probing global routing nodes in real-time..."
+                      );
                       try {
-                        const res = await fetch("/api/probe-relays");
+                        const params = new URLSearchParams();
+                        if (selectedGame.profileAvailable) params.set("gameId", selectedGame.id);
+                        if (selectedRegion?.id) params.set("regionId", selectedRegion.id);
+                        const query = params.toString();
+                        const res = await fetch(`/api/probe-relays${query ? `?${query}` : ""}`);
                         if (res.ok) {
                           const data = await res.json();
                           const mapped = mapProbeRelays(data);
                           setRelays(mapped);
                           if (mapped.length === 0) {
                             notify("No relays are configured. Deploy a relay or add a custom node first.");
+                          } else if (selectedRegion?.id) {
+                            notify("✅ Relays ranked by measured client + relay → region anchor RTT.");
                           } else {
                             notify("✅ Relays reprobed with measured RTT and loss.");
                           }
@@ -3523,6 +3541,11 @@ export default function App() {
                           <span className="text-[9px] font-mono text-white/35">
                             {relay.historySamples > 0 ? `${relay.historySamples} probe${relay.historySamples === 1 ? "" : "s"} kept` : "No probe history yet"}
                           </span>
+                          {relay.totalEstimateMs > 0 && (
+                            <span className="text-[9px] font-mono text-[#10b981]">
+                              via relay: {relay.totalEstimateMs} ms total (relay → region {relay.relayAnchorRttMs} ms)
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex flex-col items-end gap-1 w-[110px]">

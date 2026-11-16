@@ -78,6 +78,12 @@ func TestFilterRelaysByContinent(t *testing.T) {
 
 // startMockRelayUDPServer starts a lightweight mock Lagvex UDP relay for testing prober.
 func startMockRelayUDPServer(t *testing.T, psk []byte, simulatedDelay time.Duration) (*net.UDPConn, string) {
+	return startMockRelayUDPServerMode(t, psk, simulatedDelay, true)
+}
+
+// startMockRelayUDPServerMode additionally controls whether the mock answers
+// anchor probes, so tests can cover the graceful "no reply" path.
+func startMockRelayUDPServerMode(t *testing.T, psk []byte, simulatedDelay time.Duration, answerAnchors bool) (*net.UDPConn, string) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("failed to listen UDP: %v", err)
@@ -130,6 +136,16 @@ func startMockRelayUDPServer(t *testing.T, psk []byte, simulatedDelay time.Durat
 						pongBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 						pong := sessCrypto.EncodePong(pongBuf, sessionID, ts)
 						_, _ = conn.WriteToUDP(pong, remote)
+					case protocol.TypeAnchorProbe:
+						if !answerAnchors {
+							continue
+						}
+						packed, _ := protocol.DecodeControlPayload(payload)
+						seq, _ := protocol.DecodeAnchorProbeRequest(packed)
+						replyBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+						reply := sessCrypto.EncodeAnchorProbeReply(replyBuf, sessionID,
+							protocol.EncodeAnchorProbeReply(seq, 12_345, 0))
+						_, _ = conn.WriteToUDP(reply, remote)
 					case protocol.TypeDisconnect:
 						sessCrypto = nil
 						sessionID = 0
@@ -364,5 +380,68 @@ func TestProbeHistorySkipsMissingPSK(t *testing.T) {
 	}, 1)
 	if result.HistorySamples != 0 {
 		t.Fatalf("a missing PSK must not be recorded as a network sample, got %d", result.HistorySamples)
+	}
+}
+
+func TestProbeEndpointWithAnchorMeasuresRelaySegment(t *testing.T) {
+	psk := []byte("test-psk-prober-secret-123")
+	_, endpoint := startMockRelayUDPServer(t, psk, 5*time.Millisecond)
+
+	prober := NewProberWithConfig(ProberConfig{
+		DefaultSamples: 2,
+		SampleTimeout:  1 * time.Second,
+		SampleInterval: 5 * time.Millisecond,
+	})
+	relay := profiles.RelayEndpoint{
+		ID:       "anchor-relay",
+		Endpoint: endpoint,
+		PSK:      string(psk),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := prober.ProbeEndpointWithAnchor(ctx, relay, 2, 1)
+	if !result.Reachable {
+		t.Fatalf("expected a reachable relay, got error %q", result.Error)
+	}
+	if result.RelayAnchorRTTMs <= 0 {
+		t.Fatalf("expected a relay anchor RTT, got %f", result.RelayAnchorRTTMs)
+	}
+	if result.TotalEstimateMs < result.RTTMedianMs {
+		t.Fatalf("total estimate %f must include the client->relay RTT %f", result.TotalEstimateMs, result.RTTMedianMs)
+	}
+
+	// A plain probe must not carry anchor values.
+	plain := prober.ProbeEndpoint(ctx, relay, 2)
+	if plain.RelayAnchorRTTMs != 0 || plain.TotalEstimateMs != 0 {
+		t.Fatalf("plain probe must not report anchor values: %+v", plain)
+	}
+}
+
+func TestProbeEndpointWithoutAnchorReplyDegradesGracefully(t *testing.T) {
+	psk := []byte("test-psk-prober-secret-123")
+	_, endpoint := startMockRelayUDPServerMode(t, psk, 5*time.Millisecond, false)
+
+	prober := NewProberWithConfig(ProberConfig{
+		DefaultSamples: 1,
+		SampleTimeout:  1 * time.Second,
+		SampleInterval: 5 * time.Millisecond,
+	})
+	relay := profiles.RelayEndpoint{
+		ID:       "silent-anchor-relay",
+		Endpoint: endpoint,
+		PSK:      string(psk),
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	result := prober.ProbeEndpointWithAnchor(ctx, relay, 1, 1)
+	if !result.Reachable {
+		t.Fatalf("relay should stay reachable without an anchor reply, got error %q", result.Error)
+	}
+	if result.RelayAnchorRTTMs != 0 || result.TotalEstimateMs != 0 {
+		t.Fatalf("no anchor reply must mean no anchor values: %+v", result)
 	}
 }

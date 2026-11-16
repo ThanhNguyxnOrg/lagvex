@@ -41,7 +41,17 @@ type ProbeResult struct {
 	RTTTrend       []float64 `json:"rttTrend,omitempty"`
 	HistorySamples int       `json:"historySamples,omitempty"`
 	LastProbeAt    string    `json:"lastProbeAt,omitempty"`
+
+	// Per-segment anchor measurement: the relay's own RTT to one allowlisted
+	// public anchor (relay -> region), and the client->relay + relay->anchor
+	// estimate used to score per-segment paths.
+	RelayAnchorRTTMs float64 `json:"relayAnchorRttMs,omitempty"`
+	TotalEstimateMs  float64 `json:"totalEstimateMs,omitempty"`
 }
+
+// anchorProbeTimeout bounds the wait for a relay anchor-probe reply during a
+// sweep. The relay itself dials two TCP samples with 1.5s timeouts each.
+const anchorProbeTimeout = 3500 * time.Millisecond
 
 // probeHistoryEntry is one completed probe run for an endpoint.
 type probeHistoryEntry struct {
@@ -104,7 +114,14 @@ func NewProberWithConfig(cfg ProberConfig) *Prober {
 }
 
 // ProbeEndpoint tests an individual relay node and returns detailed telemetry.
-func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint, samples int) (result ProbeResult) {
+func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint, samples int) ProbeResult {
+	return p.ProbeEndpointWithAnchor(ctx, relay, samples, 0)
+}
+
+// ProbeEndpointWithAnchor also asks the relay for its own RTT to an allowlisted
+// anchor (protocol.AnchorProbeTargets) when anchorID is not zero, so callers
+// can score the whole client->relay->anchor segment instead of one hop.
+func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.RelayEndpoint, samples int, anchorID byte) (result ProbeResult) {
 	if samples <= 0 {
 		samples = p.cfg.DefaultSamples
 	}
@@ -245,6 +262,49 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 			pRtt := float64(time.Since(pStart).Microseconds()) / 1000.0
 			rtts = append(rtts, pRtt)
 		}
+
+		// Optional per-segment measurement: the relay's own RTT to an
+		// allowlisted anchor. The relay rejects unknown ids, so this can never
+		// be pointed at an arbitrary host.
+		if anchorID != 0 {
+			seq := uint32(time.Now().UnixNano())
+			probeBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+			probePacket := sessCrypto.EncodeAnchorProbe(probeBuf, resp.SessionID,
+				protocol.EncodeAnchorProbeRequest(seq, anchorID))
+
+			probeDeadline := time.Now().Add(anchorProbeTimeout)
+			if d, ok := ctx.Deadline(); ok && d.Before(probeDeadline) {
+				probeDeadline = d
+			}
+			_ = conn.SetDeadline(probeDeadline)
+
+			if _, err := conn.WriteToUDP(probePacket, udpAddr); err == nil {
+			waitAnchorReply:
+				for {
+					an, _, err := conn.ReadFromUDP(recvBuf)
+					if err != nil {
+						break
+					}
+					plainA := make([]byte, protocol.MaxPacketSize)
+					mtypeA, payloadA, err := sessCrypto.OpenPacket(plainA, recvBuf[:an])
+					if err != nil || mtypeA != protocol.TypeAnchorProbeReply {
+						continue
+					}
+					packed, err := protocol.DecodeControlPayload(payloadA)
+					if err != nil {
+						continue
+					}
+					replySeq, rttUs, _ := protocol.DecodeAnchorProbeReply(packed)
+					if replySeq != seq {
+						continue
+					}
+					if rttUs > 0 {
+						result.RelayAnchorRTTMs = roundTo(float64(rttUs)/1000.0, 1)
+					}
+					break waitAnchorReply
+				}
+			}
+		}
 	}
 
 	// Calculate loss
@@ -264,6 +324,9 @@ func (p *Prober) ProbeEndpoint(ctx context.Context, relay profiles.RelayEndpoint
 
 	// Composite score: Score = RTT_median + (2 * Jitter) + (PacketLoss * 50)
 	result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs)+(result.PacketLoss*50.0), 2)
+	if result.RelayAnchorRTTMs > 0 {
+		result.TotalEstimateMs = roundTo(result.RTTMedianMs+result.RelayAnchorRTTMs, 1)
+	}
 
 	return result
 }
@@ -434,6 +497,13 @@ func calculateStdDev(vals []float64) float64 {
 // Reachable relays are sorted with lowest composite score first.
 // The top reachable relay is marked with IsOptimal = true.
 func (p *Prober) ProbeAll(ctx context.Context, relays []profiles.RelayEndpoint, concurrency int) []ProbeResult {
+	return p.ProbeAllWithAnchor(ctx, relays, concurrency, 0)
+}
+
+// ProbeAllWithAnchor additionally asks every reachable relay for its own RTT to
+// one allowlisted anchor and sorts by the measured client->relay->anchor total
+// when those per-segment values exist.
+func (p *Prober) ProbeAllWithAnchor(ctx context.Context, relays []profiles.RelayEndpoint, concurrency int, anchorID byte) []ProbeResult {
 	if len(relays) == 0 {
 		return nil
 	}
@@ -476,7 +546,7 @@ func (p *Prober) ProbeAll(ctx context.Context, relays []profiles.RelayEndpoint, 
 						Error:     "context cancelled",
 					}
 				default:
-					results[task.index] = p.ProbeEndpoint(ctx, task.relay, p.cfg.DefaultSamples)
+					results[task.index] = p.ProbeEndpointWithAnchor(ctx, task.relay, p.cfg.DefaultSamples, anchorID)
 				}
 			}
 		}()
@@ -484,10 +554,31 @@ func (p *Prober) ProbeAll(ctx context.Context, relays []profiles.RelayEndpoint, 
 
 	wg.Wait()
 
-	// Sort: Reachable first sorted by Score ascending, then unreachable
+	// When per-segment totals are available, they rank reachable relays by the
+	// full measured path; otherwise the client->relay score decides.
+	anyTotals := false
+	for i := range results {
+		if results[i].Reachable && results[i].TotalEstimateMs > 0 {
+			anyTotals = true
+			break
+		}
+	}
+
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].Reachable != results[j].Reachable {
 			return results[i].Reachable
+		}
+		if anyTotals {
+			ti, tj := results[i].TotalEstimateMs, results[j].TotalEstimateMs
+			if ti == 0 {
+				ti = math.MaxFloat64
+			}
+			if tj == 0 {
+				tj = math.MaxFloat64
+			}
+			if ti != tj {
+				return ti < tj
+			}
 		}
 		return results[i].Score < results[j].Score
 	})
@@ -505,11 +596,17 @@ func (p *Prober) ProbeAll(ctx context.Context, relays []profiles.RelayEndpoint, 
 
 // SelectBest evaluates the given candidate relays and returns the optimal node.
 func (p *Prober) SelectBest(ctx context.Context, relays []profiles.RelayEndpoint) (*ProbeResult, error) {
+	return p.SelectBestWithAnchor(ctx, relays, 0)
+}
+
+// SelectBestWithAnchor ranks candidates by the measured client->relay->anchor
+// path when an anchor id is given, falling back to the client->relay score.
+func (p *Prober) SelectBestWithAnchor(ctx context.Context, relays []profiles.RelayEndpoint, anchorID byte) (*ProbeResult, error) {
 	if len(relays) == 0 {
 		return nil, errors.New("no relays provided")
 	}
 
-	results := p.ProbeAll(ctx, relays, p.cfg.DefaultConcurrency)
+	results := p.ProbeAllWithAnchor(ctx, relays, p.cfg.DefaultConcurrency, anchorID)
 	for _, res := range results {
 		if res.Reachable && res.IsOptimal {
 			best := res

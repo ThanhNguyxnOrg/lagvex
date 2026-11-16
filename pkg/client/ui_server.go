@@ -264,7 +264,14 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	anchorID := u.resolveAnchorProbeID(r.URL.Query().Get("gameId"), r.URL.Query().Get("regionId"))
+
+	sweepTimeout := 5 * time.Second
+	if anchorID != 0 {
+		// Each relay also performs an allowlisted anchor probe during the sweep.
+		sweepTimeout = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), sweepTimeout)
 	defer cancel()
 
 	prober := u.prober
@@ -274,7 +281,7 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 		prober = NewProberWithConfig(cfg)
 	}
 
-	results := prober.ProbeAll(ctx, relays, 8)
+	results := prober.ProbeAllWithAnchor(ctx, relays, 8, anchorID)
 	_ = json.NewEncoder(w).Encode(results)
 }
 
@@ -288,10 +295,16 @@ func (u *UIServer) handleBestRelay(w http.ResponseWriter, r *http.Request) {
 		relays = FilterRelaysByContinent(relays, continent)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	anchorID := u.resolveAnchorProbeID(r.URL.Query().Get("gameId"), r.URL.Query().Get("regionId"))
+
+	sweepTimeout := 5 * time.Second
+	if anchorID != 0 {
+		sweepTimeout = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), sweepTimeout)
 	defer cancel()
 
-	best, err := u.prober.SelectBest(ctx, relays)
+	best, err := u.prober.SelectBestWithAnchor(ctx, relays, anchorID)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(map[string]any{"error": err.Error()})
@@ -345,10 +358,15 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	// Auto Node Selection if requested or endpoint is "auto"
 	if req.AutoNode || req.RelayEndpoint == "auto" || req.RelayEndpoint == "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		anchorID := u.resolveAnchorProbeID(req.GameID, req.RegionID)
+		autoTimeout := 3 * time.Second
+		if anchorID != 0 {
+			autoTimeout = 15 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), autoTimeout)
 		defer cancel()
 
-		best, err := u.prober.SelectBest(ctx, catalog.Relays)
+		best, err := u.prober.SelectBestWithAnchor(ctx, catalog.Relays, anchorID)
 		if err == nil && best != nil {
 			req.RelayEndpoint = best.Endpoint
 			for _, rel := range catalog.Relays {
@@ -780,11 +798,16 @@ func (u *UIServer) handleAdvisor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	anchorID := u.resolveAnchorProbeID(gameID, regionID)
+	sweepTimeout := 3 * time.Second
+	if anchorID != 0 {
+		sweepTimeout = 15 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), sweepTimeout)
 	defer cancel()
 
 	// 1. Probe candidate relays to find optimal relay
-	bestRelay, err := u.prober.SelectBest(ctx, catalog.Relays)
+	bestRelay, err := u.prober.SelectBestWithAnchor(ctx, catalog.Relays, anchorID)
 	if err != nil {
 		for _, rel := range catalog.Relays {
 			res := u.prober.ProbeEndpoint(ctx, rel, 2)
@@ -1203,6 +1226,32 @@ var telemetryAnchors = []telemetryAnchor{
 // anchorTarget resolves the allowlisted probe target for an anchor.
 func anchorTarget(anchor telemetryAnchor) string {
 	return protocol.AnchorProbeTargets[anchor.probeID]
+}
+
+// resolveAnchorProbeID maps a game/region selection to the shared anchor
+// allowlist id, or 0 when the region has no anchor.
+func (u *UIServer) resolveAnchorProbeID(gameID, regionID string) byte {
+	if gameID == "" || regionID == "" || u.profileMgr == nil {
+		return 0
+	}
+	game, ok := u.profileMgr.FindGameByID(gameID)
+	if !ok {
+		return 0
+	}
+	regionName := ""
+	for _, region := range game.Regions {
+		if strings.EqualFold(region.ID, regionID) {
+			regionName = region.Name
+			break
+		}
+	}
+	if regionName == "" {
+		return 0
+	}
+	if anchor, ok := matchTelemetryAnchor(regionID, regionName); ok {
+		return anchor.probeID
+	}
+	return 0
 }
 
 func matchTelemetryAnchor(regionID, regionName string) (telemetryAnchor, bool) {
