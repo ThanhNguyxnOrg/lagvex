@@ -68,6 +68,9 @@ type TunnelStats struct {
 
 	// FullTunnel sends all IPv4 traffic through the relay (opt-in).
 	FullTunnel bool `json:"fullTunnel"`
+
+	// Failovers counts successful relay handovers in the current session.
+	Failovers int `json:"failovers"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -113,6 +116,7 @@ type Engine struct {
 	lastErr             atomic.Pointer[string]
 	autoFailoverEnabled atomic.Bool
 	lastFailover        atomic.Pointer[FailoverEvent]
+	failoverCount       atomic.Int64
 
 	fecEncoder       *protocol.FECEncoder
 	fecDecoder       *protocol.FECDecoder
@@ -221,6 +225,7 @@ func (e *Engine) Stats() TunnelStats {
 		PeerRouteCount:   len(peerIPs),
 		PeerRouteIPs:     peerIPs,
 		FullTunnel:       e.fullTunnelEnabled.Load(),
+		Failovers:        int(e.failoverCount.Load()),
 	}
 }
 
@@ -673,7 +678,9 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.upRate.Store(0)
 	e.downRate.Store(0)
 	e.lossPctBits.Store(0)
+	e.failoverCount.Store(0)
 	e.mu.Unlock()
+	e.failoverCtrl.ResetHistory()
 
 	// If manual mode, install routes right away
 	if forceRoutesNow && len(cidrs) > 0 {
@@ -779,6 +786,7 @@ func (e *Engine) Disconnect() error {
 	e.upRate.Store(0)
 	e.downRate.Store(0)
 	e.lossPctBits.Store(0)
+	e.failoverCount.Store(0)
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Tunnel disconnected and routes cleaned.")
@@ -1361,6 +1369,7 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 		HandoverOk:   true,
 	}
 	e.failoverCtrl.RecordSwitch(event)
+	e.failoverCount.Add(1)
 	e.lastFailover.Store(&event)
 
 	log.Printf("[Failover] Handover SUCCESSFUL: %s -> %s (RTT: %.1fms -> %.1fms, reason: %s)",

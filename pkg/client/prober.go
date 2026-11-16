@@ -51,6 +51,10 @@ type ProbeResult struct {
 	// Recent marks a relay the user connected through recently (set by the UI
 	// layer from the local config; the prober itself never sets it).
 	Recent bool `json:"recent,omitempty"`
+
+	// Unstable is derived from retained history: high average loss or a large
+	// RTT spread across at least three probe runs.
+	Unstable bool `json:"unstable,omitempty"`
 }
 
 // anchorProbeTimeout bounds the wait for a relay anchor-probe reply during a
@@ -378,6 +382,14 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 	if len(stored) > 0 {
 		result.LossAvgPct = lossAvgPct
 	}
+
+	// Mark relays whose retained history shows instability, so ranking can
+	// prefer a slightly slower but steady path.
+	if result.HistorySamples >= 3 && result.Reachable {
+		unstableLoss := result.LossAvgPct >= 5.0
+		unstableSpread := result.RTTAvgMs > 0 && result.RTTStdMs >= result.RTTAvgMs*0.35
+		result.Unstable = unstableLoss || unstableSpread
+	}
 }
 
 // summarizeHistory computes measured statistics from retained probe runs.
@@ -557,9 +569,14 @@ func (p *Prober) ProbeAllWithAnchor(ctx context.Context, relays []profiles.Relay
 	}
 
 	wg.Wait()
+	rankProbeResults(results)
+	return results
+}
 
-	// When per-segment totals are available, they rank reachable relays by the
-	// full measured path; otherwise the client->relay score decides.
+// rankProbeResults orders reachable relays (stable before unstable, then by
+// the measured per-segment total when available, else the composite score) and
+// marks the best reachable one as optimal.
+func rankProbeResults(results []ProbeResult) {
 	anyTotals := false
 	for i := range results {
 		if results[i].Reachable && results[i].TotalEstimateMs > 0 {
@@ -571,6 +588,11 @@ func (p *Prober) ProbeAllWithAnchor(ctx context.Context, relays []profiles.Relay
 	sort.SliceStable(results, func(i, j int) bool {
 		if results[i].Reachable != results[j].Reachable {
 			return results[i].Reachable
+		}
+		// A steady path beats a flapping one even when its current sample is
+		// slightly faster.
+		if results[i].Unstable != results[j].Unstable {
+			return !results[i].Unstable
 		}
 		if anyTotals {
 			ti, tj := results[i].TotalEstimateMs, results[j].TotalEstimateMs
@@ -587,15 +609,15 @@ func (p *Prober) ProbeAllWithAnchor(ctx context.Context, relays []profiles.Relay
 		return results[i].Score < results[j].Score
 	})
 
-	// Mark the best reachable node as optimal
+	for i := range results {
+		results[i].IsOptimal = false
+	}
 	for i := range results {
 		if results[i].Reachable {
 			results[i].IsOptimal = true
 			break
 		}
 	}
-
-	return results
 }
 
 // SelectBest evaluates the given candidate relays and returns the optimal node.

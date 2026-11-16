@@ -151,3 +151,24 @@ func TestEngineFailoverControls(t *testing.T) {
 		t.Fatalf("expected 0 initial history, got %d", len(hist))
 	}
 }
+
+func TestFailoverResetHistory(t *testing.T) {
+	fc := NewFailoverController(DefaultFailoverConfig())
+	fc.RecordSwitch(FailoverEvent{Timestamp: time.Now(), HandoverOk: true})
+
+	if len(fc.History()) != 1 {
+		t.Fatalf("expected one recorded event, got %d", len(fc.History()))
+	}
+	if fc.LastSwitchTime().IsZero() {
+		t.Fatalf("expected the cooldown timer to be set")
+	}
+
+	fc.ResetHistory()
+
+	if len(fc.History()) != 0 {
+		t.Fatalf("history must be empty after reset, got %d", len(fc.History()))
+	}
+	if !fc.LastSwitchTime().IsZero() {
+		t.Fatalf("cooldown timer must be cleared after reset")
+	}
+}

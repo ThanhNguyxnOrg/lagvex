@@ -180,6 +180,7 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"peerRouteCount":   stats.PeerRouteCount,
 		"peerRoutes":       stats.PeerRouteIPs,
 		"fullTunnel":       stats.FullTunnel,
+		"failovers":        stats.Failovers,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }

@@ -442,6 +442,8 @@ export type RelayNode = {
   isOptimal: boolean;
   /** Relay the user connected through recently. */
   recent: boolean;
+  /** History shows high loss or a large RTT spread. */
+  unstable: boolean;
 };
 
 export type DetectedGame = {
@@ -488,6 +490,18 @@ export type RouteHop = {
   measured: boolean;
   reason?: string;
   note?: string;
+};
+
+export type FailoverEventItem = {
+  timestamp: string;
+  oldRelayId: string;
+  oldRelayName: string;
+  newRelayId: string;
+  newRelayName: string;
+  oldPingMs: number;
+  newPingMs: number;
+  reason: string;
+  handoverOk: boolean;
 };
 
 export type RouteAnchor = {
@@ -556,7 +570,8 @@ const EMPTY_RELAY: RelayNode = {
   relayAnchorRttMs: 0,
   totalEstimateMs: 0,
   isOptimal: false,
-  recent: false
+  recent: false,
+  unstable: false
 };
 
 function mapProbeRelays(data: unknown): RelayNode[] {
@@ -597,7 +612,8 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         relayAnchorRttMs: typeof item.relayAnchorRttMs === "number" ? item.relayAnchorRttMs : 0,
         totalEstimateMs: typeof item.totalEstimateMs === "number" ? item.totalEstimateMs : 0,
         isOptimal: item.isOptimal === true,
-        recent: item.recent === true
+        recent: item.recent === true,
+        unstable: item.unstable === true
       };
     });
 }
@@ -799,6 +815,7 @@ export default function App() {
   const [fullTunnel, setFullTunnel] = useState(false);
   const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
   const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
+  const [failoverEvents, setFailoverEvents] = useState<FailoverEventItem[]>([]);
   const trafficCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [recentPeers, setRecentPeers] = useState<{ endpoint: string; firstSeen: number }[]>([]);
 
@@ -1419,6 +1436,27 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBoosting, selectedGame.id]);
+
+  // Relay failover history (measured handovers, per session).
+  useEffect(() => {
+    if (!isBoosting && activeTab !== "boost") return;
+    let stopped = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/failover/history");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped || !Array.isArray(data)) return;
+        setFailoverEvents(data as FailoverEventItem[]);
+      } catch {}
+    };
+    load();
+    const timer = setInterval(load, 10000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [isBoosting, activeTab]);
 
   // Keep the route detail fresh while the routing view is open.
   useEffect(() => {
@@ -3041,6 +3079,46 @@ export default function App() {
                         </span>
                       </div>
                     </div>
+
+                    <div className="mt-4 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                          RELAY FAILOVERS (THIS SESSION)
+                        </span>
+                        <span className="text-[10px] font-mono text-white/45">
+                          {failoverEvents.length === 0
+                            ? "No failovers yet"
+                            : `${failoverEvents.length} handover${failoverEvents.length === 1 ? "" : "s"}`}
+                        </span>
+                      </div>
+                      {failoverEvents.length === 0 ? (
+                        <span className="text-[10px] text-white/35">
+                          Automatic failover only switches when the measured path degrades; nothing has switched this
+                          session.
+                        </span>
+                      ) : (
+                        <div className="flex flex-col gap-1.5 font-mono text-[10px] text-white/70 max-h-[120px] overflow-y-auto">
+                          {failoverEvents
+                            .slice(-3)
+                            .reverse()
+                            .map((ev, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between gap-3 p-1.5 rounded bg-white/[0.02]"
+                              >
+                                <span className="truncate">
+                                  {new Date(ev.timestamp).toLocaleTimeString()} &bull;{" "}
+                                  {ev.oldRelayName || ev.oldRelayId} &rarr; {ev.newRelayName || ev.newRelayId}
+                                </span>
+                                <span className="shrink-0 text-white/50">
+                                  {Math.round(ev.oldPingMs)} &rarr; {Math.round(ev.newPingMs)} ms
+                                  {ev.handoverOk ? "" : " (failed)"}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                     </>
                   )}
 
@@ -3601,6 +3679,14 @@ export default function App() {
                                 title="You connected through this relay recently"
                               >
                                 RECENT
+                              </span>
+                            )}
+                            {relay.unstable && (
+                              <span
+                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#f59e0b]/20 text-[#f59e0b]"
+                                title="Retained probe history shows high loss or a large RTT spread"
+                              >
+                                UNSTABLE
                               </span>
                             )}
                           </div>

@@ -143,6 +143,15 @@ func (fc *FailoverController) RecordSwitch(event FailoverEvent) {
 	}
 }
 
+// ResetHistory clears recorded events and the cooldown timer so counters are
+// per-session; called when a fresh tunnel starts.
+func (fc *FailoverController) ResetHistory() {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	fc.history = fc.history[:0]
+	fc.lastSwitch = time.Time{}
+}
+
 // History returns a copy of recent handover events.
 func (fc *FailoverController) History() []FailoverEvent {
 	fc.mu.Lock()

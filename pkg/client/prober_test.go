@@ -445,3 +445,72 @@ func TestProbeEndpointWithoutAnchorReplyDegradesGracefully(t *testing.T) {
 		t.Fatalf("no anchor reply must mean no anchor values: %+v", result)
 	}
 }
+
+func TestUnstableRelayMarking(t *testing.T) {
+	now := time.Now()
+
+	lossy := NewProber()
+	lossy.history = map[string][]probeHistoryEntry{
+		"relay:1": {
+			{RTTMs: 30, Loss: 8, Reached: true, At: now},
+			{RTTMs: 31, Loss: 10, Reached: true, At: now},
+			{RTTMs: 30.5, Loss: 9, Reached: true, At: now},
+		},
+	}
+	lossyResult := ProbeResult{Endpoint: "relay:1", Reachable: true, RTTMedianMs: 30.5, PacketLoss: 9}
+	lossy.finishProbe(&lossyResult)
+	if !lossyResult.Unstable {
+		t.Fatalf("a relay with >=5%% average loss must be marked unstable: %+v", lossyResult)
+	}
+
+	steady := NewProber()
+	steady.history = map[string][]probeHistoryEntry{
+		"relay:2": {
+			{RTTMs: 30, Loss: 0, Reached: true, At: now},
+			{RTTMs: 30.4, Loss: 0, Reached: true, At: now},
+			{RTTMs: 30.2, Loss: 0, Reached: true, At: now},
+		},
+	}
+	steadyResult := ProbeResult{Endpoint: "relay:2", Reachable: true, RTTMedianMs: 30.2, PacketLoss: 0}
+	steady.finishProbe(&steadyResult)
+	if steadyResult.Unstable {
+		t.Fatalf("a steady relay must not be marked unstable: %+v", steadyResult)
+	}
+
+	fresh := NewProber()
+	firstRun := ProbeResult{Endpoint: "relay:3", Reachable: true, RTTMedianMs: 40, PacketLoss: 0}
+	fresh.finishProbe(&firstRun)
+	if firstRun.Unstable {
+		t.Fatalf("one sample must not be enough to call a relay unstable: %+v", firstRun)
+	}
+}
+
+func TestRankProbeResultsPrefersStable(t *testing.T) {
+	results := []ProbeResult{
+		{RelayID: "fast-but-flapping", Reachable: true, Score: 10, RTTMedianMs: 10, Unstable: true},
+		{RelayID: "steady-slower", Reachable: true, Score: 30, RTTMedianMs: 30},
+		{RelayID: "down", Reachable: false, Score: 999999},
+	}
+
+	rankProbeResults(results)
+
+	if results[0].RelayID != "steady-slower" || !results[0].IsOptimal {
+		t.Fatalf("a steady relay must rank first and be optimal: %+v", results)
+	}
+	if results[2].RelayID != "down" || results[2].IsOptimal {
+		t.Fatalf("unreachable relays must stay last and never optimal: %+v", results)
+	}
+}
+
+func TestRankProbeResultsUsesTotalsWhenMeasured(t *testing.T) {
+	results := []ProbeResult{
+		{RelayID: "near-but-slow-relay", Reachable: true, Score: 5, RTTMedianMs: 5, TotalEstimateMs: 120},
+		{RelayID: "far-but-fast-region", Reachable: true, Score: 40, RTTMedianMs: 40, TotalEstimateMs: 60},
+	}
+
+	rankProbeResults(results)
+
+	if results[0].RelayID != "far-but-fast-region" || !results[0].IsOptimal {
+		t.Fatalf("per-segment totals must decide the ranking when measured: %+v", results)
+	}
+}
