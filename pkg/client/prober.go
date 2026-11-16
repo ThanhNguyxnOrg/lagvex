@@ -47,6 +47,10 @@ type ProbeResult struct {
 	// estimate used to score per-segment paths.
 	RelayAnchorRTTMs float64 `json:"relayAnchorRttMs,omitempty"`
 	TotalEstimateMs  float64 `json:"totalEstimateMs,omitempty"`
+
+	// Recent marks a relay the user connected through recently (set by the UI
+	// layer from the local config; the prober itself never sets it).
+	Recent bool `json:"recent,omitempty"`
 }
 
 // anchorProbeTimeout bounds the wait for a relay anchor-probe reply during a

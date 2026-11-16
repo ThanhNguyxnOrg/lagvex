@@ -78,3 +78,30 @@ func TestConfigStorePersistence(t *testing.T) {
 		t.Fatalf("expected reloaded custom relay, got %+v", cfg2.CustomRelays)
 	}
 }
+
+func TestAddRecentRelay(t *testing.T) {
+	cs := NewConfigStore(filepath.Join(t.TempDir(), "user_config.json"))
+
+	cs.AddRecentRelay("a:1")
+	cs.AddRecentRelay("b:2")
+	cs.AddRecentRelay("a:1") // dedupe and move to front
+	cs.AddRecentRelay("c:3")
+	cs.AddRecentRelay("d:4") // cap at three entries
+
+	got := cs.Get().RecentRelays
+	want := []string{"d:4", "c:3", "a:1"}
+	if len(got) != len(want) {
+		t.Fatalf("recent relays = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("recent relays = %v, want %v", got, want)
+		}
+	}
+
+	// Empty input is ignored.
+	cs.AddRecentRelay("   ")
+	if got := cs.Get().RecentRelays; len(got) != 3 {
+		t.Fatalf("empty input must not change the list: %v", got)
+	}
+}

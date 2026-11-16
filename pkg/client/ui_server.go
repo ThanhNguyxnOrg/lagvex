@@ -284,6 +284,19 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := prober.ProbeAllWithAnchor(ctx, relays, 8, anchorID)
+
+	// Mark recently used relays from the local config so the dashboard can
+	// offer the same node-history shortcut as GearUP/Mudfish.
+	if u.configStore != nil {
+		for _, endpoint := range u.configStore.Get().RecentRelays {
+			for i := range results {
+				if strings.EqualFold(results[i].Endpoint, endpoint) {
+					results[i].Recent = true
+				}
+			}
+		}
+	}
+
 	_ = json.NewEncoder(w).Encode(results)
 }
 
@@ -425,6 +438,12 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[Dashboard] Connect error: %v", err)
 		writeJSONError(w, http.StatusBadGateway, err.Error())
 		return
+	}
+
+	// Remember the relay for the recent-node shortcut only after a real
+	// successful connect.
+	if u.configStore != nil {
+		u.configStore.AddRecentRelay(req.RelayEndpoint)
 	}
 
 	stats := u.engine.Stats()

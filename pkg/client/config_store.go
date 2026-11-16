@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
@@ -17,6 +18,7 @@ type UserConfig struct {
 	CustomGames       []profiles.GameDefinition `json:"customGames"`
 	CustomRelays      []profiles.RelayEndpoint  `json:"customRelays"`
 	Tweaks            map[string]bool           `json:"tweaks"`
+	RecentRelays      []string                  `json:"recentRelays,omitempty"`
 }
 
 // ConfigStore manages reading and writing UserConfig to disk atomically.
@@ -130,6 +132,31 @@ func (cs *ConfigStore) AddCustomRelay(relay profiles.RelayEndpoint) {
 	if !found {
 		cs.config.CustomRelays = append(cs.config.CustomRelays, relay)
 	}
+	cs.mu.Unlock()
+	_ = cs.Save()
+}
+
+// AddRecentRelay remembers the last few relays the user connected through,
+// most recent first (max 3), for quick re-selection like the node-history
+// lists in GearUP and Mudfish.
+func (cs *ConfigStore) AddRecentRelay(endpoint string) {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return
+	}
+
+	cs.mu.Lock()
+	recent := make([]string, 0, 4)
+	recent = append(recent, endpoint)
+	for _, existing := range cs.config.RecentRelays {
+		if len(recent) >= 3 {
+			break
+		}
+		if !strings.EqualFold(existing, endpoint) {
+			recent = append(recent, existing)
+		}
+	}
+	cs.config.RecentRelays = recent
 	cs.mu.Unlock()
 	_ = cs.Save()
 }

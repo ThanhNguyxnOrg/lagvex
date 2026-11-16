@@ -438,6 +438,10 @@ export type RelayNode = {
   relayAnchorRttMs: number;
   /** client→relay + relay→anchor, the measured path estimate used for ranking. */
   totalEstimateMs: number;
+  /** Top-ranked relay of the last measured sweep. */
+  isOptimal: boolean;
+  /** Relay the user connected through recently. */
+  recent: boolean;
 };
 
 export type DetectedGame = {
@@ -550,7 +554,9 @@ const EMPTY_RELAY: RelayNode = {
   historySamples: 0,
   lastProbeAt: "",
   relayAnchorRttMs: 0,
-  totalEstimateMs: 0
+  totalEstimateMs: 0,
+  isOptimal: false,
+  recent: false
 };
 
 function mapProbeRelays(data: unknown): RelayNode[] {
@@ -589,7 +595,9 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         historySamples: typeof item.historySamples === "number" ? item.historySamples : 0,
         lastProbeAt: typeof item.lastProbeAt === "string" ? item.lastProbeAt : "",
         relayAnchorRttMs: typeof item.relayAnchorRttMs === "number" ? item.relayAnchorRttMs : 0,
-        totalEstimateMs: typeof item.totalEstimateMs === "number" ? item.totalEstimateMs : 0
+        totalEstimateMs: typeof item.totalEstimateMs === "number" ? item.totalEstimateMs : 0,
+        isOptimal: item.isOptimal === true,
+        recent: item.recent === true
       };
     });
 }
@@ -3577,6 +3585,22 @@ export default function App() {
                             {isSelected && (
                               <span className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#00F0FF]/20 text-[#00F0FF]">
                                 ACTIVE
+                              </span>
+                            )}
+                            {!isSelected && relay.isOptimal && relay.reachable && (
+                              <span
+                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#10b981]/20 text-[#10b981]"
+                                title="Top-ranked by the last measured sweep"
+                              >
+                                BEST ROUTE
+                              </span>
+                            )}
+                            {relay.recent && (
+                              <span
+                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-white/[0.08] text-white/60"
+                                title="You connected through this relay recently"
+                              >
+                                RECENT
                               </span>
                             )}
                           </div>
