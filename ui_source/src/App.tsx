@@ -780,6 +780,10 @@ export default function App() {
   const [peerRouting, setPeerRouting] = useState(false);
   const [peerRouteCount, setPeerRouteCount] = useState(0);
   const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
+  const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
+  const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
+  const trafficCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [recentPeers, setRecentPeers] = useState<{ endpoint: string; firstSeen: number }[]>([]);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -1086,6 +1090,37 @@ export default function App() {
     }
   };
 
+  // Keep the last few distinct endpoints this game was seen talking to.
+  const rememberRecentPeers = (report: GameConnectionReport, gameId: string) => {
+    const status = report.games.find((g) => g.gameId === gameId);
+    if (!status?.running) return;
+
+    const ips: string[] = [];
+    for (const conn of status.connections) {
+      if (!conn.remote) continue;
+      const host = conn.remote.includes("]")
+        ? conn.remote.slice(1, conn.remote.indexOf("]"))
+        : conn.remote.split(":")[0];
+      if (host && !ips.includes(host)) ips.push(host);
+    }
+    if (ips.length === 0) return;
+
+    setRecentPeers((prev) => {
+      const merged = [...prev];
+      for (const ip of ips) {
+        if (!merged.some((p) => p.endpoint === ip)) {
+          merged.push({ endpoint: ip, firstSeen: Date.now() });
+        }
+      }
+      return merged.slice(-3);
+    });
+  };
+
+  // A new game selection starts a fresh observed-endpoint history.
+  useEffect(() => {
+    setRecentPeers([]);
+  }, [selectedGame.id]);
+
   // Game server connections: read-only scan of the local OS socket tables
   const handleScanGameConnections = async (silent = false) => {
     if (!silent) setIsScanningConnections(true);
@@ -1096,12 +1131,14 @@ export default function App() {
         return;
       }
       const data = await res.json();
-      setGameConnections({
+      const report: GameConnectionReport = {
         supported: data.supported === true,
         note: typeof data.note === "string" ? data.note : "",
         scannedAt: typeof data.scannedAt === "string" ? data.scannedAt : "",
         games: Array.isArray(data.games) ? data.games : []
-      });
+      };
+      setGameConnections(report);
+      rememberRecentPeers(report, selectedGame.id);
     } catch {
       if (!silent) notify("Failed to reach the local Lagvex service.");
     } finally {
@@ -1204,6 +1241,19 @@ export default function App() {
     const s = (sec % 60).toString().padStart(2, "0");
     const h = Math.floor(sec / 3600).toString().padStart(2, "0");
     return `${h}:${m}:${s}`;
+  };
+
+  const formatRate = (bps: number) => {
+    if (!bps || bps <= 0) return "0 KB/s";
+    if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} MB/s`;
+    return `${Math.round(bps / 1000)} KB/s`;
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes || bytes <= 0) return "0 MB";
+    const mb = bytes / (1024 * 1024);
+    if (mb < 1024) return `${mb.toFixed(1)} MB`;
+    return `${(mb / 1024).toFixed(2)} GB`;
   };
 
   // Fetch real relays, status, system-info, and game-telemetry from Go Backend
@@ -1309,12 +1359,14 @@ export default function App() {
         if (!res.ok) return;
         const data = await res.json();
         if (stopped) return;
-        setGameConnections({
+        const report: GameConnectionReport = {
           supported: data.supported === true,
           note: typeof data.note === "string" ? data.note : "",
           scannedAt: typeof data.scannedAt === "string" ? data.scannedAt : "",
           games: Array.isArray(data.games) ? data.games : []
-        });
+        };
+        setGameConnections(report);
+        rememberRecentPeers(report, selectedGame.id);
       } catch {}
     };
     scan();
@@ -1323,7 +1375,8 @@ export default function App() {
       stopped = true;
       clearInterval(timer);
     };
-  }, [isBoosting]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBoosting, selectedGame.id]);
 
   // Keep the route detail fresh while the routing view is open.
   useEffect(() => {
@@ -1400,6 +1453,36 @@ export default function App() {
     };
   }, [isBoosting]);
 
+  // Tunnel throughput canvas: draws only measured engine rate samples.
+  useEffect(() => {
+    const canvas = trafficCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+    if (rateHistory.length < 2) return;
+
+    const maxRate = Math.max(1, ...rateHistory.map((s) => Math.max(s.up, s.down)));
+    const step = width / (rateHistory.length - 1);
+    const drawLine = (pick: (s: { up: number; down: number }) => number, color: string) => {
+      ctx.beginPath();
+      rateHistory.forEach((sample, i) => {
+        const x = i * step;
+        const y = height - (pick(sample) / maxRate) * (height - 8) - 4;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    };
+    drawLine((s) => s.down, "#10b981");
+    drawLine((s) => s.up, "#00F0FF");
+  }, [rateHistory, boostSubTab, activeTab]);
+
   // Keep UI state in sync with the real engine, including failures and
   // disconnects triggered outside this browser tab.
   useEffect(() => {
@@ -1424,6 +1507,8 @@ export default function App() {
           setIsBoosting(false);
           setPeerRoutes([]);
           setPeerRouteCount(0);
+          setRateHistory([]);
+          setSessionBytes({ up: 0, down: 0 });
           if (data.lastError) setConnectionError(data.lastError);
         }
       } catch {}
@@ -1474,6 +1559,18 @@ export default function App() {
               if (data.packetLossPct !== undefined) {
                 setPacketLoss(Number(Number(data.packetLossPct).toFixed(1)));
               }
+
+              // Real measured throughput samples (bytes/sec from the engine)
+              const upRate = Number(data.upRateBps) || 0;
+              const downRate = Number(data.downRateBps) || 0;
+              setRateHistory((prev) => [
+                ...prev.slice(-59),
+                { t: Date.now(), up: upRate, down: downRate }
+              ]);
+              setSessionBytes({
+                up: Number(data.bytesUp) || 0,
+                down: Number(data.bytesDown) || 0
+              });
             }
           }
         } catch {}
@@ -1484,6 +1581,8 @@ export default function App() {
       setPacketLoss(null);
       recentPingsRef.current = [];
       pingHistoryRef.current = [];
+      setRateHistory([]);
+      setSessionBytes({ up: 0, down: 0 });
     }
     return () => clearInterval(timer);
   }, [isBoosting, selectedGame, selectedRelay]);
@@ -2827,6 +2926,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
+                    <>
                     <div className="mt-4 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
@@ -2840,6 +2940,35 @@ export default function App() {
                         <canvas ref={historyCanvasRef} width={900} height={120} className="w-full h-full" />
                       </div>
                     </div>
+
+                    <div className="mt-4 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                          TUNNEL THROUGHPUT (MEASURED)
+                        </span>
+                        <span className="text-[10px] font-mono text-white/45">
+                          <span className="text-[#10b981]">↓</span>{" "}
+                          {formatRate(rateHistory.length > 0 ? rateHistory[rateHistory.length - 1].down : 0)} &bull;{" "}
+                          <span className="text-[#00F0FF]">↑</span>{" "}
+                          {formatRate(rateHistory.length > 0 ? rateHistory[rateHistory.length - 1].up : 0)}
+                        </span>
+                      </div>
+                      <div className="h-[100px] w-full rounded-lg overflow-hidden bg-black/40">
+                        <canvas ref={trafficCanvasRef} width={900} height={100} className="w-full h-full" />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-white/45">
+                        <span>
+                          Session <span className="text-[#10b981]">↓</span> {formatBytes(sessionBytes.down)} &bull;{" "}
+                          <span className="text-[#00F0FF]">↑</span> {formatBytes(sessionBytes.up)}
+                        </span>
+                        <span>
+                          {rateHistory.length < 2
+                            ? "Waiting for measured samples…"
+                            : `${rateHistory.length} samples @ 2s`}
+                        </span>
+                      </div>
+                    </div>
+                    </>
                   )}
 
                   {/* GAME SERVER CONNECTIONS (MEASURED, READ-ONLY) */}
@@ -2931,6 +3060,11 @@ export default function App() {
                               </div>
                             ))}
                           </div>
+                        )}
+                        {recentPeers.length > 0 && (
+                          <span className="text-[9px] font-mono text-white/35">
+                            Recent endpoints this session: {recentPeers.map((p) => p.endpoint).join(", ")}
+                          </span>
                         )}
                         {gameConnections.note && (
                           <span className="text-[9px] text-white/30">{gameConnections.note}</span>
