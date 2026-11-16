@@ -15,12 +15,13 @@ import (
 
 // RouteManager on Linux manages routes using `ip route`.
 type RouteManager struct {
-	mu             sync.Mutex
-	tunName        string
-	installedCIDRs []string
-	installedPeers []string
-	pinnedRelay    string
-	pinnedDev      string
+	mu                  sync.Mutex
+	tunName             string
+	installedCIDRs      []string
+	installedPeers      []string
+	fullTunnelInstalled bool
+	pinnedRelay         string
+	pinnedDev           string
 }
 
 func NewRouteManager() *RouteManager {
@@ -209,6 +210,39 @@ func (r *RouteManager) removeAllPeersLocked() {
 	r.installedPeers = r.installedPeers[:0]
 }
 
+// InstallFullTunnel routes all IPv4 traffic through the tunnel using the two
+// half-default prefixes. The relay /32 pin is untouched, so the tunnel itself
+// never loops. Callers must treat this as an explicit user choice.
+func (r *RouteManager) InstallFullTunnel() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.tunName == "" {
+		return
+	}
+	for _, prefix := range fullTunnelPrefixes {
+		_ = exec.Command("ip", "route", "replace", prefix, "dev", r.tunName).Run()
+	}
+	r.fullTunnelInstalled = true
+}
+
+// RemoveFullTunnel removes the half-default routes installed by InstallFullTunnel.
+func (r *RouteManager) RemoveFullTunnel() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.removeFullTunnelLocked()
+}
+
+func (r *RouteManager) removeFullTunnelLocked() {
+	if !r.fullTunnelInstalled {
+		return
+	}
+	for _, prefix := range fullTunnelPrefixes {
+		_ = exec.Command("ip", "route", "del", prefix).Run()
+	}
+	r.fullTunnelInstalled = false
+}
+
 func (r *RouteManager) RemoveAll() {
 	r.RemoveGameRoutes()
 
@@ -216,6 +250,7 @@ func (r *RouteManager) RemoveAll() {
 	defer r.mu.Unlock()
 
 	r.removeAllPeersLocked()
+	r.removeFullTunnelLocked()
 
 	if r.pinnedRelay != "" {
 		_ = exec.Command("ip", "route", "del", r.pinnedRelay).Run()

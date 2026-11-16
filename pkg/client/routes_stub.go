@@ -31,6 +31,10 @@ func (r *RouteManager) AddPeerRoutes(ips []string) []string { return nil }
 
 func (r *RouteManager) RemovePeerRoutes(ips []string) {}
 
+func (r *RouteManager) InstallFullTunnel() {}
+
+func (r *RouteManager) RemoveFullTunnel() {}
+
 func (r *RouteManager) RemoveAll() {}
 
 func (r *RouteManager) ActiveRouteCount() int { return 0 }

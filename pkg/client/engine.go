@@ -65,6 +65,9 @@ type TunnelStats struct {
 	PeerRouting    bool     `json:"peerRouting"`
 	PeerRouteCount int      `json:"peerRouteCount"`
 	PeerRouteIPs   []string `json:"peerRoutes,omitempty"`
+
+	// FullTunnel sends all IPv4 traffic through the relay (opt-in).
+	FullTunnel bool `json:"fullTunnel"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -123,6 +126,7 @@ type Engine struct {
 	lossPctBits      atomic.Uint64
 
 	peerRoutingEnabled atomic.Bool
+	fullTunnelEnabled  atomic.Bool
 	peerMu             sync.Mutex
 	peerRoutes         map[string]time.Time // peer IP -> last time it was observed
 	peerLoopCancel     context.CancelFunc
@@ -216,6 +220,7 @@ func (e *Engine) Stats() TunnelStats {
 		PeerRouting:      e.peerRoutingEnabled.Load(),
 		PeerRouteCount:   len(peerIPs),
 		PeerRouteIPs:     peerIPs,
+		FullTunnel:       e.fullTunnelEnabled.Load(),
 	}
 }
 
@@ -245,6 +250,30 @@ func (e *Engine) SetPeerRouting(enabled bool) {
 // PeerRoutingEnabled reports whether observed-peer routing is on.
 func (e *Engine) PeerRoutingEnabled() bool {
 	return e.peerRoutingEnabled.Load()
+}
+
+// SetFullTunnel enables or disables routing all IPv4 traffic through the relay.
+// While disconnected it only stores the preference; the routes are installed
+// on connect, and removed immediately when switched off during a session.
+func (e *Engine) SetFullTunnel(enabled bool) {
+	e.fullTunnelEnabled.Store(enabled)
+
+	e.mu.Lock()
+	connected := e.state == StateConnected
+	e.mu.Unlock()
+	if !connected {
+		return
+	}
+	if enabled {
+		e.routeManager.InstallFullTunnel()
+	} else {
+		e.routeManager.RemoveFullTunnel()
+	}
+}
+
+// FullTunnelEnabled reports whether full-tunnel routing is on.
+func (e *Engine) FullTunnelEnabled() bool {
+	return e.fullTunnelEnabled.Load()
 }
 
 // ActivePeerRoutes returns the currently routed peer IPs, sorted.
@@ -649,6 +678,9 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	// If manual mode, install routes right away
 	if forceRoutesNow && len(cidrs) > 0 {
 		e.routeManager.InstallGameRoutes(cidrs)
+	}
+	if e.fullTunnelEnabled.Load() {
+		e.routeManager.InstallFullTunnel()
 	}
 
 	// 8. Start I/O pumps

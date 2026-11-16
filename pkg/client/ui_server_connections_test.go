@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -93,5 +94,43 @@ func TestPeerRoutingToggleRequiresEngine(t *testing.T) {
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 without an engine, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFullTunnelToggleEndpoint(t *testing.T) {
+	engine, err := NewEngine(nil)
+	if err != nil {
+		t.Fatalf("create engine: %v", err)
+	}
+	server := NewUIServer(engine, nil, "")
+	handler := server.setupRoutes()
+
+	for _, want := range []bool{true, false} {
+		body, _ := json.Marshal(map[string]bool{"enabled": want})
+		req := httptest.NewRequest(http.MethodPost, "/api/full-tunnel/toggle", bytes.NewReader(body))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var res struct {
+			Success bool `json:"success"`
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if !res.Success || res.Enabled != want {
+			t.Fatalf("full tunnel toggle wanted %v, got %+v", want, res)
+		}
+	}
+
+	// /api/status carries the flag even while disconnected.
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	statusRec := httptest.NewRecorder()
+	handler.ServeHTTP(statusRec, statusReq)
+	if !strings.Contains(statusRec.Body.String(), "fullTunnel") {
+		t.Fatalf("status must expose fullTunnel, got %s", statusRec.Body.String())
 	}
 }

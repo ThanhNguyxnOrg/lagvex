@@ -87,6 +87,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/game-connections", u.handleGameConnections)
 	mux.HandleFunc("/api/route-detail", u.handleRouteDetail)
 	mux.HandleFunc("/api/peer-routing/toggle", u.handlePeerRoutingToggle)
+	mux.HandleFunc("/api/full-tunnel/toggle", u.handleFullTunnelToggle)
 	mux.HandleFunc("/api/relays", u.handleRelays)
 	mux.HandleFunc("/api/probe-relays", u.handleProbeRelays)
 	mux.HandleFunc("/api/best-relay", u.handleBestRelay)
@@ -178,6 +179,7 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"peerRouting":      stats.PeerRouting,
 		"peerRouteCount":   stats.PeerRouteCount,
 		"peerRoutes":       stats.PeerRouteIPs,
+		"fullTunnel":       stats.FullTunnel,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -322,6 +324,7 @@ type connectReq struct {
 	RegionID      string `json:"regionId"`
 	ForceNow      bool   `json:"forceNow"`
 	AutoNode      bool   `json:"autoNode"`
+	FullTunnel    bool   `json:"fullTunnel"`
 }
 
 func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
@@ -413,6 +416,11 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	// Connect synchronously so the dashboard only shows an active boost after
 	// the relay handshake, TUN setup and route validation actually succeeded.
+	// Store the full-tunnel preference first: an active session switches over
+	// immediately, a fresh connect installs the half-default routes as it comes
+	// up.
+	u.engine.SetFullTunnel(req.FullTunnel)
+
 	if err := u.engine.Connect(req.RelayEndpoint, []byte(req.PSK), req.GameID, req.RegionID, req.ForceNow); err != nil {
 		log.Printf("[Dashboard] Connect error: %v", err)
 		writeJSONError(w, http.StatusBadGateway, err.Error())

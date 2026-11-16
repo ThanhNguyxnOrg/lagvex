@@ -94,3 +94,32 @@ func (u *UIServer) handlePeerRoutingToggle(w http.ResponseWriter, r *http.Reques
 		"peerRoutes": u.engine.ActivePeerRoutes(),
 	})
 }
+
+// handleFullTunnelToggle enables or disables routing all IPv4 traffic through
+// the relay. This is an explicit user choice: while it is on, a slow or down
+// relay slows down or breaks normal browsing too.
+func (u *UIServer) handleFullTunnelToggle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if u.engine == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "engine is not running")
+		return
+	}
+
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	u.engine.SetFullTunnel(req.Enabled)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success": true,
+		"enabled": u.engine.FullTunnelEnabled(),
+	})
+}

@@ -22,11 +22,12 @@ import (
 type RouteManager struct {
 	mu sync.Mutex
 
-	tunIfIndex         uint32
-	installedGameCIDRs []string
-	installedPeers     []string
-	pinnedRelayRoute   string
-	pinnedPhysIndex    uint32
+	tunIfIndex          uint32
+	installedGameCIDRs  []string
+	installedPeers      []string
+	fullTunnelInstalled bool
+	pinnedRelayRoute    string
+	pinnedPhysIndex     uint32
 }
 
 // NewRouteManager initializes a new RouteManager.
@@ -249,6 +250,43 @@ func (r *RouteManager) removeAllPeersLocked() {
 	r.installedPeers = r.installedPeers[:0]
 }
 
+// InstallFullTunnel routes all IPv4 traffic through the tunnel using the two
+// half-default prefixes. The relay /32 pin is untouched, so the tunnel itself
+// never loops. Callers must treat this as an explicit user choice.
+func (r *RouteManager) InstallFullTunnel() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.tunIfIndex == 0 {
+		return
+	}
+	for _, prefix := range fullTunnelPrefixes {
+		_ = runNetsh(fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
+			prefix, r.tunIfIndex))
+		_ = runNetsh(fmt.Sprintf("interface ipv4 add route prefix=%s interface=%d metric=5 store=active",
+			prefix, r.tunIfIndex))
+	}
+	r.fullTunnelInstalled = true
+}
+
+// RemoveFullTunnel removes the half-default routes installed by InstallFullTunnel.
+func (r *RouteManager) RemoveFullTunnel() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.removeFullTunnelLocked()
+}
+
+func (r *RouteManager) removeFullTunnelLocked() {
+	if !r.fullTunnelInstalled {
+		return
+	}
+	for _, prefix := range fullTunnelPrefixes {
+		_ = runNetsh(fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",
+			prefix, r.tunIfIndex))
+	}
+	r.fullTunnelInstalled = false
+}
+
 // RemoveAll cleans all game routes and unpins the relay route.
 func (r *RouteManager) RemoveAll() {
 	r.RemoveGameRoutes()
@@ -257,6 +295,7 @@ func (r *RouteManager) RemoveAll() {
 	defer r.mu.Unlock()
 
 	r.removeAllPeersLocked()
+	r.removeFullTunnelLocked()
 
 	if r.pinnedRelayRoute != "" && r.pinnedPhysIndex != 0 {
 		cmd := fmt.Sprintf("interface ipv4 delete route prefix=%s interface=%d store=active",

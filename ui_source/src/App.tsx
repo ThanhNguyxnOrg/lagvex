@@ -788,6 +788,7 @@ export default function App() {
   const [peerRouting, setPeerRouting] = useState(false);
   const [peerRouteCount, setPeerRouteCount] = useState(0);
   const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
+  const [fullTunnel, setFullTunnel] = useState(false);
   const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
   const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
   const trafficCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1221,6 +1222,31 @@ export default function App() {
     }
   };
 
+  // Full tunnel: opt-in "all IPv4 traffic through the relay" mode
+  const handleToggleFullTunnel = async () => {
+    try {
+      const res = await fetch("/api/full-tunnel/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !fullTunnel })
+      });
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Could not change full tunnel: ${message.trim()}`);
+        return;
+      }
+      const data = await res.json();
+      setFullTunnel(data.enabled === true);
+      notify(
+        data.enabled
+          ? "Full tunnel enabled: all IPv4 traffic now uses the relay."
+          : "Full tunnel disabled; normal routing restored."
+      );
+    } catch {
+      notify("Failed to reach the local Lagvex service.");
+    }
+  };
+
   // Save nickname
   const handleSaveNickname = () => {
     const trimmed = tempNickname.trim();
@@ -1503,6 +1529,7 @@ export default function App() {
         if (stopped) return;
 
         setPeerRouting(data.peerRouting === true);
+        setFullTunnel(data.fullTunnel === true);
         if (Array.isArray(data.peerRoutes)) setPeerRoutes(data.peerRoutes);
         if (typeof data.peerRouteCount === "number") setPeerRouteCount(data.peerRouteCount);
 
@@ -2930,6 +2957,36 @@ export default function App() {
                         <span className="text-[9px] text-white/30">
                           On Windows only TCP peers are visible to the OS; UDP peers are not observed there, so peer
                           routing may need the region CIDRs as well.
+                        </span>
+                      </div>
+
+                      {/* FULL TUNNEL (OPT-IN) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-brand font-bold text-[#f59e0b] uppercase tracking-wider">
+                              FULL TUNNEL (ALL IPv4 TRAFFIC)
+                            </span>
+                            <span className="text-[10px] text-white/40">
+                              Sends everything — browser, Discord, updates — through the relay, not just game traffic.
+                              Off by default.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => void handleToggleFullTunnel()}
+                            className={`h-[34px] px-4 rounded-xl text-[10px] font-brand font-bold cursor-pointer border-none transition-all shrink-0 ${
+                              fullTunnel
+                                ? "bg-[#f59e0b] text-black shadow-md shadow-[#f59e0b]/20"
+                                : "bg-white/[0.08] text-white/60 hover:bg-white/15"
+                            }`}
+                          >
+                            {fullTunnel ? "FULL TUNNEL: ON" : "FULL TUNNEL: OFF"}
+                          </button>
+                        </div>
+
+                        <span className="text-[9px] text-[#f59e0b]/80">
+                          If the relay is slow or unreachable while this is on, all normal browsing slows down or stops
+                          too. The relay route stays pinned and DNS still uses your local resolver.
                         </span>
                       </div>
                     </div>
