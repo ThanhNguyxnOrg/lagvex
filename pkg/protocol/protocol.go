@@ -30,6 +30,12 @@ const (
 	TypeDisconnect    = 0x6
 	TypeFEC           = 0x7
 
+	// Anchor probing: the client asks the relay to measure its own RTT to one
+	// allowlisted public anchor (see AnchorProbeTargets). Old relays ignore
+	// these types, so the feature degrades to "not measured".
+	TypeAnchorProbe      = 0x8
+	TypeAnchorProbeReply = 0x9
+
 	// Packet lengths in bytes.
 	HandshakeReqLen  = 57
 	HandshakeRespLen = 60

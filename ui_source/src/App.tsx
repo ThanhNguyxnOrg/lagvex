@@ -489,6 +489,11 @@ export type RouteAnchor = {
   rttMs?: number;
   measured: boolean;
   note?: string;
+  relayRttMs?: number;
+  relayMeasured: boolean;
+  viaRelayEstimateMs?: number;
+  improvementMs?: number;
+  improvementMeasured: boolean;
 };
 
 export type RouteDetail = {
@@ -1128,7 +1133,14 @@ export default function App() {
         anchor:
           data.anchor && typeof data.anchor === "object"
             ? data.anchor
-            : { id: "", label: "", target: "", measured: false },
+            : {
+                id: "",
+                label: "",
+                target: "",
+                measured: false,
+                relayMeasured: false,
+                improvementMeasured: false
+              },
         notes: Array.isArray(data.notes) ? data.notes : []
       });
     } catch {
@@ -2740,6 +2752,25 @@ export default function App() {
                                     ? `${routeDetail.anchor.rttMs} ms`
                                     : "—"}{" "}
                                   — {routeDetail.anchor.note}
+                                </span>
+                              )}
+                              {routeDetail.anchor.relayMeasured && (
+                                <span className="text-[10px] font-mono text-white/60 bg-white/[0.04] px-2 py-1 rounded">
+                                  Relay &rarr; {routeDetail.anchor.label} anchor:{" "}
+                                  {routeDetail.anchor.relayRttMs} ms (measured by the relay)
+                                </span>
+                              )}
+                              {routeDetail.anchor.improvementMeasured && (
+                                <span
+                                  className={`text-[10px] font-mono px-2 py-1 rounded bg-white/[0.04] ${
+                                    (routeDetail.anchor.improvementMs ?? 0) > 0
+                                      ? "text-[#10b981]"
+                                      : "text-[#f59e0b]"
+                                  }`}
+                                >
+                                  Estimated via-relay improvement:{" "}
+                                  {(routeDetail.anchor.improvementMs ?? 0) > 0 ? "+" : ""}
+                                  {routeDetail.anchor.improvementMs} ms (region anchor estimate)
                                 </span>
                               )}
                             </div>

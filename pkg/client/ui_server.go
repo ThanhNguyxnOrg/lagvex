@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
+	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 	"github.com/ThanhNguyxnOrg/lagvex/web"
 )
 
@@ -1175,27 +1176,33 @@ type GameTelemetryItem struct {
 }
 
 type telemetryAnchor struct {
-	id     string
-	label  string
-	target string
-	keys   []string
+	id      string
+	label   string
+	probeID byte // key in protocol.AnchorProbeTargets (shared with the relay)
+	keys    []string
 }
 
 // telemetryAnchors are public cloud endpoints used only as direct-route RTT
 // references. They are not game servers, so the API never presents their RTT
-// as a game-server ping.
+// as a game-server ping. The probeID lets the relay measure the same target
+// from its side without accepting an arbitrary host from a client.
 var telemetryAnchors = []telemetryAnchor{
-	{"sg", "Singapore", "ec2.ap-southeast-1.amazonaws.com:443", []string{"singapore", "asia-sg", "sg-"}},
-	{"jp", "Tokyo", "ec2.ap-northeast-1.amazonaws.com:443", []string{"tokyo", "japan", "asia-jp"}},
-	{"kr", "Seoul", "ec2.ap-northeast-2.amazonaws.com:443", []string{"seoul", "korea", "asia-kr"}},
-	{"hk", "Hong Kong", "ec2.ap-east-1.amazonaws.com:443", []string{"hong kong", "hongkong", "asia-hk"}},
-	{"in", "Mumbai", "ec2.ap-south-1.amazonaws.com:443", []string{"mumbai", "india", "asia-mumbai"}},
-	{"au", "Sydney", "ec2.ap-southeast-2.amazonaws.com:443", []string{"sydney", "oceania", "oc-"}},
-	{"us-east", "US East", "ec2.us-east-1.amazonaws.com:443", []string{"us-east", "virginia", "chicago", "na-us-east", "na-chicago"}},
-	{"us-west", "US West", "ec2.us-west-1.amazonaws.com:443", []string{"us-west", "california", "na-us-west"}},
-	{"eu", "Frankfurt", "ec2.eu-central-1.amazonaws.com:443", []string{"frankfurt", "london", "stockholm", "europe", "eu-"}},
-	{"sa", "Sao Paulo", "ec2.sa-east-1.amazonaws.com:443", []string{"sao paulo", "são paulo", "brazil", "south america", "sa-"}},
-	{"af", "Johannesburg", "ec2.af-south-1.amazonaws.com:443", []string{"johannesburg", "africa", "af-"}},
+	{"sg", "Singapore", 1, []string{"singapore", "asia-sg", "sg-"}},
+	{"jp", "Tokyo", 2, []string{"tokyo", "japan", "asia-jp"}},
+	{"kr", "Seoul", 3, []string{"seoul", "korea", "asia-kr"}},
+	{"hk", "Hong Kong", 4, []string{"hong kong", "hongkong", "asia-hk"}},
+	{"in", "Mumbai", 5, []string{"mumbai", "india", "asia-mumbai"}},
+	{"au", "Sydney", 6, []string{"sydney", "oceania", "oc-"}},
+	{"us-east", "US East", 7, []string{"us-east", "virginia", "chicago", "na-us-east", "na-chicago"}},
+	{"us-west", "US West", 8, []string{"us-west", "california", "na-us-west"}},
+	{"eu", "Frankfurt", 9, []string{"frankfurt", "london", "stockholm", "europe", "eu-"}},
+	{"sa", "Sao Paulo", 10, []string{"sao paulo", "são paulo", "brazil", "south america", "sa-"}},
+	{"af", "Johannesburg", 11, []string{"johannesburg", "africa", "af-"}},
+}
+
+// anchorTarget resolves the allowlisted probe target for an anchor.
+func anchorTarget(anchor telemetryAnchor) string {
+	return protocol.AnchorProbeTargets[anchor.probeID]
 }
 
 func matchTelemetryAnchor(regionID, regionName string) (telemetryAnchor, bool) {
@@ -1241,17 +1248,21 @@ func (u *UIServer) handleGameTelemetry(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	for _, anchor := range telemetryAnchors {
+		target := anchorTarget(anchor)
+		if target == "" {
+			continue
+		}
 		wg.Add(1)
-		go func(a telemetryAnchor) {
+		go func(a telemetryAnchor, target string) {
 			defer wg.Done()
-			vals, err := probeTCPGateway(ctx, a.target, 2)
+			vals, err := probeTCPGateway(ctx, target, 2)
 			if err == nil && len(vals) > 0 {
 				median := calculateMedian(vals)
 				mu.Lock()
 				rtts[a.id] = math.Round(median*10) / 10
 				mu.Unlock()
 			}
-		}(anchor)
+		}(anchor, target)
 	}
 	wg.Wait()
 

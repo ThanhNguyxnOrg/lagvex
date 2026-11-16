@@ -193,7 +193,7 @@ func (s *Server) loopUDP(ctx context.Context) {
 		switch mtype {
 		case protocol.TypeHandshakeReq:
 			s.handleHandshake(buf[:n], remoteEndpoint)
-		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC:
+		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC, protocol.TypeAnchorProbe:
 			s.handleSessionPacket(buf[:n], remoteEndpoint)
 		}
 
@@ -353,6 +353,28 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 		pongBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 		pong := sess.Crypto.EncodePong(pongBuf, sessionID, ts)
 		s.sendUDP(pong, remote)
+
+	case protocol.TypeAnchorProbe:
+		packed, err := protocol.DecodeControlPayload(payload)
+		if err != nil {
+			return
+		}
+		seq, anchorID := protocol.DecodeAnchorProbeRequest(packed)
+		target, ok := protocol.AnchorProbeTargets[anchorID]
+		if !ok {
+			// Unknown ids are never probed; the allowlist is the only source of
+			// targets so the relay cannot be pointed at arbitrary hosts.
+			log.Printf("[Relay] Rejected anchor probe for unknown id %d from session %016x", anchorID, sessionID)
+			return
+		}
+		if !sess.AllowAnchorProbe(time.Now()) {
+			return // Rate limited; silently drop to avoid amplification.
+		}
+		rttUs, lossPct := probeAnchorTarget(target)
+		replyBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+		reply := sess.Crypto.EncodeAnchorProbeReply(replyBuf, sessionID,
+			protocol.EncodeAnchorProbeReply(seq, rttUs, lossPct))
+		s.sendUDP(reply, remote)
 
 	case protocol.TypeDisconnect:
 		s.mu.Lock()

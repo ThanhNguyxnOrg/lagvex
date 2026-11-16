@@ -161,13 +161,14 @@ func (u *UIServer) handleRouteDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	hops = append(hops, tunnelHop)
 
-	// Hop: game server. Lagvex runs no probe on the relay side, so the
-	// PC -> relay -> server split cannot be measured and is not guessed.
+	// Hop: game server. The relay can measure its own RTT to an allowlisted
+	// anchor (see "anchor" below), but it never probes the actual game server,
+	// so this segment is not guessed.
 	gameServerHop := routeHop{
 		ID:     "game-server",
 		Label:  "Game server",
 		Target: regionName,
-		Reason: "Lagvex has no relay-side probe yet, so the relay-to-server segment is not measured",
+		Reason: "no server-side probe target; only the region anchor below is measured",
 	}
 	hops = append(hops, gameServerHop)
 
@@ -177,25 +178,56 @@ func (u *UIServer) handleRouteDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type anchorStatus struct {
-		ID       string  `json:"id"`
-		Label    string  `json:"label"`
-		Target   string  `json:"target"`
-		RTTMs    float64 `json:"rttMs,omitempty"`
-		Measured bool    `json:"measured"`
-		Note     string  `json:"note,omitempty"`
+		ID                  string  `json:"id"`
+		Label               string  `json:"label"`
+		Target              string  `json:"target"`
+		RTTMs               float64 `json:"rttMs,omitempty"`
+		Measured            bool    `json:"measured"`
+		Note                string  `json:"note,omitempty"`
+		RelayRTTMs          float64 `json:"relayRttMs,omitempty"`
+		RelayMeasured       bool    `json:"relayMeasured"`
+		ViaRelayEstimateMs  float64 `json:"viaRelayEstimateMs,omitempty"`
+		ImprovementMs       float64 `json:"improvementMs,omitempty"`
+		ImprovementMeasured bool    `json:"improvementMeasured"`
 	}
 	anchor := anchorStatus{}
 	if anchorMatch, ok := matchTelemetryAnchor(regionID, regionName); ok {
 		anchor.ID = anchorMatch.id
 		anchor.Label = anchorMatch.label
-		anchor.Target = anchorMatch.target
+		anchor.Target = anchorTarget(anchorMatch)
 		anchor.Note = "public cloud reference for this region, not the game server"
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		rtts, _ := probeTCPGateway(ctx, anchorMatch.target, 2)
-		cancel()
-		if len(rtts) > 0 {
-			anchor.RTTMs = roundTo(calculateMedian(rtts), 1)
-			anchor.Measured = true
+
+		if target := anchorTarget(anchorMatch); target != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			rtts, _ := probeTCPGateway(ctx, target, 2)
+			cancel()
+			if len(rtts) > 0 {
+				anchor.RTTMs = roundTo(calculateMedian(rtts), 1)
+				anchor.Measured = true
+			}
+		}
+
+		// Ask the relay to measure its own side of the same anchor. The relay
+		// only accepts allowlisted ids, and old relays simply do not answer.
+		if connected && u.engine != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2500*time.Millisecond)
+			relayRTT, _, err := u.engine.ProbeAnchorViaRelay(ctx, anchorMatch.probeID)
+			cancel()
+			if err == nil && relayRTT > 0 {
+				anchor.RelayRTTMs = roundTo(relayRTT, 1)
+				anchor.RelayMeasured = true
+			}
+		}
+	}
+
+	// The via-relay estimate is the sum of two measured hops (PC -> relay plus
+	// relay -> anchor). It only appears when both measurements exist, and the
+	// improvement compares it with the direct anchor RTT.
+	if anchor.RelayMeasured && tunnelHop.Measured && tunnelHop.RTTMs > 0 {
+		anchor.ViaRelayEstimateMs = roundTo(tunnelHop.RTTMs+anchor.RelayRTTMs, 1)
+		if anchor.Measured && anchor.RTTMs > 0 {
+			anchor.ImprovementMs = roundTo(anchor.RTTMs-anchor.ViaRelayEstimateMs, 1)
+			anchor.ImprovementMeasured = true
 		}
 	}
 
@@ -204,6 +236,12 @@ func (u *UIServer) handleRouteDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	if !connected {
 		notes = append(notes, "Connect to a relay to add the live tunnel measurement.")
+	}
+	if anchor.ImprovementMeasured {
+		notes = append(notes, "Improvement compares the direct anchor RTT with tunnel RTT + relay-measured anchor RTT; it is a region estimate, not a game-server measurement.")
+	}
+	if connected && !anchor.RelayMeasured {
+		notes = append(notes, "The relay did not answer the anchor probe (older relay build or rate limit), so the estimate is unavailable.")
 	}
 
 	_ = json.NewEncoder(w).Encode(map[string]any{

@@ -196,6 +196,20 @@ func (c *SessionCrypto) EncodeFEC(dst []byte, sessionID uint64, fecPayload []byt
 	return c.SealPacket(dst, TypeFEC, sessionID, fecPayload)
 }
 
+// EncodeAnchorProbe seals an allowlisted anchor-probe request.
+func (c *SessionCrypto) EncodeAnchorProbe(dst []byte, sessionID uint64, packed uint64) []byte {
+	var p [8]byte
+	binary.BigEndian.PutUint64(p[:], packed)
+	return c.SealPacket(dst, TypeAnchorProbe, sessionID, p[:])
+}
+
+// EncodeAnchorProbeReply seals the relay's anchor-probe result.
+func (c *SessionCrypto) EncodeAnchorProbeReply(dst []byte, sessionID uint64, packed uint64) []byte {
+	var p [8]byte
+	binary.BigEndian.PutUint64(p[:], packed)
+	return c.SealPacket(dst, TypeAnchorProbeReply, sessionID, p[:])
+}
+
 // DecodeControlPayload extracts the 8-byte timestamp carried by Ping/Pong.
 func DecodeControlPayload(payload []byte) (uint64, error) {
 	if len(payload) != 8 {

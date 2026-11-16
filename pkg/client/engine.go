@@ -126,6 +126,16 @@ type Engine struct {
 	peerMu             sync.Mutex
 	peerRoutes         map[string]time.Time // peer IP -> last time it was observed
 	peerLoopCancel     context.CancelFunc
+
+	anchorProbeMu   sync.Mutex
+	anchorProbeWait map[uint32]chan anchorProbeResult
+	anchorProbeSeq  atomic.Uint32
+}
+
+// anchorProbeResult is a relay-measured anchor RTT.
+type anchorProbeResult struct {
+	rttMs   float64
+	lossPct float64
 }
 
 // NewEngine initializes the Lagvex Client Engine.
@@ -136,15 +146,16 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 	}
 
 	e := &Engine{
-		state:         StateDisconnected,
-		clientID:      clientID,
-		routeManager:  NewRouteManager(),
-		profileMgr:    pm,
-		failoverCtrl:  NewFailoverController(DefaultFailoverConfig()),
-		fecEncoder:    protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
-		fecDecoder:    protocol.NewFECDecoder(128),
-		fecController: protocol.NewAdaptiveFECController(),
-		peerRoutes:    make(map[string]time.Time),
+		state:           StateDisconnected,
+		clientID:        clientID,
+		routeManager:    NewRouteManager(),
+		profileMgr:      pm,
+		failoverCtrl:    NewFailoverController(DefaultFailoverConfig()),
+		fecEncoder:      protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
+		fecDecoder:      protocol.NewFECDecoder(128),
+		fecController:   protocol.NewAdaptiveFECController(),
+		peerRoutes:      make(map[string]time.Time),
+		anchorProbeWait: make(map[uint32]chan anchorProbeResult),
 	}
 	e.autoFailoverEnabled.Store(true)
 	e.fecEnabled.Store(true)
@@ -356,6 +367,68 @@ func (e *Engine) syncPeerRoutes() {
 	if len(removed) > 0 {
 		log.Printf("[Engine] Peer routing: removing %d stale peer route(s)", len(removed))
 		e.routeManager.RemovePeerRoutes(removed)
+	}
+}
+
+// deliverAnchorProbe hands a relay-measured anchor RTT to the waiting caller.
+func (e *Engine) deliverAnchorProbe(seq uint32, rttUs uint32, lossPct uint8) {
+	e.anchorProbeMu.Lock()
+	ch := e.anchorProbeWait[seq]
+	delete(e.anchorProbeWait, seq)
+	e.anchorProbeMu.Unlock()
+
+	if ch == nil {
+		return
+	}
+	select {
+	case ch <- anchorProbeResult{rttMs: float64(rttUs) / 1000.0, lossPct: float64(lossPct)}:
+	default:
+	}
+}
+
+// ProbeAnchorViaRelay asks the connected relay to measure its own RTT to one
+// allowlisted anchor. The relay only accepts ids from
+// protocol.AnchorProbeTargets, so neither side can probe arbitrary hosts.
+func (e *Engine) ProbeAnchorViaRelay(ctx context.Context, anchorID byte) (float64, float64, error) {
+	if _, ok := protocol.AnchorProbeTargets[anchorID]; !ok {
+		return 0, 0, fmt.Errorf("unknown anchor id %d", anchorID)
+	}
+
+	e.mu.Lock()
+	connected := e.state == StateConnected
+	crypto := e.crypto
+	conn := e.udpConn
+	relay := e.relayAddr
+	sessionID := e.sessionID
+	e.mu.Unlock()
+
+	if !connected || crypto == nil || conn == nil {
+		return 0, 0, fmt.Errorf("tunnel is not connected")
+	}
+
+	seq := e.anchorProbeSeq.Add(1)
+	ch := make(chan anchorProbeResult, 1)
+
+	e.anchorProbeMu.Lock()
+	e.anchorProbeWait[seq] = ch
+	e.anchorProbeMu.Unlock()
+	defer func() {
+		e.anchorProbeMu.Lock()
+		delete(e.anchorProbeWait, seq)
+		e.anchorProbeMu.Unlock()
+	}()
+
+	buf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+	packet := crypto.EncodeAnchorProbe(buf, sessionID, protocol.EncodeAnchorProbeRequest(seq, anchorID))
+	if _, err := conn.WriteToUDPAddrPort(packet, relay); err != nil {
+		return 0, 0, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, 0, ctx.Err()
+	case result := <-ch:
+		return result.rttMs, result.lossPct, nil
 	}
 }
 
@@ -828,6 +901,13 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 				rtt := time.Since(time.Unix(0, int64(ts)))
 				e.pingMs.Store(rtt.Milliseconds())
 				e.lastPong.Store(time.Now().UnixNano())
+			}
+
+		case protocol.TypeAnchorProbeReply:
+			packed, err := protocol.DecodeControlPayload(payload)
+			if err == nil {
+				seq, rttUs, lossPct := protocol.DecodeAnchorProbeReply(packed)
+				e.deliverAnchorProbe(seq, rttUs, lossPct)
 			}
 
 		case protocol.TypeDisconnect:

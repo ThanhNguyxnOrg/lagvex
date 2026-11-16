@@ -3,8 +3,16 @@ package relay
 import (
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 	"net/netip"
+	"sync"
 	"sync/atomic"
 	"time"
+)
+
+// Anchor-probe rate limits: they stop one client from turning a relay into a
+// probe amplifier while still allowing occasional route-detail measurements.
+const (
+	anchorProbeMinInterval = 2 * time.Second
+	anchorProbeMaxPerHour  = 60
 )
 
 // Session represents an authenticated connected client.
@@ -24,6 +32,31 @@ type Session struct {
 	BytesUp          atomic.Uint64
 	BytesDown        atomic.Uint64
 	PacketsRecovered atomic.Uint64
+
+	anchorProbeMu     sync.Mutex
+	anchorProbeLast   time.Time
+	anchorProbeWindow time.Time
+	anchorProbeCount  int
+}
+
+// AllowAnchorProbe applies the per-session rate limit for relay-side probes.
+func (s *Session) AllowAnchorProbe(now time.Time) bool {
+	s.anchorProbeMu.Lock()
+	defer s.anchorProbeMu.Unlock()
+
+	if !s.anchorProbeLast.IsZero() && now.Sub(s.anchorProbeLast) < anchorProbeMinInterval {
+		return false
+	}
+	if s.anchorProbeWindow.IsZero() || now.Sub(s.anchorProbeWindow) > time.Hour {
+		s.anchorProbeWindow = now
+		s.anchorProbeCount = 0
+	}
+	if s.anchorProbeCount >= anchorProbeMaxPerHour {
+		return false
+	}
+	s.anchorProbeLast = now
+	s.anchorProbeCount++
+	return true
 }
 
 // NewSession initializes a new client session.
