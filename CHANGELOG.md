@@ -310,3 +310,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - stability-aware relay ranking and session failover history ([1f15aa7](https://github.com/ThanhNguyxnOrg/lagvex/commit/1f15aa750bcabe215ae2c617104a663cdfbd59e9))
 
+## [1.6.0] - 2026-11-16
+
+### Features
+
+- optional unprivileged ICMP echo measurement for relay probes ([4d253c4](https://github.com/ThanhNguyxnOrg/lagvex/commit/4d253c4470bd9a3936fabc4e5832fc677763ad8b))
+- pre-measured standby relay for instant failover ([7f97100](https://github.com/ThanhNguyxnOrg/lagvex/commit/7f97100a5d711d1896b88e22c04787db034a2b3c))
+
