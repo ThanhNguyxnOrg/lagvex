@@ -304,3 +304,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - opt-in full tunnel mode (all IPv4 traffic through the relay) ([d94ddb5](https://github.com/ThanhNguyxnOrg/lagvex/commit/d94ddb5b3e07d3aee0beffb7ab8bde5850f7790c))
 - recent-relay shortcut and best-route badge from measured sweeps ([07db59c](https://github.com/ThanhNguyxnOrg/lagvex/commit/07db59c))
 
+## [1.5.0] - 2026-11-16
+
+### Features
+
+- stability-aware relay ranking and session failover history ([1f15aa7](https://github.com/ThanhNguyxnOrg/lagvex/commit/1f15aa750bcabe215ae2c617104a663cdfbd59e9))
+
