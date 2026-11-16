@@ -172,3 +172,50 @@ func TestFailoverResetHistory(t *testing.T) {
 		t.Fatalf("cooldown timer must be cleared after reset")
 	}
 }
+
+func TestSelectStandbyResult(t *testing.T) {
+	results := []ProbeResult{
+		{RelayID: "active", Endpoint: "a:1", Reachable: true, Score: 5},
+		{RelayID: "unstable", Endpoint: "b:1", Reachable: true, Score: 6, Unstable: true},
+		{RelayID: "down", Endpoint: "c:1", Reachable: false},
+		{RelayID: "good", Endpoint: "d:1", Reachable: true, Score: 20, RTTMedianMs: 20},
+	}
+
+	best, ok := selectStandbyResult(results, "a:1")
+	if !ok {
+		t.Fatalf("expected a standby relay")
+	}
+	if best.RelayID != "good" {
+		t.Fatalf("standby = %s, want good (skip active, unstable and down)", best.RelayID)
+	}
+
+	// Only the active relay available: no standby.
+	if _, ok := selectStandbyResult([]ProbeResult{{RelayID: "active", Endpoint: "a:1", Reachable: true}}, "a:1"); ok {
+		t.Fatalf("the active relay must never be chosen as standby")
+	}
+}
+
+func TestFreshStandbyExpiry(t *testing.T) {
+	engine := &Engine{}
+	result := ProbeResult{RelayID: "s1", Endpoint: "s:1", Reachable: true}
+
+	if _, ok := engine.freshStandby(); ok {
+		t.Fatalf("no standby must not be reported as fresh")
+	}
+
+	engine.standby = &result
+	engine.standbyAt = time.Now()
+	if got, ok := engine.freshStandby(); !ok || got.RelayID != "s1" {
+		t.Fatalf("recent standby must be fresh: %+v ok=%v", got, ok)
+	}
+
+	engine.standbyAt = time.Now().Add(-2 * standbyMaxAge)
+	if _, ok := engine.freshStandby(); ok {
+		t.Fatalf("stale standby must not be fresh")
+	}
+
+	engine.clearStandby()
+	if _, ok := engine.freshStandby(); ok {
+		t.Fatalf("cleared standby must not be fresh")
+	}
+}

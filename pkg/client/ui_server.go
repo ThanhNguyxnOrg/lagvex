@@ -181,6 +181,11 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"peerRoutes":       stats.PeerRouteIPs,
 		"fullTunnel":       stats.FullTunnel,
 		"failovers":        stats.Failovers,
+		"standbyRelayId":   stats.StandbyRelayID,
+		"standbyRelayName": stats.StandbyRelayName,
+		"standbyRttMs":     stats.StandbyRttMs,
+		"standbyTotalMs":   stats.StandbyTotalMs,
+		"standbyAgeSec":    stats.StandbyAgeSec,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -1259,27 +1264,7 @@ func anchorTarget(anchor telemetryAnchor) string {
 // resolveAnchorProbeID maps a game/region selection to the shared anchor
 // allowlist id, or 0 when the region has no anchor.
 func (u *UIServer) resolveAnchorProbeID(gameID, regionID string) byte {
-	if gameID == "" || regionID == "" || u.profileMgr == nil {
-		return 0
-	}
-	game, ok := u.profileMgr.FindGameByID(gameID)
-	if !ok {
-		return 0
-	}
-	regionName := ""
-	for _, region := range game.Regions {
-		if strings.EqualFold(region.ID, regionID) {
-			regionName = region.Name
-			break
-		}
-	}
-	if regionName == "" {
-		return 0
-	}
-	if anchor, ok := matchTelemetryAnchor(regionID, regionName); ok {
-		return anchor.probeID
-	}
-	return 0
+	return anchorProbeIDForRegion(u.profileMgr, gameID, regionID)
 }
 
 func matchTelemetryAnchor(regionID, regionName string) (telemetryAnchor, bool) {

@@ -817,6 +817,7 @@ export default function App() {
   const [peerRouteCount, setPeerRouteCount] = useState(0);
   const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
   const [fullTunnel, setFullTunnel] = useState(false);
+  const [standby, setStandby] = useState<{ id: string; name: string; rttMs: number; totalMs: number; ageSec: number } | null>(null);
   const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
   const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
   const [failoverEvents, setFailoverEvents] = useState<FailoverEventItem[]>([]);
@@ -1580,6 +1581,17 @@ export default function App() {
 
         setPeerRouting(data.peerRouting === true);
         setFullTunnel(data.fullTunnel === true);
+        if (data.standbyRelayName) {
+          setStandby({
+            id: typeof data.standbyRelayId === "string" ? data.standbyRelayId : "",
+            name: data.standbyRelayName,
+            rttMs: typeof data.standbyRttMs === "number" ? data.standbyRttMs : 0,
+            totalMs: typeof data.standbyTotalMs === "number" ? data.standbyTotalMs : 0,
+            ageSec: typeof data.standbyAgeSec === "number" ? data.standbyAgeSec : 0
+          });
+        } else {
+          setStandby(null);
+        }
         if (Array.isArray(data.peerRoutes)) setPeerRoutes(data.peerRoutes);
         if (typeof data.peerRouteCount === "number") setPeerRouteCount(data.peerRouteCount);
 
@@ -3007,6 +3019,28 @@ export default function App() {
                         <span className="text-[9px] text-white/30">
                           On Windows only TCP peers are visible to the OS; UDP peers are not observed there, so peer
                           routing may need the region CIDRs as well.
+                        </span>
+                      </div>
+
+                      {/* STANDBY RELAY (PRE-MEASURED) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                            STANDBY RELAY (PRE-MEASURED)
+                          </span>
+                          {standby ? (
+                            <span className="text-[10px] font-mono text-[#10b981]">
+                              {standby.name} — {standby.rttMs} ms
+                              {standby.totalMs > 0 ? ` (via relay ${standby.totalMs} ms)` : ""} •{" "}
+                              {standby.ageSec}s ago
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-white/35">No standby measured yet</span>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-white/30">
+                          While a tunnel is up, one alternative relay is probed in the background. Automatic failover
+                          promotes it when the active path degrades, so the switch does not wait for a fresh sweep.
                         </span>
                       </div>
 

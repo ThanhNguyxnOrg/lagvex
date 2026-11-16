@@ -71,6 +71,13 @@ type TunnelStats struct {
 
 	// Failovers counts successful relay handovers in the current session.
 	Failovers int `json:"failovers"`
+
+	// Pre-measured standby relay used for instant failover.
+	StandbyRelayID   string  `json:"standbyRelayId,omitempty"`
+	StandbyRelayName string  `json:"standbyRelayName,omitempty"`
+	StandbyRttMs     float64 `json:"standbyRttMs,omitempty"`
+	StandbyTotalMs   float64 `json:"standbyTotalMs,omitempty"`
+	StandbyAgeSec    int     `json:"standbyAgeSec,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -135,6 +142,11 @@ type Engine struct {
 	peerRoutes         map[string]time.Time // peer IP -> last time it was observed
 	peerLoopCancel     context.CancelFunc
 
+	standbyMu      sync.Mutex
+	standby        *ProbeResult // pre-measured alternative relay
+	standbyAt      time.Time    // when the standby was last measured
+	standbyTriedAt time.Time    // when a standby refresh was last attempted
+
 	anchorProbeMu   sync.Mutex
 	anchorProbeWait map[uint32]chan anchorProbeResult
 	anchorProbeSeq  atomic.Uint32
@@ -193,6 +205,19 @@ func (e *Engine) Stats() TunnelStats {
 	loss := math.Float64frombits(e.lossPctBits.Load())
 	peerIPs := e.peerRouteIPs()
 
+	e.standbyMu.Lock()
+	var standbyID, standbyName string
+	var standbyRTT, standbyTotal float64
+	standbyAge := 0
+	if e.standby != nil && !e.standbyAt.IsZero() {
+		standbyID = e.standby.RelayID
+		standbyName = e.standby.Name
+		standbyRTT = e.standby.RTTMedianMs
+		standbyTotal = e.standby.TotalEstimateMs
+		standbyAge = int(time.Since(e.standbyAt).Seconds())
+	}
+	e.standbyMu.Unlock()
+
 	return TunnelStats{
 		State:            e.state,
 		RelayAddr:        e.relayAddr.String(),
@@ -226,6 +251,11 @@ func (e *Engine) Stats() TunnelStats {
 		PeerRouteIPs:     peerIPs,
 		FullTunnel:       e.fullTunnelEnabled.Load(),
 		Failovers:        int(e.failoverCount.Load()),
+		StandbyRelayID:   standbyID,
+		StandbyRelayName: standbyName,
+		StandbyRttMs:     standbyRTT,
+		StandbyTotalMs:   standbyTotal,
+		StandbyAgeSec:    standbyAge,
 	}
 }
 
@@ -402,6 +432,97 @@ func (e *Engine) syncPeerRoutes() {
 		log.Printf("[Engine] Peer routing: removing %d stale peer route(s)", len(removed))
 		e.routeManager.RemovePeerRoutes(removed)
 	}
+}
+
+const (
+	standbyRefreshInterval = 20 * time.Second
+	standbyMaxAge          = 45 * time.Second
+)
+
+// selectStandbyResult picks the best pre-measured alternative relay: reachable,
+// not unstable, and not the relay currently in use.
+func selectStandbyResult(results []ProbeResult, activeEndpoint string) (ProbeResult, bool) {
+	for _, result := range results {
+		if !result.Reachable || result.Unstable {
+			continue
+		}
+		if strings.EqualFold(result.Endpoint, activeEndpoint) {
+			continue
+		}
+		return result, true
+	}
+	return ProbeResult{}, false
+}
+
+// maybeRefreshStandby keeps one alternative relay pre-measured while connected
+// so a degradation never has to wait for a sweep at the worst moment.
+func (e *Engine) maybeRefreshStandby(ctx context.Context, prober *Prober, activeRelayID, activeEndpoint string) {
+	if e.profileMgr == nil {
+		return
+	}
+
+	e.standbyMu.Lock()
+	tried := e.standbyTriedAt
+	e.standbyMu.Unlock()
+	if !tried.IsZero() && time.Since(tried) < standbyRefreshInterval {
+		return
+	}
+
+	allRelays := e.profileMgr.Catalog().Relays
+	if len(allRelays) <= 1 {
+		return
+	}
+
+	candidates := make([]profiles.RelayEndpoint, 0, 3)
+	for _, relay := range allRelays {
+		if relay.ID == activeRelayID || relay.Endpoint == activeEndpoint {
+			continue
+		}
+		candidates = append(candidates, relay)
+		if len(candidates) >= 3 {
+			break
+		}
+	}
+	if len(candidates) == 0 {
+		return
+	}
+
+	e.mu.Lock()
+	gameID, regionID := e.activeGame, e.activeRegion
+	e.mu.Unlock()
+	anchorID := anchorProbeIDForRegion(e.profileMgr, gameID, regionID)
+
+	probeCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	results := prober.ProbeAllWithAnchor(probeCtx, candidates, 3, anchorID)
+	cancel()
+
+	best, ok := selectStandbyResult(results, activeEndpoint)
+	e.standbyMu.Lock()
+	e.standbyTriedAt = time.Now()
+	if ok {
+		bestCopy := best
+		e.standby = &bestCopy
+		e.standbyAt = time.Now()
+	}
+	e.standbyMu.Unlock()
+}
+
+// freshStandby returns the pre-measured alternative relay when it is recent.
+func (e *Engine) freshStandby() (*ProbeResult, bool) {
+	e.standbyMu.Lock()
+	defer e.standbyMu.Unlock()
+	if e.standby == nil || e.standbyAt.IsZero() || time.Since(e.standbyAt) > standbyMaxAge {
+		return nil, false
+	}
+	copyResult := *e.standby
+	return &copyResult, true
+}
+
+func (e *Engine) clearStandby() {
+	e.standbyMu.Lock()
+	e.standby = nil
+	e.standbyAt = time.Time{}
+	e.standbyMu.Unlock()
 }
 
 // deliverAnchorProbe hands a relay-measured anchor RTT to the waiting caller.
@@ -1108,6 +1229,9 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 			baselinePing := e.baselinePingMs
 			e.mu.Unlock()
 
+			// Keep an alternative relay pre-measured so failover is instant.
+			e.maybeRefreshStandby(ctx, prober, activeRelayID, activeEndpoint)
+
 			currentPing := float64(e.pingMs.Load())
 			if currentPing <= 0 {
 				continue
@@ -1172,43 +1296,50 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 				continue
 			}
 
-			// Determine current relay's continent
-			var currContinent string
-			for _, r := range allRelays {
-				if r.ID == activeRelayID || r.Endpoint == activeEndpoint {
-					currContinent = r.Continent
-					break
-				}
-			}
-
-			var candidates []profiles.RelayEndpoint
-			// Prefer relays in same continent
-			for _, r := range allRelays {
-				if (r.ID != activeRelayID && r.Endpoint != activeEndpoint) && r.Continent == currContinent {
-					candidates = append(candidates, r)
-				}
-			}
-			// Fallback to all other relays if no candidates in same continent
-			if len(candidates) == 0 {
+			// Prefer the already pre-measured standby; only sweep when it is
+			// missing or stale.
+			var bestCandidate *ProbeResult
+			if standby, fresh := e.freshStandby(); fresh {
+				bestCandidate = standby
+				log.Printf("[Failover] Using pre-measured standby relay %s (%.1fms)", standby.Name, standby.RTTMedianMs)
+			} else {
+				// Determine current relay's continent
+				var currContinent string
 				for _, r := range allRelays {
-					if r.ID != activeRelayID && r.Endpoint != activeEndpoint {
+					if r.ID == activeRelayID || r.Endpoint == activeEndpoint {
+						currContinent = r.Continent
+						break
+					}
+				}
+
+				var candidates []profiles.RelayEndpoint
+				// Prefer relays in same continent
+				for _, r := range allRelays {
+					if (r.ID != activeRelayID && r.Endpoint != activeEndpoint) && r.Continent == currContinent {
 						candidates = append(candidates, r)
 					}
 				}
-			}
-			if len(candidates) == 0 {
-				continue
-			}
+				// Fallback to all other relays if no candidates in same continent
+				if len(candidates) == 0 {
+					for _, r := range allRelays {
+						if r.ID != activeRelayID && r.Endpoint != activeEndpoint {
+							candidates = append(candidates, r)
+						}
+					}
+				}
+				if len(candidates) == 0 {
+					continue
+				}
 
-			probeCtx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
-			results := prober.ProbeAll(probeCtx, candidates, 4)
-			cancel()
+				probeCtx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+				results := prober.ProbeAll(probeCtx, candidates, 4)
+				cancel()
 
-			if len(results) == 0 || !results[0].Reachable {
-				continue
+				if len(results) == 0 || !results[0].Reachable {
+					continue
+				}
+				bestCandidate = &results[0]
 			}
-
-			bestCandidate := &results[0]
 			currentScore := currentPing*(1.0+2.0*lossRate) + float64(missedPongs)*50.0
 
 			if shouldSwitch, switchReason := e.failoverCtrl.ShouldSwitch(currentScore, bestCandidate.Score, time.Now()); shouldSwitch {
@@ -1374,6 +1505,9 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 
 	log.Printf("[Failover] Handover SUCCESSFUL: %s -> %s (RTT: %.1fms -> %.1fms, reason: %s)",
 		oldRelayName, candidate.Name, oldPing, candidate.RTTMedianMs, reason)
+
+	// The promoted relay is now active; the next refresh measures a new one.
+	e.clearStandby()
 
 	// 10. Gracefully notify old relay and close old connection
 	go func() {
