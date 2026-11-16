@@ -52,6 +52,11 @@ type ProbeResult struct {
 	// layer from the local config; the prober itself never sets it).
 	Recent bool `json:"recent,omitempty"`
 
+	// Optional ICMP echo measurement to the relay host, when the OS allows
+	// unprivileged ICMP. Absent means "not measured", never zero.
+	ICMPRTTMs   float64 `json:"icmpRttMs,omitempty"`
+	ICMPLossPct float64 `json:"icmpLossPct,omitempty"`
+
 	// Unstable is derived from retained history: high average loss or a large
 	// RTT spread across at least three probe runs.
 	Unstable bool `json:"unstable,omitempty"`
@@ -79,6 +84,13 @@ type ProberConfig struct {
 	SampleTimeout      time.Duration
 	SampleInterval     time.Duration
 	DefaultConcurrency int
+
+	// Optional ICMP echo measurement alongside the tunnel probe. It uses
+	// unprivileged ICMP sockets where the OS allows them and is skipped
+	// silently otherwise (never faked).
+	ICMPProbe   bool
+	ICMPSamples int
+	ICMPTimeout time.Duration
 }
 
 // DefaultProberConfig returns recommended defaults for fast, non-blocking sweeps.
@@ -88,6 +100,9 @@ func DefaultProberConfig() ProberConfig {
 		SampleTimeout:      800 * time.Millisecond,
 		SampleInterval:     40 * time.Millisecond,
 		DefaultConcurrency: 8,
+		ICMPProbe:          true,
+		ICMPSamples:        2,
+		ICMPTimeout:        700 * time.Millisecond,
 	}
 }
 
@@ -117,6 +132,12 @@ func NewProberWithConfig(cfg ProberConfig) *Prober {
 	}
 	if cfg.DefaultConcurrency <= 0 {
 		cfg.DefaultConcurrency = 8
+	}
+	if cfg.ICMPSamples <= 0 {
+		cfg.ICMPSamples = 2
+	}
+	if cfg.ICMPTimeout <= 0 {
+		cfg.ICMPTimeout = 700 * time.Millisecond
 	}
 	return &Prober{cfg: cfg}
 }
@@ -334,6 +355,17 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 	result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs)+(result.PacketLoss*50.0), 2)
 	if result.RelayAnchorRTTMs > 0 {
 		result.TotalEstimateMs = roundTo(result.RTTMedianMs+result.RelayAnchorRTTMs, 1)
+	}
+
+	// Optional ICMP echo to the same host, when the OS allows it. Failures are
+	// simply "not measured" so the sweep never invents a value.
+	if p.cfg.ICMPProbe {
+		if icmpRes, err := probeICMP(ctx, udpAddr.IP, p.cfg.ICMPSamples, p.cfg.ICMPTimeout); err == nil && icmpRes.Samples > 0 {
+			if icmpRes.RTTMs > 0 {
+				result.ICMPRTTMs = roundTo(icmpRes.RTTMs, 1)
+			}
+			result.ICMPLossPct = roundTo(icmpRes.LossPct, 0)
+		}
 	}
 
 	return result

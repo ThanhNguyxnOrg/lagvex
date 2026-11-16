@@ -444,6 +444,8 @@ export type RelayNode = {
   recent: boolean;
   /** History shows high loss or a large RTT spread. */
   unstable: boolean;
+  /** Optional ICMP echo RTT to the relay host (0 = not measured). */
+  icmpRttMs: number;
 };
 
 export type DetectedGame = {
@@ -571,7 +573,8 @@ const EMPTY_RELAY: RelayNode = {
   totalEstimateMs: 0,
   isOptimal: false,
   recent: false,
-  unstable: false
+  unstable: false,
+  icmpRttMs: 0
 };
 
 function mapProbeRelays(data: unknown): RelayNode[] {
@@ -613,7 +616,8 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         totalEstimateMs: typeof item.totalEstimateMs === "number" ? item.totalEstimateMs : 0,
         isOptimal: item.isOptimal === true,
         recent: item.recent === true,
-        unstable: item.unstable === true
+        unstable: item.unstable === true,
+        icmpRttMs: typeof item.icmpRttMs === "number" ? item.icmpRttMs : 0
       };
     });
 }
@@ -3708,6 +3712,14 @@ export default function App() {
                           <span className="text-[9px] font-mono text-white/35">
                             {relay.historySamples > 0 ? `${relay.historySamples} probe${relay.historySamples === 1 ? "" : "s"} kept` : "No probe history yet"}
                           </span>
+                          {relay.icmpRttMs > 0 && (
+                            <span
+                              className="text-[9px] font-mono text-white/40"
+                              title="ICMP echo measured locally, when the OS allows unprivileged ICMP"
+                            >
+                              ICMP {relay.icmpRttMs} ms
+                            </span>
+                          )}
                           {relay.totalEstimateMs > 0 && (
                             <span className="text-[9px] font-mono text-[#10b981]">
                               via relay: {relay.totalEstimateMs} ms total (relay → region {relay.relayAnchorRttMs} ms)
