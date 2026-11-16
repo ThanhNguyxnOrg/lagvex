@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.3.0] - 2026-11-16
 
 ### 🎯 Relay-measured anchor probe
 
@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The relay refuses unknown ids, applies a per-session rate limit (2s minimum
   interval, 60 per hour) and only uses the fixed target list, so it cannot be
   pointed at arbitrary hosts.
+
+### 📈 Measured throughput view and endpoint history
+
+- The Boost history tab charts the engine's own up/down byte rates with live
+  rates and session totals, and shows a waiting state until samples exist.
+- The game-connections card remembers the last three distinct remote IPs the
+  selected game was observed talking to; no geolocation and no guessing.
 
 ---
 
