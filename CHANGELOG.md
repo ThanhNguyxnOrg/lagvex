@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### 🎯 Relay-measured anchor probe
+
+- New `AnchorProbe`/`AnchorProbeReply` control messages: the client asks the
+  relay to measure its own RTT to one **allowlisted** anchor, and the route
+  detail view combines tunnel RTT + relay RTT into a measured via-relay
+  estimate with a direct-vs-via-relay improvement value.
+- The relay refuses unknown ids, applies a per-session rate limit (2s minimum
+  interval, 60 per hour) and only uses the fixed target list, so it cannot be
+  pointed at arbitrary hosts.
+
+---
+
 ## [1.2.0] - 2026-11-15
 
 ### 🧭 Honest telemetry overhaul (breaking behavior changes)

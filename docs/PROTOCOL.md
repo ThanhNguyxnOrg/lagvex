@@ -20,7 +20,7 @@ Every packet begins with a 1-byte header:
 
 ```text
 bits 7..4 : Protocol Version (currently 0x1)
-bits 3..0 : Message Type (0x1 .. 0x7)
+bits 3..0 : Message Type (0x1 .. 0x9)
 ```
 
 | Type Code | 🏷️ Message Name | ↔️ Direction | 📏 Packet Size |
@@ -32,6 +32,11 @@ bits 3..0 : Message Type (0x1 .. 0x7)
 | `0x5` | `Pong` 🎾 | Relay -> Client | 41 bytes (Encrypted timestamp payload) |
 | `0x6` | `Disconnect` 🛑 | Client -> Relay | 33 bytes (Encrypted notification) |
 | `0x7` | `FEC` 🛡️ | Client -> Relay | 33 bytes + Parity Payload |
+| `0x8` | `AnchorProbe` 🎯 | Client -> Relay | 41 bytes (Encrypted sequence + anchor id) |
+| `0x9` | `AnchorProbeReply` 🎯 | Relay -> Client | 41 bytes (Encrypted sequence + rtt + loss) |
+
+Old relays drop the `0x8`/`0x9` types, so anchor probing degrades to "not
+measured" instead of breaking the tunnel.
 
 ---
 
@@ -131,7 +136,26 @@ The relay immediately cleans up the session table and frees the IP address in th
 
 ---
 
-## 7. 📏 MTU Math & TCP MSS Clamping
+## 7. 🎯 Anchor Probe (41 Bytes)
+
+The client can ask the connected relay to measure **its own** RTT to one public
+cloud anchor so the route detail view can show a measured via-relay estimate.
+
+- `AnchorProbe` payload (8 bytes, sealed): `sequence (u32) | anchor id (u8)`.
+- `AnchorProbeReply` payload (8 bytes, sealed): `sequence (u32) | rtt us (u24) | loss % (u8)`.
+
+Safety rules that keep a relay from becoming a scanner or amplifier:
+
+- The relay only accepts ids from the fixed `protocol.AnchorProbeTargets`
+  allowlist; unknown ids are rejected and logged. A client can never request an
+  arbitrary host or port.
+- Each session is rate limited to one probe every 2 seconds and 60 per hour.
+- A probe is only two TCP handshakes with a 1.5s timeout each; failures are
+  reported as loss, never as invented latency.
+
+---
+
+## 8. 📏 MTU Math & TCP MSS Clamping
 
 ```text
 Standard Path MTU:               1500 bytes
