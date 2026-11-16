@@ -296,3 +296,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - grant artifact-read permissions to shared publisher ([1bdac98](https://github.com/ThanhNguyxnOrg/lagvex/commit/1bdac984e043fe66b864d73fcab01c2726dcd6a4))
 
+## [1.4.0] - 2026-11-16
+
+### Features
+
+- rank relays by measured per-segment RTT (client + relay to region) ([da710bf](https://github.com/ThanhNguyxnOrg/lagvex/commit/da710bfcce8a5078a8f4bd087ed97a2225cc0884))
+- opt-in full tunnel mode (all IPv4 traffic through the relay) ([d94ddb5](https://github.com/ThanhNguyxnOrg/lagvex/commit/d94ddb5b3e07d3aee0beffb7ab8bde5850f7790c))
+
