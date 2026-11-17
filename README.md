@@ -49,8 +49,10 @@ anti-cheat checks the way socket-hooking boosters can.
   the public IPs your game process is actually talking to (Linux/macOS observe UDP and
   TCP; Windows exposes TCP peers only). Off by default.
 - 📊 **Measured node list** — per-relay RTT history: latest, average, standard
-  deviation, loss and a sparkline built from real probe runs. When the OS permits
-  unprivileged ICMP, an echo RTT (`ICMP x ms`) is shown next to the tunnel probe.
+  deviation, loss and a sparkline built from real probe runs. Hover a sparkline
+  point to see its sample number, RTT and change from the previous sample. When
+  the OS permits unprivileged ICMP, an echo RTT (`ICMP x ms`) is shown next to
+  the tunnel probe.
 - 🗺️ **Route detail** — per-hop measurement (gateway, direct relay probe, live tunnel
   echo, region cloud anchor) with explicit "not measured" reasons for segments the
   client cannot observe.

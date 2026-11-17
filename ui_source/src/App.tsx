@@ -670,6 +670,8 @@ function formatProbeAge(lastProbeAt: string): string {
 
 /** Small measured-RTT sparkline. Renders a dash until two real samples exist. */
 function RttSparkline({ samples, width = 110, height = 26 }: { samples: number[]; width?: number; height?: number }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
   if (!samples || samples.length < 2) {
     return <span className="text-[10px] text-white/30">Not enough samples</span>;
   }
@@ -677,27 +679,72 @@ function RttSparkline({ samples, width = 110, height = 26 }: { samples: number[]
   const max = Math.max(...samples);
   const range = max - min || 1;
   const step = width / (samples.length - 1);
+  const pointAt = (value: number, index: number) => ({
+    x: index * step,
+    y: height - 3 - ((value - min) / range) * (height - 6)
+  });
   const points = samples
     .map((v, i) => {
-      const x = i * step;
-      const y = height - 3 - ((v - min) / range) * (height - 6);
+      const { x, y } = pointAt(v, i);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
   const last = samples[samples.length - 1];
-  const lastY = height - 3 - ((last - min) / range) * (height - 6);
+  const lastPoint = pointAt(last, samples.length - 1);
+  const hoveredPoint = hovered !== null && hovered < samples.length ? pointAt(samples[hovered], hovered) : null;
+  const delta = hovered !== null && hovered > 0 && hovered < samples.length ? samples[hovered] - samples[hovered - 1] : 0;
+
   return (
-    <svg width={width} height={height} className="overflow-visible" role="img" aria-label="Measured RTT history">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="#00F0FF"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <circle cx={width} cy={lastY} r="2" fill="#00F0FF" />
-    </svg>
+    <div className="relative" onMouseLeave={() => setHovered(null)}>
+      <svg width={width} height={height} className="overflow-visible" role="img" aria-label="Measured RTT history">
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#00F0FF"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx={width} cy={lastPoint.y} r="2" fill="#00F0FF" />
+        {samples.map((_, i) => (
+          <rect
+            key={i}
+            x={Math.max(0, i * step - step / 2)}
+            y={0}
+            width={step}
+            height={height}
+            fill="transparent"
+            onMouseEnter={() => setHovered(i)}
+          />
+        ))}
+        {hovered !== null && hoveredPoint && (
+          <>
+            <line
+              x1={hoveredPoint.x}
+              y1={0}
+              x2={hoveredPoint.x}
+              y2={height}
+              stroke="rgba(255,255,255,0.25)"
+              strokeDasharray="2 2"
+            />
+            <circle cx={hoveredPoint.x} cy={hoveredPoint.y} r="2.5" fill="#00F0FF" />
+          </>
+        )}
+      </svg>
+      {hovered !== null && (
+        <div
+          className="absolute -top-8 z-20 px-2 py-1 rounded-md bg-[#0f1722] border border-[#223042] text-[9px] font-mono text-white whitespace-nowrap pointer-events-none shadow-lg"
+          style={{ left: Math.min(Math.max(hovered * step, 24), width - 24), transform: "translateX(-50%)" }}
+        >
+          #{hovered + 1}/{samples.length} · {samples[hovered]} ms
+          {hovered > 0 && (
+            <span className={delta > 0 ? "text-[#f59e0b]" : delta < 0 ? "text-[#10b981]" : "text-white/40"}>
+              {" "}({delta > 0 ? "+" : ""}{delta.toFixed(1)})
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
