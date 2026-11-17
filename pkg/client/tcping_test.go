@@ -180,6 +180,30 @@ func TestHandleTCPPingRejectsUnsafeRequests(t *testing.T) {
 	}
 }
 
+func TestTCPPingRouteIsGuarded(t *testing.T) {
+	server := NewUIServer(nil, nil, "")
+	handler := withLocalRequestGuard(server.setupRoutes())
+
+	// The browser CSRF guard must cover the TCP ping endpoint: without the
+	// intent header a cross-site page could otherwise drive local dials.
+	req := httptest.NewRequest(http.MethodPost, "/api/tcping", strings.NewReader(`{"target":"1.1.1.1"}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status without guard header = %d, want 403", rec.Code)
+	}
+
+	// With the header the request reaches the handler, which still refuses
+	// non-public targets before any socket is opened.
+	req = httptest.NewRequest(http.MethodPost, "/api/tcping", strings.NewReader(`{"target":"192.168.1.1"}`))
+	req.Header.Set(dashboardRequestHeader, "1")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status for private target = %d, want 400 (body %s)", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleTCPPingRateLimit(t *testing.T) {
 	now := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
 	server := &UIServer{}
