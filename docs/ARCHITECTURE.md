@@ -128,7 +128,7 @@ The frontend (`web/`) is architected as a lightweight, zero-dependency tactical 
                   ├─► GET /api/status       (Engine state, active game, active relay)
                   ├─► POST /api/connect     (Triggers handshake & dynamic routing)
                   ├─► POST /api/disconnect  (Tears down routes & releases IP)
-                  ├─► POST /api/probe       (ICMP/UDP multi-probe for latency scoring)
+                  ├─► POST /api/probe       (UDP tunnel probe + optional ICMP echo)
                   └─► Static Assets         (HTML5, Vanilla CSS, JS with zero npm bloat)
 ```
 

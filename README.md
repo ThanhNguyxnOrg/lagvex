@@ -49,7 +49,8 @@ anti-cheat checks the way socket-hooking boosters can.
   the public IPs your game process is actually talking to (Linux/macOS observe UDP and
   TCP; Windows exposes TCP peers only). Off by default.
 - 📊 **Measured node list** — per-relay RTT history: latest, average, standard
-  deviation, loss and a sparkline built from real probe runs.
+  deviation, loss and a sparkline built from real probe runs. When the OS permits
+  unprivileged ICMP, an echo RTT (`ICMP x ms`) is shown next to the tunnel probe.
 - 🗺️ **Route detail** — per-hop measurement (gateway, direct relay probe, live tunnel
   echo, region cloud anchor) with explicit "not measured" reasons for segments the
   client cannot observe.
@@ -58,7 +59,8 @@ anti-cheat checks the way socket-hooking boosters can.
 - 🧾 **Diagnostics snapshot** — export measured state plus non-secret settings for bug
   reports; import merges them back (relay PSKs are never included).
 - 🛡️ **Adaptive FEC, failover and DSCP marking** — loss recovery and relay failover
-  with honest status reporting.
+  with honest status reporting. While connected, one alternative relay is kept
+  pre-measured as a standby, so a degradation promotes it without waiting for a sweep.
 - 🖥️ **Windows, macOS and Linux client** — WinTun, native `utun` and `/dev/net/tun`
   respectively; one Go codebase, one React dashboard.
 
