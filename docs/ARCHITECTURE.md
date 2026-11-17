@@ -132,6 +132,17 @@ The frontend (`web/`) is architected as a lightweight, zero-dependency tactical 
                   └─► Static Assets         (HTML5, Vanilla CSS, JS with zero npm bloat)
 ```
 
+### Local API guard
+
+The dashboard API is bound to loopback, but loopback alone does not stop a
+malicious web page from POSTing to it. Every state-changing request
+(`POST`/`PUT`/`PATCH`/`DELETE`) must carry `X-Lagvex-Request: 1`, and a
+request that presents an `Origin` header must come from a loopback origin.
+Browsers cannot add the custom header cross-site without a CORS preflight,
+which the server never grants. The React dashboard sends it automatically;
+command-line callers must add it explicitly. Read-only `GET` requests are
+unchanged.
+
 ### Key Front-End Subsystems:
 1. 🛡️ **Resolution-Independent Vector Emblems**: Custom inline SVG insignias for all 11 games provide instantaneous rasterization with zero blur on 4K / Ultrawide gaming monitors.
 2. 📡 **Tactical Dual-Ring Radar Scanner**: Animated Canvas/SVG radar sweep line with synchronized radial sonar rings provides visual feedback during connection negotiation and process discovery.

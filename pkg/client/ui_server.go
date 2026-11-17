@@ -130,7 +130,7 @@ func (u *UIServer) Start(addr string) error {
 
 	u.server = &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      withLocalRequestGuard(mux),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}

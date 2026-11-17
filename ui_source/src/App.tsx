@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import FloatingHUD from "./FloatingHUD";
 
+// The dashboard API requires this header on state-changing requests so a
+// cross-site page cannot drive the loopback API (custom headers force a CORS
+// preflight, which the local server never allows).
+const nativeFetch = window.fetch.bind(window);
+function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  headers.set("X-Lagvex-Request", "1");
+  return nativeFetch(input, { ...init, headers });
+}
+
 // ==================== BRAND ASSETS ====================
 const imgLagvexLogo = "/assets/logo.jpg";
 
@@ -949,7 +959,7 @@ export default function App() {
 
   const refreshGames = async (): Promise<Game[]> => {
     try {
-      const res = await fetch("/api/games");
+      const res = await apiFetch("/api/games");
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -978,7 +988,7 @@ export default function App() {
     }
     const id = newGameName.toLowerCase().replace(/[^a-z0-9]/g, "");
     try {
-      const res = await fetch("/api/add-game", {
+      const res = await apiFetch("/api/add-game", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1020,7 +1030,7 @@ export default function App() {
     }
     const id = "custom-" + Date.now();
     try {
-      const res = await fetch("/api/add-relay", {
+      const res = await apiFetch("/api/add-relay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1045,7 +1055,7 @@ export default function App() {
       setNewNodeLocation("");
       setNewNodePsk("");
       // Re-probe relays
-      const pRes = await fetch("/api/probe-relays");
+      const pRes = await apiFetch("/api/probe-relays");
       if (pRes.ok) {
         const data = await pRes.json();
         setRelays(mapProbeRelays(data));
@@ -1059,7 +1069,7 @@ export default function App() {
   const handleRelaunchAdmin = async () => {
     notify("Requesting administrator elevation prompt...");
     try {
-      const res = await fetch("/api/relaunch-admin", { method: "POST" });
+      const res = await apiFetch("/api/relaunch-admin", { method: "POST" });
       const data = await res.json();
       if (data.isAdmin) {
         setIsAdmin(true);
@@ -1079,7 +1089,7 @@ export default function App() {
     if (window.confirm("Exit Lagvex completely? All game acceleration tunnels will be safely terminated.")) {
       notify("Shutting down Lagvex application...");
       try {
-        await fetch("/api/shutdown", { method: "POST" });
+        await apiFetch("/api/shutdown", { method: "POST" });
       } catch {
         // Ignored
       }
@@ -1094,7 +1104,7 @@ export default function App() {
     setIsTestingBufferbloat(true);
     notify("⚡ Testing connection latency under load (Bufferbloat Analysis)...");
     try {
-      const res = await fetch("/api/diagnose-bufferbloat");
+      const res = await apiFetch("/api/diagnose-bufferbloat");
       if (!res.ok) {
         notify(`Bufferbloat test failed (${res.status}).`);
         return;
@@ -1124,7 +1134,7 @@ export default function App() {
   // Diagnostics snapshot: export measured state, import non-secret settings
   const handleExportDiagnostics = async () => {
     try {
-      const res = await fetch("/api/diagnostics/export");
+      const res = await apiFetch("/api/diagnostics/export");
       if (!res.ok) {
         notify("Could not export a diagnostics snapshot.");
         return;
@@ -1147,7 +1157,7 @@ export default function App() {
   const handleImportDiagnostics = async (file: File) => {
     try {
       const text = await file.text();
-      const res = await fetch("/api/diagnostics/import", {
+      const res = await apiFetch("/api/diagnostics/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: text
@@ -1203,7 +1213,7 @@ export default function App() {
   const handleScanGameConnections = async (silent = false) => {
     if (!silent) setIsScanningConnections(true);
     try {
-      const res = await fetch("/api/game-connections");
+      const res = await apiFetch("/api/game-connections");
       if (!res.ok) {
         if (!silent) notify(`Connection scan failed (${res.status}).`);
         return;
@@ -1233,7 +1243,7 @@ export default function App() {
       if (selectedRegion?.id) params.set("regionId", selectedRegion.id);
       if (selectedRelay.address) params.set("relayEndpoint", selectedRelay.address);
 
-      const res = await fetch(`/api/route-detail?${params.toString()}`);
+      const res = await apiFetch(`/api/route-detail?${params.toString()}`);
       if (!res.ok) {
         if (!silent) notify(`Route measurement failed (${res.status}).`);
         return;
@@ -1268,7 +1278,7 @@ export default function App() {
   // Peer routing: opt-in /32 routes for the peers the game actually talks to
   const handleTogglePeerRouting = async () => {
     try {
-      const res = await fetch("/api/peer-routing/toggle", {
+      const res = await apiFetch("/api/peer-routing/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: !peerRouting })
@@ -1294,7 +1304,7 @@ export default function App() {
   // Full tunnel: opt-in "all IPv4 traffic through the relay" mode
   const handleToggleFullTunnel = async () => {
     try {
-      const res = await fetch("/api/full-tunnel/toggle", {
+      const res = await apiFetch("/api/full-tunnel/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: !fullTunnel })
@@ -1363,7 +1373,7 @@ export default function App() {
   useEffect(() => {
     const fetchSystemInfo = async () => {
       try {
-        const res = await fetch("/api/system-info");
+        const res = await apiFetch("/api/system-info");
         if (res.ok) {
           const data = await res.json();
           if (data.hostname) setPcHostname(data.hostname);
@@ -1382,7 +1392,7 @@ export default function App() {
 
     const fetchNetworkDiagnostics = async () => {
       try {
-        const res = await fetch("/api/diagnose-network");
+        const res = await apiFetch("/api/diagnose-network");
         if (res.ok) {
           const data = await res.json();
           setNetworkDiag(data);
@@ -1395,7 +1405,7 @@ export default function App() {
 
     const fetchRelays = async () => {
       try {
-        const res = await fetch("/api/probe-relays");
+        const res = await apiFetch("/api/probe-relays");
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -1408,7 +1418,7 @@ export default function App() {
 
     const fetchStatus = async () => {
       try {
-        const res = await fetch("/api/status");
+        const res = await apiFetch("/api/status");
         if (res.ok) {
           const data = await res.json();
           if (data.active || data.state === "connected") {
@@ -1433,7 +1443,7 @@ export default function App() {
     let stopped = false;
     const pollDetected = async () => {
       try {
-        const res = await fetch("/api/detected-processes");
+        const res = await apiFetch("/api/detected-processes");
         if (!res.ok) return;
         const data = await res.json();
         if (stopped || !Array.isArray(data.games)) return;
@@ -1458,7 +1468,7 @@ export default function App() {
     let stopped = false;
     const scan = async () => {
       try {
-        const res = await fetch("/api/game-connections");
+        const res = await apiFetch("/api/game-connections");
         if (!res.ok) return;
         const data = await res.json();
         if (stopped) return;
@@ -1487,7 +1497,7 @@ export default function App() {
     let stopped = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/failover/history");
+        const res = await apiFetch("/api/failover/history");
         if (!res.ok) return;
         const data = await res.json();
         if (stopped || !Array.isArray(data)) return;
@@ -1613,7 +1623,7 @@ export default function App() {
     let stopped = false;
     const pollStatus = async () => {
       try {
-        const res = await fetch("/api/status");
+        const res = await apiFetch("/api/status");
         if (!res.ok) return;
         const data = await res.json();
         if (stopped) return;
@@ -1664,7 +1674,7 @@ export default function App() {
     if (isBoosting) {
       timer = setInterval(async () => {
         try {
-          const res = await fetch("/api/status");
+          const res = await apiFetch("/api/status");
           if (res.ok) {
             const data = await res.json();
             if (data.active || data.state === "connected") {
@@ -1728,7 +1738,7 @@ export default function App() {
     if (isBoosting) {
       setIsConnecting(true);
       try {
-        await fetch("/api/disconnect", { method: "POST" });
+        await apiFetch("/api/disconnect", { method: "POST" });
         setIsBoosting(false);
         setLivePing(0);
         setConnectionError(null);
@@ -1755,7 +1765,7 @@ export default function App() {
     const targetRelayAddr = selectedRelay.address || "auto";
     notify(`Accelerating ${selectedGame.name} (${selectedRegion.name}) via ${selectedRelay.cleanName}...`);
     try {
-      const res = await fetch("/api/connect", {
+      const res = await apiFetch("/api/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1815,7 +1825,7 @@ export default function App() {
   const handleCreateSquadRoom = async () => {
     const code = `LGVX-${Math.floor(1000 + Math.random() * 9000)}`;
     try {
-      const res = await fetch("/api/squad/create", {
+      const res = await apiFetch("/api/squad/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1857,7 +1867,7 @@ export default function App() {
     }
     const code = joinInputCode.trim().toUpperCase();
     try {
-      const res = await fetch("/api/squad/join", {
+      const res = await apiFetch("/api/squad/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1901,7 +1911,7 @@ export default function App() {
   const handleLeaveSquadRoom = async () => {
     if (currentSquadRoom) {
       try {
-        await fetch("/api/squad/leave", {
+        await apiFetch("/api/squad/leave", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: currentSquadRoom, name: gamerNickname })
@@ -1919,7 +1929,7 @@ export default function App() {
     if (!currentSquadRoom) return;
     const interval = setInterval(async () => {
       try {
-        await fetch("/api/squad/heartbeat", {
+        await apiFetch("/api/squad/heartbeat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1928,7 +1938,7 @@ export default function App() {
             ping: Math.round(livePing)
           })
         });
-        const res = await fetch(`/api/squad/room?code=${encodeURIComponent(currentSquadRoom)}`);
+        const res = await apiFetch(`/api/squad/room?code=${encodeURIComponent(currentSquadRoom)}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.members)) {
@@ -1956,7 +1966,7 @@ export default function App() {
   // Apply Windows System Tweaks via API
   const handleApplyTweaks = async () => {
     try {
-      const res = await fetch("/api/tweak", {
+      const res = await apiFetch("/api/tweak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3648,7 +3658,7 @@ export default function App() {
                         if (selectedGame.profileAvailable) params.set("gameId", selectedGame.id);
                         if (selectedRegion?.id) params.set("regionId", selectedRegion.id);
                         const query = params.toString();
-                        const res = await fetch(`/api/probe-relays${query ? `?${query}` : ""}`);
+                        const res = await apiFetch(`/api/probe-relays${query ? `?${query}` : ""}`);
                         if (res.ok) {
                           const data = await res.json();
                           const mapped = mapProbeRelays(data);
