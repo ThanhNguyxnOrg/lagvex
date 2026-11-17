@@ -119,37 +119,76 @@ func TestDualDedupSweepExpiresGroups(t *testing.T) {
 	}
 }
 
-func TestDualAckRateLimitPerSession(t *testing.T) {
+func TestDualAckContiguousWatermark(t *testing.T) {
 	now := time.Unix(1_700_000_100, 0)
-	sess := &Session{}
+	sess := &Session{dualAckHoles: make(map[uint32]struct{})}
 
 	if _, ok := sess.TakeDualAck(now); ok {
 		t.Fatal("no ACK before the first forwarded dual frame")
 	}
 
-	sess.RecordDualForwarded(5)
+	// In-order frames advance the watermark directly.
+	sess.TrackDualForwarded(1)
 	highest, ok := sess.TakeDualAck(now)
-	if !ok || highest != 5 {
-		t.Fatalf("first ack = %d/%v, want 5/true", highest, ok)
+	if !ok || highest != 1 {
+		t.Fatalf("first ack = %d/%v, want 1/true", highest, ok)
 	}
 
-	// Within the interval: no ACK.
-	sess.RecordDualForwarded(9)
-	if _, ok := sess.TakeDualAck(now.Add(dualAckInterval / 2)); ok {
+	// A gap holds the watermark: frame 3 arrives before frame 2. The ACK
+	// still fires (rate limit allows) but only reports the contiguous part.
+	sess.TrackDualForwarded(3)
+	highest, ok = sess.TakeDualAck(now.Add(dualAckInterval + time.Millisecond))
+	if !ok || highest != 1 {
+		t.Fatalf("ack across gap = %d/%v, want 1/true", highest, ok)
+	}
+
+	// Fill the gap: watermark jumps to 3.
+	sess.TrackDualForwarded(2)
+	highest, ok = sess.TakeDualAck(now.Add(2*dualAckInterval + time.Millisecond))
+	if !ok || highest != 3 {
+		t.Fatalf("ack after fill = %d/%v, want 3/true", highest, ok)
+	}
+
+	// A retransmitted duplicate fills a hole too (proof of earlier forward).
+	sess.TrackDualForwarded(6)
+	sess.TrackDualForwarded(5)
+	highest, _ = sess.TakeDualAck(now.Add(4 * dualAckInterval))
+	if highest != 3 {
+		t.Fatalf("ack = %d, want 3 (5 and 6 are holes)", highest)
+	}
+	sess.TrackDualForwarded(4)
+	sess.TrackDualForwarded(5) // suppressed duplicate of the hole
+	highest, _ = sess.TakeDualAck(now.Add(6 * dualAckInterval))
+	if highest != 6 {
+		t.Fatalf("ack = %d, want 6", highest)
+	}
+
+	// Rate limit still applies between ACKs.
+	if _, ok := sess.TakeDualAck(now.Add(6*dualAckInterval + time.Millisecond)); ok {
 		t.Fatal("ACK must be rate limited")
 	}
+}
 
-	// After the interval the highest sequence is reported.
-	highest, ok = sess.TakeDualAck(now.Add(dualAckInterval + time.Millisecond))
-	if !ok || highest != 9 {
-		t.Fatalf("second ack = %d/%v, want 9/true", highest, ok)
+func TestDualAckHolesBounded(t *testing.T) {
+	now := time.Unix(1_700_000_200, 0)
+	sess := &Session{dualAckHoles: make(map[uint32]struct{})}
+
+	// Watermark stuck at a permanent gap; push more holes than the cap.
+	sess.TrackDualForwarded(1)
+	sess.TrackDualForwarded(dualAckHolesCap + 10)
+	for i := 2; i <= dualAckHolesCap+9; i++ {
+		sess.TrackDualForwarded(uint32(i))
+	}
+	if len(sess.dualAckHoles) > dualAckHolesCap {
+		t.Fatalf("hole set grew to %d", len(sess.dualAckHoles))
 	}
 
-	// Lower sequences never move the high-water mark.
-	sess.RecordDualForwarded(7)
-	highest, _ = sess.TakeDualAck(now.Add(3 * dualAckInterval))
-	if highest != 9 {
-		t.Fatalf("ack after stale frame = %d, want 9", highest)
+	// The evicted oldest hole re-enters tracking when its retransmission
+	// arrives as a suppressed duplicate.
+	sess.TrackDualForwarded(2)
+	highest, _ := sess.TakeDualAck(now.Add(dualAckInterval + time.Millisecond))
+	if highest < 2 {
+		t.Fatalf("ack = %d, want >= 2 after hole re-entry", highest)
 	}
 }
 

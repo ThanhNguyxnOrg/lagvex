@@ -247,17 +247,25 @@ at zero until Phase 2 exists.
 ### 9.6 DualAck progress report (Phase 2 groundwork)
 
 For dual sessions the relay sends a `DualAck` (type `0xA`, sealed like Pong)
-after forwarding dual frames. The 8-byte payload carries the **highest dual
-frame sequence** the relay has forwarded to the game server; four bytes are
-reserved. ACKs are rate-limited to at most one per 20 ms per session (50/s),
-and a session that has never forwarded a dual frame never receives one.
+after forwarding dual frames. The 8-byte payload carries the **highest
+contiguous dual frame sequence** the relay has forwarded to the game server;
+four bytes are reserved. ACKs are rate-limited to at most one per 20 ms per
+session (50/s), and a session that has never forwarded a dual frame never
+receives one. Contiguity matters: a highest-seq ACK with gaps below it would
+let the client purge frames it still needs to retransmit, so the watermark
+only advances across sequences the relay has actually seen — a suppressed
+duplicate (a client retransmission of an earlier copy) counts too and can
+fill a hole. The out-of-order tracking set behind the watermark is capped at
+512 entries; evicting the oldest hole stalls the watermark at that sequence
+until the client's retransmission fills it, so the state self-heals.
 
 The client (Phase 2) keeps a small ring of recent dual frames, purges it on
 ACK, and retransmits only frames that stay unacked beyond a measured
-threshold. This mirrors ExitLag's confirm/`detect_lost_packets` behaviour and
-keeps the common case free of duplicate packets at the game server: blind
-duplicate sends would make both relays forward their own first copy, since
-dedup state is per relay and relays do not share state.
+threshold — the primary relay first (Phase 1 dedup makes that idempotent),
+then the standby relay. This mirrors ExitLag's confirm/`detect_lost_packets`
+behaviour and keeps the common case free of duplicate packets at the game
+server: blind duplicate sends would make both relays forward their own first
+copy, since dedup state is per relay and relays do not share state.
 
 ---
 

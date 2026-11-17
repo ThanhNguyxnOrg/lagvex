@@ -19,6 +19,12 @@ const (
 // client: at most 50 ACKs per second per session.
 const dualAckInterval = 20 * time.Millisecond
 
+// dualAckHolesCap bounds the out-of-order set behind the contiguous ACK
+// watermark. When it overflows, the oldest hole is evicted; the resulting
+// stall self-heals because the client retransmits that sequence and the
+// suppressed duplicate re-enters tracking.
+const dualAckHolesCap = 512
+
 // Session represents an authenticated connected client.
 type Session struct {
 	ID        uint64
@@ -45,12 +51,15 @@ type Session struct {
 	DualSuppressed atomic.Uint64
 	DualBadFrames  atomic.Uint64
 
-	// Dual ACK bookkeeping: highest dual sequence forwarded to the game
-	// server, reported to the client at most once per interval so it can
-	// retransmit only frames the relay may have missed.
-	dualAckMu      sync.Mutex
-	dualAckHighest uint32
-	dualAckLast    time.Time
+	// Dual ACK bookkeeping: the highest *contiguous* dual sequence forwarded
+	// to the game server, reported to the client at most once per interval.
+	// Contiguity matters: a highest-seq ACK with gaps below it would let the
+	// client purge frames it still needs to retransmit.
+	dualAckMu     sync.Mutex
+	dualAckContig uint32
+	dualAckHoles  map[uint32]struct{}
+	dualAckHoleQ  []uint32
+	dualAckLast   time.Time
 
 	anchorProbeMu     sync.Mutex
 	anchorProbeLast   time.Time
@@ -58,30 +67,69 @@ type Session struct {
 	anchorProbeCount  int
 }
 
-// RecordDualForwarded bumps the highest dual-path sequence this relay has
-// forwarded to the game server for the session's group.
-func (s *Session) RecordDualForwarded(seq uint32) {
+// TrackDualForwarded records a dual sequence that reached the game server:
+// the first forwarded copy, or a suppressed duplicate (proof it was forwarded
+// earlier). It advances the contiguous ACK watermark when possible.
+func (s *Session) TrackDualForwarded(seq uint32) {
+	if seq == 0 {
+		return // sequence 0 is never assigned
+	}
 	s.dualAckMu.Lock()
 	defer s.dualAckMu.Unlock()
-	if seq > s.dualAckHighest {
-		s.dualAckHighest = seq
+
+	if seq <= s.dualAckContig {
+		return
+	}
+	if seq == s.dualAckContig+1 {
+		s.dualAckContig = seq
+		for {
+			next := s.dualAckContig + 1
+			if _, ok := s.dualAckHoles[next]; !ok {
+				break
+			}
+			delete(s.dualAckHoles, next)
+			s.removeHoleQ(next)
+			s.dualAckContig = next
+		}
+		return
+	}
+	if _, ok := s.dualAckHoles[seq]; ok {
+		return
+	}
+	if len(s.dualAckHoles) >= dualAckHolesCap {
+		oldest := s.dualAckHoleQ[0]
+		s.dualAckHoleQ = s.dualAckHoleQ[1:]
+		delete(s.dualAckHoles, oldest)
+	}
+	s.dualAckHoles[seq] = struct{}{}
+	s.dualAckHoleQ = append(s.dualAckHoleQ, seq)
+}
+
+// removeHoleQ drops one sequence from the FIFO hole queue. Callers hold
+// dualAckMu.
+func (s *Session) removeHoleQ(seq uint32) {
+	for i, candidate := range s.dualAckHoleQ {
+		if candidate == seq {
+			s.dualAckHoleQ = append(s.dualAckHoleQ[:i], s.dualAckHoleQ[i+1:]...)
+			return
+		}
 	}
 }
 
-// TakeDualAck returns the highest forwarded dual sequence when an ACK may be
-// emitted now, respecting dualAckInterval. highest is 0 before the first
+// TakeDualAck returns the contiguous forwarded dual sequence when an ACK may
+// be emitted now, respecting dualAckInterval. The value is 0 before the first
 // forwarded dual frame; callers must not send an ACK in that case.
-func (s *Session) TakeDualAck(now time.Time) (highest uint32, ok bool) {
+func (s *Session) TakeDualAck(now time.Time) (contiguous uint32, ok bool) {
 	s.dualAckMu.Lock()
 	defer s.dualAckMu.Unlock()
-	if s.dualAckHighest == 0 {
+	if s.dualAckContig == 0 {
 		return 0, false
 	}
 	if !s.dualAckLast.IsZero() && now.Sub(s.dualAckLast) < dualAckInterval {
 		return 0, false
 	}
 	s.dualAckLast = now
-	return s.dualAckHighest, true
+	return s.dualAckContig, true
 }
 
 // AllowAnchorProbe applies the per-session rate limit for relay-side probes.
@@ -107,13 +155,14 @@ func (s *Session) AllowAnchorProbe(now time.Time) bool {
 // NewSession initializes a new client session.
 func NewSession(id, clientID uint64, innerIP netip.Addr, remote netip.AddrPort, crypto *protocol.SessionCrypto) *Session {
 	s := &Session{
-		ID:         id,
-		ClientID:   clientID,
-		InnerIP:    innerIP,
-		Crypto:     crypto,
-		FECEncoder: protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
-		FECDecoder: protocol.NewFECDecoder(128),
-		createdAt:  time.Now(),
+		ID:           id,
+		ClientID:     clientID,
+		InnerIP:      innerIP,
+		Crypto:       crypto,
+		FECEncoder:   protocol.NewFECEncoder(protocol.DefaultFECEncoderConfig()),
+		FECDecoder:   protocol.NewFECDecoder(128),
+		dualAckHoles: make(map[uint32]struct{}),
+		createdAt:    time.Now(),
 	}
 	s.RemoteUDP.Store(&remote)
 	s.Touch()

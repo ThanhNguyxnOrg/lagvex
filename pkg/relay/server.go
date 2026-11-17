@@ -367,10 +367,15 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 			}
 			if s.dedup.observe(sess.GroupHash, seq) {
 				sess.DualSuppressed.Add(1)
+				// A suppressed duplicate proves this sequence reached the
+				// game server earlier; it still counts toward the
+				// contiguous ACK watermark (a retransmission can fill a
+				// hole that overflowed the tracking set).
+				sess.TrackDualForwarded(seq)
 				return
 			}
 			sess.DualForwarded.Add(1)
-			sess.RecordDualForwarded(seq)
+			sess.TrackDualForwarded(seq)
 
 			// Dual ACK (Phase 2 groundwork): tell the client the highest
 			// sequence forwarded, rate-limited per session, so its
