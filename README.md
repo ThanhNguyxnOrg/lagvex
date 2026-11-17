@@ -60,6 +60,8 @@ anti-cheat checks the way socket-hooking boosters can.
   explicit public game-server IP. Hostnames and private, loopback or link-local
   addresses are refused, and runs are limited to one every 2 seconds and 60 per
   hour. A closed port still reports a real RTT when the host answers with RST.
+  Endpoints observed in the game-connections panel can be sent to the tool with
+  one click.
 - 🪟 **Floating HUD** — an always-on-top overlay that reads the same `/api/status`
   values and shows dashes until a sample exists.
 - 🧾 **Diagnostics snapshot** — export measured state plus non-secret settings for bug

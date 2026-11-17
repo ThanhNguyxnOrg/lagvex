@@ -800,6 +800,17 @@ function mergeGameProfiles(catalog: GameProfile[]): Game[] {
   return merged;
 }
 
+/** Split an observed "host:port" / "[v6]:port" endpoint for the TCP ping tool. */
+function parseEndpointHostPort(remote: string): { host: string; port: string } | null {
+  const bracketed = /^\[([^\]]+)\]:(\d+)$/.exec(remote);
+  if (bracketed) return { host: bracketed[1], port: bracketed[2] };
+  const idx = remote.lastIndexOf(":");
+  if (idx > 0 && /^\d+$/.test(remote.slice(idx + 1))) {
+    return { host: remote.slice(0, idx), port: remote.slice(idx + 1) };
+  }
+  return null;
+}
+
 function pickRegionForRelay(regions: GameRegion[], relay: RelayNode): string {
   const haystack = `${relay.country} ${relay.location} ${relay.name}`.toLowerCase();
   let prefix = "";
@@ -3402,15 +3413,35 @@ export default function App() {
                                   {conn.state && <span className="text-[9px] text-white/30">{conn.state}</span>}
                                 </span>
                                 {conn.remote && (
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard?.writeText(conn.remote);
-                                      notify(`Copied ${conn.remote}`);
-                                    }}
-                                    className="text-[10px] text-white/40 hover:text-white bg-transparent border-none cursor-pointer shrink-0"
-                                  >
-                                    Copy
-                                  </button>
+                                  <>
+                                    {(() => {
+                                      const endpoint = parseEndpointHostPort(conn.remote);
+                                      return endpoint ? (
+                                        <button
+                                          onClick={() => {
+                                            setTCPPingTarget(endpoint.host);
+                                            setTCPPingPort(endpoint.port);
+                                            setTCPPingError(null);
+                                            setActiveTab("nodes");
+                                            notify(`TCP ping prefilled with ${endpoint.host}:${endpoint.port}`);
+                                          }}
+                                          title="Prefill the TCP ping tool with this endpoint"
+                                          className="text-[10px] text-white/40 hover:text-[#00F0FF] bg-transparent border-none cursor-pointer shrink-0"
+                                        >
+                                          Ping
+                                        </button>
+                                      ) : null;
+                                    })()}
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(conn.remote);
+                                        notify(`Copied ${conn.remote}`);
+                                      }}
+                                      className="text-[10px] text-white/40 hover:text-white bg-transparent border-none cursor-pointer shrink-0"
+                                    >
+                                      Copy
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             ))}
