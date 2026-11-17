@@ -167,8 +167,10 @@ The dashboard is a React/Vite app in `ui_source/`; the build writes hashed bundl
 - **Windows cannot see another process's UDP peers.** Peer routing on Windows works with
   TCP observations only; the UI says so. Game traffic is mostly UDP, so keep the region
   CIDRs enabled there.
-- **The relay does not probe on its own yet.** The "relay → game server" hop is reported
-  as unmeasured rather than guessed.
+- **The relay only probes allowlisted cloud anchors.** On request it measures its own
+  RTT to a fixed set of public cloud endpoints (rate-limited per session); the
+  "relay → game server" hop itself stays unmeasured and is reported as such rather
+  than guessed.
 - **No region/device spoofing, no DLL/LSP injection, no anti-cheat evasion.** Those are
   out of scope by design.
 
