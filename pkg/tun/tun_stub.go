@@ -9,12 +9,13 @@ import (
 
 // Device provides a userspace virtual network device for non-Linux platforms (e.g. Windows/macOS dev & hosting).
 type Device struct {
-	name   string
-	mtu    int
-	cidr   string
-	closed bool
-	mu     sync.Mutex
-	ch     chan []byte
+	name      string
+	mtu       int
+	cidr      string
+	closed    bool
+	mu        sync.Mutex
+	ch        chan []byte
+	writeSink func([]byte)
 }
 
 // Open fails on non-Linux platforms. A userspace stub used to accept the TUN
@@ -43,6 +44,14 @@ func (d *Device) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 	return len(p), nil
+}
+
+// SetWriteSink mirrors the Linux userspace hook. Open always fails on
+// non-Linux platforms, so no device ever exists to observe.
+func (d *Device) SetWriteSink(sink func([]byte)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.writeSink = sink
 }
 
 func (d *Device) Close() error {

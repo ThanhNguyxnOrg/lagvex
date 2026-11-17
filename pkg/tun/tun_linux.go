@@ -35,6 +35,7 @@ type Device struct {
 	mu          sync.Mutex
 	ch          chan []byte
 	closed      bool
+	writeSink   func([]byte)
 }
 
 // Open creates or connects to a TUN interface by name (e.g. "lagvex0").
@@ -99,13 +100,32 @@ func (d *Device) Read(p []byte) (int, error) {
 func (d *Device) Write(p []byte) (int, error) {
 	if d.isUserspace {
 		d.mu.Lock()
-		defer d.mu.Unlock()
-		if d.closed {
+		sink := d.writeSink
+		closed := d.closed
+		d.mu.Unlock()
+		if closed {
 			return 0, nil
+		}
+		if sink != nil {
+			// Dev/test hook: hand the packet to the observer instead of
+			// discarding it. The sink must not block for long.
+			sink(append([]byte(nil), p...))
 		}
 		return len(p), nil
 	}
 	return d.file.Write(p)
+}
+
+// SetWriteSink installs an observer for packets written to the userspace
+// fallback device, so tests can see what the relay forwards without a kernel
+// TUN. It is a no-op on real kernel devices and must not be used in production.
+func (d *Device) SetWriteSink(sink func([]byte)) {
+	if !d.isUserspace {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.writeSink = sink
 }
 
 func (d *Device) Close() error {

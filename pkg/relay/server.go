@@ -54,6 +54,13 @@ type Server struct {
 	// dedup holds first-copy-wins state for dual-path connection groups.
 	dedup *dualDedupRegistry
 
+	// tunAtomic mirrors tunDev so tests and tooling can fetch the device
+	// without racing the assignment in Start.
+	tunAtomic atomic.Pointer[tun.Device]
+
+	// udpBound is the resolved UDP listen address, set under mu in Start.
+	udpBound netip.AddrPort
+
 	squadRoomsMu sync.RWMutex
 	squadRooms   map[string]*RelaySquadRoom
 
@@ -97,6 +104,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("open tun %s: %w", s.cfg.TunName, err)
 	}
 	s.tunDev = dev
+	s.tunAtomic.Store(dev)
 	defer func() {
 		if closeErr := s.tunDev.Close(); closeErr != nil {
 			log.Printf("[Relay] close TUN device: %v", closeErr)
@@ -120,6 +128,9 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("listen udp: %w", err)
 	}
 	s.conn = conn
+	s.mu.Lock()
+	s.udpBound = conn.LocalAddr().(*net.UDPAddr).AddrPort()
+	s.mu.Unlock()
 	defer func() {
 		if closeErr := s.conn.Close(); closeErr != nil {
 			log.Printf("[Relay] close UDP socket: %v", closeErr)
@@ -540,6 +551,18 @@ func (s *Server) loopReaper(ctx context.Context) {
 			s.squadRoomsMu.Unlock()
 		}
 	}
+}
+
+// TUN returns the tunnel device once Start has opened it, or nil before that.
+func (s *Server) TUN() *tun.Device {
+	return s.tunAtomic.Load()
+}
+
+// UDPAddr returns the bound UDP listen address once Start has bound it.
+func (s *Server) UDPAddr() netip.AddrPort {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.udpBound
 }
 
 func (s *Server) sendUDP(data []byte, to netip.AddrPort) {
