@@ -317,3 +317,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - optional unprivileged ICMP echo measurement for relay probes ([4d253c4](https://github.com/ThanhNguyxnOrg/lagvex/commit/4d253c4470bd9a3936fabc4e5832fc677763ad8b))
 - pre-measured standby relay for instant failover ([7f97100](https://github.com/ThanhNguyxnOrg/lagvex/commit/7f97100a5d711d1896b88e22c04787db034a2b3c))
 
+## [1.7.0] - 2026-11-17
+
+### Features
+
+- sort relay nodes by measured route, loss or recency ([c172d71](https://github.com/ThanhNguyxnOrg/lagvex/commit/c172d717f8156981211cceaa2de63d1576a54351))
+- block cross-site requests to the loopback dashboard API ([c5f0fb0](https://github.com/ThanhNguyxnOrg/lagvex/commit/c5f0fb042c1f393c3b12f24d48027650171089f2))
+- add a bounded TCP ping tool for game servers ([6c74955](https://github.com/ThanhNguyxnOrg/lagvex/commit/6c74955f03d866ef729d379a9338900a55140f3b))
+- show per-sample RTT details on sparkline hover ([87022d6](https://github.com/ThanhNguyxnOrg/lagvex/commit/87022d609018777578060c2c964758846b742dcc))
+- prefill TCP ping from observed game-server endpoints ([4de2562](https://github.com/ThanhNguyxnOrg/lagvex/commit/4de2562498f00b9b144f64f50348f083761be742))
+
+### Bug Fixes and Performance
+
+- check listener close error in TCP ping test ([9926ccc](https://github.com/ThanhNguyxnOrg/lagvex/commit/9926ccc04b127ddadc81f98ce2a0315e4b7c54fa))
+
