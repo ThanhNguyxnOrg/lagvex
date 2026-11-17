@@ -28,12 +28,13 @@ import (
 
 // UIServer serves the modern Gaming Booster Dashboard and REST API.
 type UIServer struct {
-	engine      *Engine
-	profileMgr  *profiles.Manager
-	webDir      string
-	server      *http.Server
-	prober      *Prober
-	configStore *ConfigStore
+	engine         *Engine
+	profileMgr     *profiles.Manager
+	webDir         string
+	server         *http.Server
+	prober         *Prober
+	configStore    *ConfigStore
+	tcpPingLimiter tcpPingLimiter
 }
 
 // NewUIServer creates a new dashboard UI server.
@@ -107,6 +108,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/relaunch-admin", u.handleRelaunchAdmin)
 	mux.HandleFunc("/api/shutdown", u.handleShutdown)
 	mux.HandleFunc("/api/diagnose-network", u.handleNetworkDiagnostics)
+	mux.HandleFunc("/api/tcping", u.handleTCPPing)
 	mux.HandleFunc("/api/diagnose-bufferbloat", u.handleDiagnoseBufferbloat)
 	mux.HandleFunc("/api/diagnostics/export", u.handleDiagnosticsExport)
 	mux.HandleFunc("/api/diagnostics/import", u.handleDiagnosticsImport)

@@ -458,6 +458,30 @@ export type RelayNode = {
   icmpRttMs: number;
 };
 
+export type TCPPingSample = {
+  attempt: number;
+  rttMs: number;
+  /** open = handshake completed, closed = host answered with RST, timeout, error */
+  outcome: "open" | "closed" | "timeout" | "error";
+  error?: string;
+};
+
+export type TCPPingResult = {
+  target: string;
+  port: number;
+  attempts: number;
+  timeoutMs: number;
+  measured: boolean;
+  minMs: number;
+  avgMs: number;
+  maxMs: number;
+  lossPct: number;
+  samples: TCPPingSample[];
+  startedAt: string;
+  finishedAt: string;
+  note: string;
+};
+
 export type DetectedGame = {
   gameId: string;
   name: string;
@@ -830,6 +854,14 @@ export default function App() {
   const [networkDiag, setNetworkDiag] = useState<{ gateway: string; lanPingMs: number; ispPingMs: number; dnsServer: string } | null>(null);
   const recentPingsRef = useRef<number[]>([]);
 
+  // TCP ping tool: handshake RTT to an explicit public game-server IP
+  const [tcpPingTarget, setTCPPingTarget] = useState("");
+  const [tcpPingPort, setTCPPingPort] = useState("443");
+  const [tcpPingAttempts, setTCPPingAttempts] = useState("4");
+  const [isTCPPinging, setIsTCPPinging] = useState(false);
+  const [tcpPingResult, setTCPPingResult] = useState<TCPPingResult | null>(null);
+  const [tcpPingError, setTCPPingError] = useState<string | null>(null);
+
   // Detected game processes (measured by one local process-table scan)
   const [detectedGames, setDetectedGames] = useState<Record<string, DetectedGame>>({});
   const [gameConnections, setGameConnections] = useState<GameConnectionReport | null>(null);
@@ -1121,6 +1153,44 @@ export default function App() {
       notify("Bufferbloat diagnostic failed to connect.");
     } finally {
       setIsTestingBufferbloat(false);
+    }
+  };
+
+  // TCP ping: TCP handshake RTT to a public game-server IP. The backend
+  // rejects hostnames and non-public addresses and rate-limits runs, so this
+  // handler only surfaces whatever it actually measured.
+  const handleTCPPing = async () => {
+    const target = tcpPingTarget.trim();
+    if (!target) {
+      setTCPPingError("Enter the game server's public IP address.");
+      return;
+    }
+    setTCPPingError(null);
+    setIsTCPPinging(true);
+    try {
+      const res = await apiFetch("/api/tcping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target,
+          port: Number(tcpPingPort) || 443,
+          attempts: Number(tcpPingAttempts) || 4
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTCPPingResult(null);
+        setTCPPingError(data.error || `TCP ping failed (${res.status}).`);
+        return;
+      }
+      setTCPPingResult(data);
+      if (!data.measured) {
+        setTCPPingError("No TCP response. The server may be offline or filtering SYNs.");
+      }
+    } catch {
+      setTCPPingError("Could not reach the local Lagvex service.");
+    } finally {
+      setIsTCPPinging(false);
     }
   };
 
@@ -3844,6 +3914,143 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* TCP Ping tool */}
+              <div className="p-6 rounded-3xl bg-[#0b1018] border border-[#1c2738] flex flex-col gap-4 shadow-lg">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 text-xs font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                      <IconActivity className="w-4 h-4" />
+                      <span>TCP PING TOOL</span>
+                    </div>
+                    <h3 className="font-brand font-extrabold text-lg text-white">
+                      Handshake RTT to a Game Server
+                    </h3>
+                    <p className="text-xs text-white/60 max-w-[640px]">
+                      Measures the TCP handshake (SYN to SYN-ACK) to an explicit public IP. Hostnames and
+                      private, loopback or link-local addresses are refused; runs are limited to one every 2
+                      seconds and 60 per hour. A closed port still yields a real RTT when the host answers
+                      with RST.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-brand font-bold uppercase tracking-wider text-white/40">Server IP</span>
+                    <input
+                      value={tcpPingTarget}
+                      onChange={(e) => setTCPPingTarget(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isTCPPinging) void handleTCPPing();
+                      }}
+                      placeholder="198.51.100.20"
+                      spellCheck={false}
+                      className="h-[42px] w-[230px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-brand font-bold uppercase tracking-wider text-white/40">Port</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={tcpPingPort}
+                      onChange={(e) => setTCPPingPort(e.target.value)}
+                      className="h-[42px] w-[110px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-brand font-bold uppercase tracking-wider text-white/40">Attempts</span>
+                    <select
+                      value={tcpPingAttempts}
+                      onChange={(e) => setTCPPingAttempts(e.target.value)}
+                      className="h-[42px] w-[110px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
+                    >
+                      {[1, 2, 3, 4, 6, 8].map((count) => (
+                        <option key={count} value={count}>{count}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    onClick={() => void handleTCPPing()}
+                    disabled={isTCPPinging}
+                    className={`h-[42px] px-5 rounded-xl font-brand font-bold text-xs uppercase tracking-wider border-none transition-all flex items-center gap-2 ${
+                      isTCPPinging
+                        ? "bg-[#00F0FF]/30 text-white/50 cursor-wait"
+                        : "bg-[#00F0FF] hover:bg-[#33f3ff] text-black cursor-pointer shadow-lg shadow-[#00F0FF]/20"
+                    }`}
+                  >
+                    {isTCPPinging ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        <span>Measuring…</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconActivity className="w-4 h-4" />
+                        <span>Run TCP Ping</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {tcpPingError && (
+                  <div className="p-4 rounded-2xl bg-[#f59e0b]/10 border border-[#f59e0b]/30 text-xs text-[#f59e0b]">
+                    {tcpPingError}
+                  </div>
+                )}
+
+                {tcpPingResult && (
+                  <div className="flex flex-col gap-3">
+                    {tcpPingResult.measured ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                          { label: "MIN", value: `${tcpPingResult.minMs} ms` },
+                          { label: "AVG", value: `${tcpPingResult.avgMs} ms` },
+                          { label: "MAX", value: `${tcpPingResult.maxMs} ms` },
+                          { label: "LOSS", value: `${tcpPingResult.lossPct}%` }
+                        ].map((metric) => (
+                          <div key={metric.label} className="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex flex-col">
+                            <span className="text-[10px] font-brand text-white/40 uppercase tracking-wider">{metric.label}</span>
+                            <span className={`font-mono font-bold text-lg mt-0.5 ${
+                              metric.label === "LOSS" && tcpPingResult.lossPct > 0 ? "text-[#f59e0b]" : "text-white"
+                            }`}>{metric.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-[#080d14] border border-[#1a2535] text-xs text-white/50">
+                        No TCP response reached {tcpPingResult.target}:{tcpPingResult.port}. Nothing is shown as a
+                        latency value because nothing was measured.
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      {tcpPingResult.samples.map((sample) => (
+                        <span
+                          key={sample.attempt}
+                          title={sample.error || ""}
+                          className={`px-2.5 py-1 rounded-lg border font-mono text-[10px] ${
+                            sample.outcome === "open"
+                              ? "bg-[#10b981]/10 border-[#10b981]/30 text-[#10b981]"
+                              : sample.outcome === "closed"
+                                ? "bg-[#00F0FF]/10 border-[#00F0FF]/30 text-[#00F0FF]"
+                                : "bg-[#f59e0b]/10 border-[#f59e0b]/30 text-[#f59e0b]"
+                          }`}
+                        >
+                          #{sample.attempt}{" "}
+                          {sample.rttMs > 0 ? `${sample.rttMs} ms` : "no reply"}
+                          {" · "}
+                          {sample.outcome === "closed" ? "closed (RST)" : sample.outcome}
+                        </span>
+                      ))}
+                    </div>
+
+                    <p className="text-[10px] text-white/40 leading-relaxed">{tcpPingResult.note}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

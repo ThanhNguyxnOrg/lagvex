@@ -129,7 +129,8 @@ The frontend (`web/`) is architected as a lightweight, zero-dependency tactical 
                   ├─► POST /api/connect     (Triggers handshake & dynamic routing)
                   ├─► POST /api/disconnect  (Tears down routes & releases IP)
                   ├─► POST /api/probe       (UDP tunnel probe + optional ICMP echo)
-                  └─► Static Assets         (HTML5, Vanilla CSS, JS with zero npm bloat)
+                  ├─► POST /api/tcping      (TCP handshake RTT to a public IP)
+                  └─► Static Assets         (React dashboard build)
 ```
 
 ### Local API guard
@@ -141,7 +142,8 @@ request that presents an `Origin` header must come from a loopback origin.
 Browsers cannot add the custom header cross-site without a CORS preflight,
 which the server never grants. The React dashboard sends it automatically;
 command-line callers must add it explicitly. Read-only `GET` requests are
-unchanged.
+unchanged. Endpoints that open outbound sockets on the user's behalf, such as
+the TCP ping tool, are POST-only so this guard also covers them.
 
 ### Key Front-End Subsystems:
 1. 🛡️ **Resolution-Independent Vector Emblems**: Custom inline SVG insignias for all 11 games provide instantaneous rasterization with zero blur on 4K / Ultrawide gaming monitors.

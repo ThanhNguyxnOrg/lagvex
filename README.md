@@ -54,6 +54,10 @@ anti-cheat checks the way socket-hooking boosters can.
 - 🗺️ **Route detail** — per-hop measurement (gateway, direct relay probe, live tunnel
   echo, region cloud anchor) with explicit "not measured" reasons for segments the
   client cannot observe.
+- 🧪 **TCP ping tool** — measures the TCP handshake RTT (min/avg/max/loss) to an
+  explicit public game-server IP. Hostnames and private, loopback or link-local
+  addresses are refused, and runs are limited to one every 2 seconds and 60 per
+  hour. A closed port still reports a real RTT when the host answers with RST.
 - 🪟 **Floating HUD** — an always-on-top overlay that reads the same `/api/status`
   values and shows dashes until a sample exists.
 - 🧾 **Diagnostics snapshot** — export measured state plus non-secret settings for bug
