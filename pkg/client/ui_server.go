@@ -697,14 +697,14 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 	switch runtime.GOOS {
 	case "windows":
 		// 1. Flush DNS cache
-		if err := exec.Command("ipconfig", "/flushdns").Run(); err == nil {
+		if err := execHidden("ipconfig", "/flushdns").Run(); err == nil {
 			applied = append(applied, "DNS resolver cache flushed")
 		} else {
 			failed = append(failed, "DNS resolver cache flush")
 		}
 
 		// 2. TCP Window Auto-Tuning
-		if err := exec.Command("netsh", "int", "tcp", "set", "global", "autotuninglevel=normal").Run(); err == nil {
+		if err := execHidden("netsh", "int", "tcp", "set", "global", "autotuninglevel=normal").Run(); err == nil {
 			applied = append(applied, "TCP window auto-tuning set to normal")
 		} else {
 			failed = append(failed, "TCP window auto-tuning (requires administrator)")
@@ -712,8 +712,8 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 
 		// 3. MMCSS Gaming Priority & Network Throttling
 		if req.MMCSSPriority {
-			throttleErr := exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "NetworkThrottlingIndex", "/t", "REG_DWORD", "/d", "0xffffffff", "/f").Run()
-			responseErr := exec.Command("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "SystemResponsiveness", "/t", "REG_DWORD", "/d", "0", "/f").Run()
+			throttleErr := execHidden("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "NetworkThrottlingIndex", "/t", "REG_DWORD", "/d", "0xffffffff", "/f").Run()
+			responseErr := execHidden("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "SystemResponsiveness", "/t", "REG_DWORD", "/d", "0", "/f").Run()
 			if throttleErr == nil && responseErr == nil {
 				applied = append(applied, "MMCSS network throttling disabled")
 			} else {
@@ -721,15 +721,15 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "darwin":
-		if err := exec.Command("dscacheutil", "-flushcache").Run(); err == nil {
+		if err := execHidden("dscacheutil", "-flushcache").Run(); err == nil {
 			applied = append(applied, "macOS DNS cache flushed")
 		} else {
 			failed = append(failed, "macOS DNS cache flush")
 		}
-		_ = exec.Command("killall", "-HUP", "mDNSResponder").Run()
+		_ = execHidden("killall", "-HUP", "mDNSResponder").Run()
 
 		if req.TCPNoDelay || req.DisableNagle {
-			if err := exec.Command("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run(); err == nil {
+			if err := execHidden("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run(); err == nil {
 				applied = append(applied, "TCP delayed ACK disabled")
 			} else {
 				failed = append(failed, "TCP delayed ACK change (requires root)")
@@ -737,13 +737,13 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		}
 	case "linux":
 		if resolvePath, err := exec.LookPath("resolvectl"); err == nil {
-			if err := exec.Command(resolvePath, "flush-caches").Run(); err == nil {
+			if err := execHidden(resolvePath, "flush-caches").Run(); err == nil {
 				applied = append(applied, "systemd-resolved DNS cache flushed")
 			} else {
 				failed = append(failed, "systemd-resolved DNS cache flush")
 			}
 		} else if resolvePath, err := exec.LookPath("systemd-resolve"); err == nil {
-			if err := exec.Command(resolvePath, "--flush-caches").Run(); err == nil {
+			if err := execHidden(resolvePath, "--flush-caches").Run(); err == nil {
 				applied = append(applied, "systemd-resolve DNS cache flushed")
 			} else {
 				failed = append(failed, "systemd-resolve DNS cache flush")
@@ -751,8 +751,8 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.TCPNoDelay || req.DisableNagle {
-			lowLatencyErr := exec.Command("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
-			slowStartErr := exec.Command("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
+			lowLatencyErr := execHidden("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
+			slowStartErr := execHidden("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
 			if lowLatencyErr == nil && slowStartErr == nil {
 				applied = append(applied, "Linux TCP low-latency sysctls applied")
 			} else {
@@ -1130,7 +1130,7 @@ func detectDefaultGateway() string {
 
 	switch runtime.GOOS {
 	case "linux":
-		out, err := exec.CommandContext(ctx, "ip", "route", "show", "default").Output()
+		out, err := execHiddenContext(ctx, "ip", "route", "show", "default").Output()
 		if err == nil {
 			fields := strings.Fields(string(out))
 			for i, field := range fields {
@@ -1140,7 +1140,7 @@ func detectDefaultGateway() string {
 			}
 		}
 	case "darwin":
-		out, err := exec.CommandContext(ctx, "route", "-n", "get", "default").Output()
+		out, err := execHiddenContext(ctx, "route", "-n", "get", "default").Output()
 		if err == nil {
 			for _, line := range strings.Split(string(out), "\n") {
 				line = strings.TrimSpace(line)
@@ -1150,7 +1150,7 @@ func detectDefaultGateway() string {
 			}
 		}
 	case "windows":
-		out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+		out, err := execHiddenContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 			"(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1).NextHop").Output()
 		if err == nil {
 			gw := strings.TrimSpace(string(out))
@@ -1167,7 +1167,7 @@ func detectDNSServer() string {
 	if runtime.GOOS == "windows" {
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 		defer cancel()
-		out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+		out, err := execHiddenContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 			"(Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses } | Select-Object -First 1).ServerAddresses[0]").Output()
 		if err == nil {
 			if dns := strings.TrimSpace(string(out)); dns != "" {
@@ -1182,7 +1182,7 @@ func detectDNSServer() string {
 		// SystemConfiguration resolver list.
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 		defer cancel()
-		out, err := exec.CommandContext(ctx, "scutil", "--dns").Output()
+		out, err := execHiddenContext(ctx, "scutil", "--dns").Output()
 		if err != nil {
 			return ""
 		}
@@ -1445,7 +1445,7 @@ func (u *UIServer) handleRelaunchAdmin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Relaunch with Start-Process -Verb RunAs to invoke Windows UAC modal
-		cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-Command", fmt.Sprintf("Start-Process -FilePath '%s' -Verb RunAs", exe))
+		cmd := execHidden("powershell", "-WindowStyle", "Hidden", "-Command", fmt.Sprintf("Start-Process -FilePath '%s' -Verb RunAs", exe))
 		if err := cmd.Start(); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1462,7 +1462,7 @@ func (u *UIServer) handleRelaunchAdmin(w http.ResponseWriter, r *http.Request) {
 		}
 		// On macOS, trigger native graphical TouchID / Password prompt via AppleScript
 		script := fmt.Sprintf("do shell script \"%s\" with administrator privileges", exe)
-		cmd := exec.Command("osascript", "-e", script)
+		cmd := execHidden("osascript", "-e", script)
 		if err := cmd.Start(); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1479,7 +1479,7 @@ func (u *UIServer) handleRelaunchAdmin(w http.ResponseWriter, r *http.Request) {
 		}
 		// On Linux, trigger PolicyKit graphical elevation modal (pkexec)
 		if pkPath, err := exec.LookPath("pkexec"); err == nil {
-			cmd := exec.Command(pkPath, exe)
+			cmd := execHidden(pkPath, exe)
 			if err := cmd.Start(); err == nil {
 				_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "status": "PolicyKit Elevation Prompt Triggered", "isAdmin": false})
 				return

@@ -16,7 +16,7 @@ const connectionScanNote = "Peers are read with lsof for sockets owned by this u
 // the kernel socket tables for the given pid.
 func scanProcessConnections(pid int) ([]ProcessConnection, bool) {
 	for _, candidate := range []string{"/usr/sbin/lsof", "lsof"} {
-		cmd := exec.Command(candidate, "-nP", "-i", "-a", "-p", strconv.Itoa(pid))
+		cmd := execHidden(candidate, "-nP", "-i", "-a", "-p", strconv.Itoa(pid))
 		out, err := cmd.Output()
 		if err == nil {
 			return parseLsofConnections(string(out)), true

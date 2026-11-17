@@ -42,7 +42,7 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 	b := innerIP.As4()
 	gwIP := netip.AddrFrom4([4]byte{b[0], b[1], b[2], 1})
 	// ifconfig utunX <innerIP> <gwIP> mtu <mtu> up
-	cmd := exec.Command("ifconfig", r.tunName, innerIP.String(), gwIP.String(), "mtu", fmt.Sprintf("%d", mtu), "up")
+	cmd := execHidden("ifconfig", r.tunName, innerIP.String(), gwIP.String(), "mtu", fmt.Sprintf("%d", mtu), "up")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("ifconfig %s: %w (%s)", r.tunName, err, strings.TrimSpace(string(out)))
 	}
@@ -60,7 +60,7 @@ func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
 	defer r.mu.Unlock()
 
 	// Find default gateway via `netstat -nr -f inet` or `route get default`
-	cmd := exec.Command("route", "-n", "get", "default")
+	cmd := execHidden("route", "-n", "get", "default")
 	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("get default route: %w", err)
@@ -80,15 +80,15 @@ func (r *RouteManager) PinRelayRoute(relayIP netip.Addr) error {
 
 	// Remove any previous pin if IP changed
 	if r.pinnedRelay != "" && r.pinnedRelay != relayIP.String() {
-		_ = exec.Command("route", "delete", "-host", r.pinnedRelay).Run()
+		_ = execHidden("route", "delete", "-host", r.pinnedRelay).Run()
 		r.pinnedRelay = ""
 	}
 
 	// Delete existing pin before adding to avoid duplicate conflict
-	_ = exec.Command("route", "delete", "-host", relayIP.String()).Run()
+	_ = execHidden("route", "delete", "-host", relayIP.String()).Run()
 
 	// route add -host <relayIP> <gateway>
-	cmdAdd := exec.Command("route", "add", "-host", relayIP.String(), gateway)
+	cmdAdd := execHidden("route", "add", "-host", relayIP.String(), gateway)
 	if out, err := cmdAdd.CombinedOutput(); err != nil {
 		return fmt.Errorf("pin relay route: %w (%s)", err, strings.TrimSpace(string(out)))
 	}
@@ -112,8 +112,8 @@ func (r *RouteManager) InstallGameRoutes(cidrs []string) {
 			continue
 		}
 
-		_ = exec.Command("route", "delete", "-net", cidr).Run()
-		cmd := exec.Command("route", "add", "-net", cidr, "-interface", r.tunName)
+		_ = execHidden("route", "delete", "-net", cidr).Run()
+		cmd := execHidden("route", "add", "-net", cidr, "-interface", r.tunName)
 		if err := cmd.Run(); err == nil {
 			r.installedCIDRs = append(r.installedCIDRs, cidr)
 		}
@@ -127,7 +127,7 @@ func (r *RouteManager) RemoveGameRoutes() {
 	defer r.mu.Unlock()
 
 	for _, cidr := range r.installedCIDRs {
-		_ = exec.Command("route", "delete", "-net", cidr).Run()
+		_ = execHidden("route", "delete", "-net", cidr).Run()
 	}
 	r.installedCIDRs = r.installedCIDRs[:0]
 }
@@ -158,8 +158,8 @@ func (r *RouteManager) AddPeerRoutes(ips []string) []string {
 		if already {
 			continue
 		}
-		_ = exec.Command("route", "delete", "-host", ip).Run()
-		if err := exec.Command("route", "add", "-host", ip, "-interface", r.tunName).Run(); err == nil {
+		_ = execHidden("route", "delete", "-host", ip).Run()
+		if err := execHidden("route", "add", "-host", ip, "-interface", r.tunName).Run(); err == nil {
 			r.installedPeers = append(r.installedPeers, ip)
 			added = append(added, ip)
 		}
@@ -182,7 +182,7 @@ func (r *RouteManager) RemovePeerRoutes(ips []string) {
 	kept := r.installedPeers[:0]
 	for _, ip := range r.installedPeers {
 		if wanted[ip] {
-			_ = exec.Command("route", "delete", "-host", ip).Run()
+			_ = execHidden("route", "delete", "-host", ip).Run()
 			continue
 		}
 		kept = append(kept, ip)
@@ -192,7 +192,7 @@ func (r *RouteManager) RemovePeerRoutes(ips []string) {
 
 func (r *RouteManager) removeAllPeersLocked() {
 	for _, ip := range r.installedPeers {
-		_ = exec.Command("route", "delete", "-host", ip).Run()
+		_ = execHidden("route", "delete", "-host", ip).Run()
 	}
 	r.installedPeers = r.installedPeers[:0]
 }
@@ -208,8 +208,8 @@ func (r *RouteManager) InstallFullTunnel() {
 		return
 	}
 	for _, prefix := range fullTunnelPrefixes {
-		_ = exec.Command("route", "delete", "-net", prefix).Run()
-		_ = exec.Command("route", "add", "-net", prefix, "-interface", r.tunName).Run()
+		_ = execHidden("route", "delete", "-net", prefix).Run()
+		_ = execHidden("route", "add", "-net", prefix, "-interface", r.tunName).Run()
 	}
 	r.fullTunnelInstalled = true
 }
@@ -226,7 +226,7 @@ func (r *RouteManager) removeFullTunnelLocked() {
 		return
 	}
 	for _, prefix := range fullTunnelPrefixes {
-		_ = exec.Command("route", "delete", "-net", prefix).Run()
+		_ = execHidden("route", "delete", "-net", prefix).Run()
 	}
 	r.fullTunnelInstalled = false
 }
@@ -241,7 +241,7 @@ func (r *RouteManager) RemoveAll() {
 	r.removeFullTunnelLocked()
 
 	if r.pinnedRelay != "" {
-		_ = exec.Command("route", "delete", "-host", r.pinnedRelay).Run()
+		_ = execHidden("route", "delete", "-host", r.pinnedRelay).Run()
 		r.pinnedRelay = ""
 	}
 }

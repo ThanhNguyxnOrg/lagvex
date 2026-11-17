@@ -319,7 +319,7 @@ func (r *RouteManager) ActiveRouteCount() int {
 }
 
 func runNetsh(args string) error {
-	cmd := exec.Command("netsh", strings.Fields(args)...)
+	cmd := execHidden("netsh", strings.Fields(args)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -379,7 +379,7 @@ func getDefaultGatewayRoute() (uint32, netip.Addr, error) {
 
 // getDefaultGatewayRouteFallback is a language-agnostic fallback that parses `route print 0.0.0.0`.
 func getDefaultGatewayRouteFallback() (uint32, netip.Addr, error) {
-	cmd := exec.Command("route", "print", "0.0.0.0")
+	cmd := execHidden("route", "print", "0.0.0.0")
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, netip.Addr{}, fmt.Errorf("route print: %w", err)
@@ -412,7 +412,7 @@ func getDefaultGatewayRouteFallback() (uint32, netip.Addr, error) {
 }
 
 func findIfIndexByIP(ip netip.Addr) (uint32, error) {
-	cmd := exec.Command("netsh", "interface", "ipv4", "show", "addresses")
+	cmd := execHidden("netsh", "interface", "ipv4", "show", "addresses")
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, err
@@ -446,7 +446,7 @@ func findIfIndexByIP(ip netip.Addr) (uint32, error) {
 }
 
 func getIfIndexByName(name string) uint32 {
-	cmd := exec.Command("netsh", "interface", "ipv4", "show", "interfaces")
+	cmd := execHidden("netsh", "interface", "ipv4", "show", "interfaces")
 	out, _ := cmd.Output()
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
@@ -462,7 +462,7 @@ func getIfIndexByName(name string) uint32 {
 }
 
 func getFirstPhysicalIfIndex() (uint32, error) {
-	cmd := exec.Command("netsh", "interface", "ipv4", "show", "interfaces")
+	cmd := execHidden("netsh", "interface", "ipv4", "show", "interfaces")
 	out, err := cmd.Output()
 	if err != nil {
 		return 0, err

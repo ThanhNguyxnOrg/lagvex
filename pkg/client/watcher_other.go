@@ -4,7 +4,6 @@ package client
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -18,7 +17,7 @@ func findRunningProcess(targets []string) (bool, string, int) {
 	}
 
 	if runtime.GOOS == "darwin" {
-		out, err := exec.Command("ps", "-A", "-c", "-o", "pid=,comm=").Output()
+		out, err := execHidden("ps", "-A", "-c", "-o", "pid=,comm=").Output()
 		if err != nil {
 			return false, "", 0
 		}
@@ -89,7 +88,7 @@ func findRunningProcesses(targets []string) map[string]int {
 	}
 
 	if runtime.GOOS == "darwin" {
-		out, err := exec.Command("ps", "-A", "-c", "-o", "pid=,comm=").Output()
+		out, err := execHidden("ps", "-A", "-c", "-o", "pid=,comm=").Output()
 		if err != nil {
 			return matches
 		}
