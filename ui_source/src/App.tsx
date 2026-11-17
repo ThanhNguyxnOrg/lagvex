@@ -587,18 +587,21 @@ function cleanNodeDisplayName(rawName: string, loc: string): { title: string; su
   const clean = rawName.replace(/^\[.*?\]\s*/i, "").trim();
   const haystack = `${rawName} ${loc}`;
 
-  let flag = "🌐";
-  if (/local|127\.0\.0\.1|localhost/i.test(haystack)) flag = "💻";
-  else if (/singapore|\bsg\b/i.test(haystack)) flag = "🇸🇬";
-  else if (/tokyo|japan|\bjp\b/i.test(haystack)) flag = "🇯🇵";
-  else if (/seoul|korea|\bkr\b/i.test(haystack)) flag = "🇰🇷";
-  else if (/hong kong|\bhk\b/i.test(haystack)) flag = "🇭🇰";
-  else if (/frankfurt|germany|\bde\b/i.test(haystack)) flag = "🇩🇪";
-  else if (/london|\buk\b/i.test(haystack)) flag = "🇬🇧";
-  else if (/paris|france|\bfr\b/i.test(haystack)) flag = "🇫🇷";
-  else if (/stockholm|sweden|\bse\b/i.test(haystack)) flag = "🇸🇪";
-  else if (/sydney|australia|\bau\b/i.test(haystack)) flag = "🇦🇺";
-  else if (/são paulo|sao paulo|brazil|\bbr\b/i.test(haystack)) flag = "🇧🇷";
+  // ExitLag-style two-letter region codes instead of flag emojis: flag
+  // emojis render inconsistently on Windows (they degrade to plain
+  // letters), so a styled code badge keeps every platform identical.
+  let flag = "GL";
+  if (/local|127\.0\.0\.1|localhost/i.test(haystack)) flag = "PC";
+  else if (/singapore|\bsg\b/i.test(haystack)) flag = "SG";
+  else if (/tokyo|japan|\bjp\b/i.test(haystack)) flag = "JP";
+  else if (/seoul|korea|\bkr\b/i.test(haystack)) flag = "KR";
+  else if (/hong kong|\bhk\b/i.test(haystack)) flag = "HK";
+  else if (/frankfurt|germany|\bde\b/i.test(haystack)) flag = "DE";
+  else if (/london|\buk\b/i.test(haystack)) flag = "UK";
+  else if (/paris|france|\bfr\b/i.test(haystack)) flag = "FR";
+  else if (/stockholm|sweden|\bse\b/i.test(haystack)) flag = "SE";
+  else if (/sydney|australia|\bau\b/i.test(haystack)) flag = "AU";
+  else if (/são paulo|sao paulo|brazil|\bbr\b/i.test(haystack)) flag = "BR";
 
   return { title: clean || loc || "Relay Node", subtitle: loc || "", flag };
 }
@@ -610,7 +613,7 @@ const EMPTY_RELAY: RelayNode = {
   address: "",
   location: "Deploy a relay or add a custom node",
   country: "GLOBAL",
-  flag: "⚠️",
+  flag: "—",
   pingMs: 0,
   packetLoss: 0,
   reachable: false,
@@ -1123,7 +1126,7 @@ export default function App() {
       const merged = await refreshGames();
       const idx = merged.findIndex((game) => game.id === id);
       if (idx >= 0) setSelectedGameIdx(idx);
-      notify(`✅ Added custom game: ${newGameName}`);
+      notify(`Added custom game: ${newGameName}`);
       setIsAddingGame(false);
       setNewGameName("");
       setNewGameProcess("");
@@ -1161,10 +1164,10 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Failed to add relay: ${message.trim()}`);
+        notify(`Failed to add relay: ${message.trim()}`);
         return;
       }
-      notify(`✅ Added custom relay node: ${newNodeName}`);
+      notify(`Added custom relay node: ${newNodeName}`);
       setIsAddingNode(false);
       setNewNodeName("");
       setNewNodeEndpoint("");
@@ -1218,7 +1221,7 @@ export default function App() {
   // Run Bufferbloat Test Handler
   const handleRunBufferbloatTest = async () => {
     setIsTestingBufferbloat(true);
-    notify("⚡ Testing connection latency under load (Bufferbloat Analysis)...");
+    notify("Testing connection latency under load (Bufferbloat Analysis)...");
     try {
       const res = await apiFetch("/api/diagnose-bufferbloat");
       if (!res.ok) {
@@ -1228,11 +1231,11 @@ export default function App() {
       const data = await res.json();
       if (data.available === false) {
         setBufferbloatResult(null);
-        notify(`⚠️ ${data.error || "Bufferbloat could not be measured."}`);
+        notify(`${data.error || "Bufferbloat could not be measured."}`);
         return;
       }
       setBufferbloatResult(data);
-      notify(`✅ Bufferbloat Test complete: Grade ${data.grade} (${data.rating})`);
+      notify(`Bufferbloat Test complete: Grade ${data.grade} (${data.rating})`);
     } catch {
       notify("Bufferbloat diagnostic failed to connect.");
     } finally {
@@ -1318,7 +1321,7 @@ export default function App() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        notify(`❌ Import failed: ${data?.error || res.statusText}`);
+        notify(`Import failed: ${data?.error || res.statusText}`);
         return;
       }
       setSnapshotResult({
@@ -1439,7 +1442,7 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Could not change peer routing: ${message.trim()}`);
+        notify(`Could not change peer routing: ${message.trim()}`);
         return;
       }
       const data = await res.json();
@@ -1466,7 +1469,7 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Could not change dual path: ${message.trim()}`);
+        notify(`Could not change dual path: ${message.trim()}`);
         return;
       }
       const data = await res.json();
@@ -1494,7 +1497,7 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Could not change full tunnel: ${message.trim()}`);
+        notify(`Could not change full tunnel: ${message.trim()}`);
         return;
       }
       const data = await res.json();
@@ -1926,7 +1929,7 @@ export default function App() {
         setIsBoosting(false);
         setLivePing(0);
         setConnectionError(null);
-        notify("⚡ Acceleration stopped. Standby mode.");
+        notify("Acceleration stopped. Standby mode.");
       } catch {
         notify("Could not reach the local Lagvex service to disconnect.");
       } finally {
@@ -1966,7 +1969,7 @@ export default function App() {
         const message = data.error || data.lastError || `Connection failed (${res.status})`;
         setConnectionError(message);
         setIsBoosting(false);
-        notify(`❌ ${message}`);
+        notify(`${message}`);
         return;
       }
 
@@ -1978,11 +1981,11 @@ export default function App() {
       const routeNote = data.routeCount > 0
         ? `${data.routeCount} game routes installed`
         : "routes will activate when the game process starts";
-      notify(`⚡ Boost Active: ${selectedGame.name} via ${selectedRelay.cleanName} — ${routeNote}.`);
+      notify(`Boost Active: ${selectedGame.name} via ${selectedRelay.cleanName} — ${routeNote}.`);
     } catch {
       setConnectionError("Could not reach the local Lagvex service.");
       setIsBoosting(false);
-      notify("❌ Could not reach the local Lagvex service.");
+      notify("Could not reach the local Lagvex service.");
     } finally {
       setIsConnecting(false);
     }
@@ -2024,7 +2027,7 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Could not create squad room: ${message.trim()}`);
+        notify(`Could not create squad room: ${message.trim()}`);
         return;
       }
       const selfMember: SquadMember = {
@@ -2064,7 +2067,7 @@ export default function App() {
       });
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`❌ Could not join squad room: ${message.trim()}`);
+        notify(`Could not join squad room: ${message.trim()}`);
         return;
       }
       const data = await res.json();
@@ -2171,16 +2174,16 @@ export default function App() {
         setDnsFlushed(true);
       }
       if (applied.length > 0 && failed.length === 0) {
-        notify(`✅ ${data.status || "Optimizations applied"}: ${applied.join(", ")}`);
+        notify(`${data.status || "Optimizations applied"}: ${applied.join(", ")}`);
       } else if (applied.length > 0) {
-        notify(`⚠️ ${data.status || "Partially applied"}. Applied: ${applied.join(", ")}. Failed: ${failed.join(", ")}`);
+        notify(`${data.status || "Partially applied"}. Applied: ${applied.join(", ")}. Failed: ${failed.join(", ")}`);
       } else if (failed.length > 0) {
-        notify(`❌ No system tweak was applied. Failed: ${failed.join(", ")}`);
+        notify(`No system tweak was applied. Failed: ${failed.join(", ")}`);
       } else {
         notify(data.status || "Preferences saved.");
       }
     } catch {
-      notify("❌ Could not reach the local Lagvex service; no tweaks were applied.");
+      notify("Could not reach the local Lagvex service; no tweaks were applied.");
     }
   };
 
@@ -2246,7 +2249,11 @@ export default function App() {
           <div className="w-full max-w-[460px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4 modal-pop-animate">
             <div className="flex items-center justify-between">
               <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Game Profile</h3>
-              <button onClick={() => setIsAddingGame(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
+              <button onClick={() => setIsAddingGame(false)} aria-label="Close" className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer p-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <p className="text-xs text-white/50">
               Register a game executable and the verified server CIDRs it connects to. Lagvex only routes those subnets through the tunnel; traffic outside them stays direct.
@@ -2338,7 +2345,11 @@ export default function App() {
           <div className="w-full max-w-[480px] rounded-3xl bg-[#0d141e] border border-[#223347] p-6 shadow-2xl flex flex-col gap-4 modal-pop-animate">
             <div className="flex items-center justify-between">
               <h3 className="font-brand font-extrabold text-lg text-white">Add Custom Routing Node</h3>
-              <button onClick={() => setIsAddingNode(false)} className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer text-base">✕</button>
+              <button onClick={() => setIsAddingNode(false)} aria-label="Close" className="text-white/40 hover:text-white border-none bg-transparent cursor-pointer p-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <p className="text-xs text-white/50">
               Hook up your personal VPS, dedicated server, or community relay node to bypass routing congestion.
@@ -2812,7 +2823,7 @@ export default function App() {
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-brand text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
-                          <span>⚡</span> {isBoosting && livePing > 0
+                          <IconBolt className="w-4 h-4 text-[#00F0FF]" /> {isBoosting && livePing > 0
                             ? "Live RTT measured by the tunnel engine"
                             : isBoosting
                             ? "Waiting for the first tunnel RTT sample"
@@ -3010,8 +3021,8 @@ export default function App() {
 
                     {/* Hop 3: Selected Super Relay Node */}
                     <div className="flex flex-col items-center gap-1.5 z-10">
-                      <div className="w-11 h-11 rounded-xl bg-[#111925] border border-[#00F0FF]/40 flex items-center justify-center text-xl shadow-lg shadow-[#00F0FF]/15">
-                        {selectedRelay.flag}
+                      <div className="w-11 h-11 rounded-xl bg-[#111925] border border-[#00F0FF]/40 flex items-center justify-center shadow-lg shadow-[#00F0FF]/15">
+                        <span className="font-mono font-black text-xs text-[#00F0FF]">{selectedRelay.flag}</span>
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">{selectedRelay.cleanName}</span>
                       <span className="text-[9px] font-mono text-[#00F0FF]">Relay Node</span>
@@ -3905,8 +3916,8 @@ export default function App() {
                     onClick={async () => {
                       notify(
                         selectedRegion?.id
-                          ? "⚡ Probing relays (client RTT + relay → region anchor)..."
-                          : "⚡ Probing global routing nodes in real-time..."
+                          ? "Probing relays (client RTT + relay → region anchor)..."
+                          : "Probing global routing nodes in real-time..."
                       );
                       try {
                         const params = new URLSearchParams();
@@ -3921,9 +3932,9 @@ export default function App() {
                           if (mapped.length === 0) {
                             notify("No relays are configured. Deploy a relay or add a custom node first.");
                           } else if (selectedRegion?.id) {
-                            notify("✅ Relays ranked by measured client + relay → region anchor RTT.");
+                            notify("Relays ranked by measured client + relay → region anchor RTT.");
                           } else {
-                            notify("✅ Relays reprobed with measured RTT and loss.");
+                            notify("Relays reprobed with measured RTT and loss.");
                           }
                         }
                       } catch {
@@ -4013,7 +4024,15 @@ export default function App() {
                       }`}
                     >
                       <div className="flex items-center gap-4">
-                        <span className="text-3xl">{relay.flag}</span>
+                        <span
+                          className={`w-11 h-11 shrink-0 rounded-xl border flex items-center justify-center font-mono font-black text-xs ${
+                            relay.reachable
+                              ? "bg-[#00F0FF]/10 border-[#00F0FF]/40 text-[#00F0FF]"
+                              : "bg-white/[0.03] border-[#1b2636] text-white/30"
+                          }`}
+                        >
+                          {relay.flag}
+                        </span>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-brand font-bold text-sm text-white">{relay.cleanName}</h3>
