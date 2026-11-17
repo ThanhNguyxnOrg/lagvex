@@ -176,6 +176,75 @@ iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp
 
 ---
 
+## 9. ♻️ Dual-Path Dedup (Redundant-lite, Phase 1)
+
+Phase 1 makes relays ready for an opt-in dual-send client (Phase 2): the same
+data frame is transmitted to two relays and the first copy seen is forwarded,
+while later copies are dropped. **No shipped client sends dual frames yet** —
+until Phase 2, every session uses a single path and the dedup state stays empty.
+
+### 9.1 Handshake extension (request)
+
+A dual-capable client appends 17 bytes after the 57-byte handshake request:
+
+| Offset (after byte 57) | Size | Field |
+|------------------------|------|-------|
+| +0 | 1 | Extension type `0x01` (dual path) |
+| +1 | 16 | Connection group ID (random, client-chosen) |
+
+The base 57 bytes and their PSK HMAC are unchanged, so **old relays still
+authenticate the handshake** and simply ignore the trailing bytes. A relay that
+receives unknown extension bytes fails the handshake closed, which makes a
+dual-capable client fall back to a single path on that relay.
+
+### 9.2 Capability echo (response)
+
+A dual-aware relay that accepted a group appends 4 bytes to the 60-byte
+handshake response: extension type `0x01` plus three reserved zero bytes. The
+base response and HMAC are unchanged, so **old clients ignore it**. A client
+must treat a response without the extension as "this relay is single-path only"
+and never duplicate frames to it.
+
+### 9.3 Dedup scope
+
+The relay derives the dedup scope as `SHA-256(PSK || group ID)` truncated to
+4 bytes. Because the hash is keyed by the relay's PSK, only PSK holders can
+join a group: an attacker who can compute a victim's group hash can already
+authenticate to the relay. The raw group ID is never used directly and is not
+covered by the request HMAC — it does not need to be.
+
+### 9.4 Data frame trailer
+
+A dual session's data frames carry an 8-byte trailer after the inner IPv4
+packet:
+
+| Offset (after inner packet) | Size | Field |
+|-----------------------------|------|-------|
+| +0 | 4 | Frame sequence (u32, shared by both relays) |
+| +4 | 4 | Group hash (u32, §9.3) |
+
+The trailer must be identical for both relays. The relay strips it before FEC
+processing and TUN delivery, and counts only the inner packet's bytes as tunnel
+uplink. A dual session that sends a frame without a valid trailer matching its
+group is dropped and counted as a bad frame.
+
+### 9.5 Relay dedup rules
+
+- First copy of `(group hash, sequence)` inside a 2-second TTL is forwarded;
+  later copies are counted as suppressed and dropped.
+- Per-group window is capped at 4096 sequences; expired entries are evicted
+  first, then the oldest.
+- Groups expire after 10 minutes without observations; at most 256 groups are
+  tracked. The reaper sweeps both every 10 seconds.
+- Unregistered groups are never deduped: only a PSK-authenticated handshake
+  creates group state.
+
+The relay `/health` endpoint reports `dualSessions`, `dualGroups`,
+`dualForwarded` and `dualSuppressed` so operators can verify the counters stay
+at zero until Phase 2 exists.
+
+---
+
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
 - 🤝 [**Contributor Guide**](../CONTRIBUTING.md)

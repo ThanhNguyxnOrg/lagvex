@@ -33,6 +33,14 @@ type Session struct {
 	BytesDown        atomic.Uint64
 	PacketsRecovered atomic.Uint64
 
+	// Dual-path (Redundant-lite) state. GroupHash is 0 for single-path
+	// sessions; non-zero means data frames carry the dual trailer and are
+	// deduplicated against the shared connection group.
+	GroupHash      uint32
+	DualForwarded  atomic.Uint64
+	DualSuppressed atomic.Uint64
+	DualBadFrames  atomic.Uint64
+
 	anchorProbeMu     sync.Mutex
 	anchorProbeLast   time.Time
 	anchorProbeWindow time.Time

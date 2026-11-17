@@ -116,6 +116,17 @@ Lagvex solves this using the **Smart Process Watcher** ([`pkg/client/watcher.go`
 | **Intranet & Metadata Scanning** | The relay drops packets destined for RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`), and cloud metadata (`169.254.169.254`). |
 | **Dynamic Roaming (Wi-Fi ↔ 4G)** | Client UDP endpoint (`IP:Port`) is dynamically updated on every valid data packet, preventing session disconnects during network switches. |
 
+### Dual-path dedup readiness (Redundant-lite Phase 1)
+
+Relays can now register a PSK-derived connection group from a handshake
+extension and keep a bounded first-copy-wins dedup window (`pkg/relay/dedup.go`:
+2 s TTL, 4096 sequences per group, 10-minute group TTL, 256 groups max). A dual
+session's data frames carry an 8-byte sequence trailer that is stripped before
+FEC and TUN delivery. No shipped client sends dual frames yet — the state stays
+empty until the opt-in dual-send mode (Phase 2) lands; `dualSessions`,
+`dualGroups`, `dualForwarded` and `dualSuppressed` on `/health` prove it. The
+full design lives in `docs/PROTOCOL.md` §9.
+
 ---
 
 ## 6. 🎨 Esports Cockpit HUD & Telemetry Architecture

@@ -51,6 +51,9 @@ type Server struct {
 	sessionsByID map[uint64]*Session
 	sessionsByIP map[netip.Addr]*Session
 
+	// dedup holds first-copy-wins state for dual-path connection groups.
+	dedup *dualDedupRegistry
+
 	squadRoomsMu sync.RWMutex
 	squadRooms   map[string]*RelaySquadRoom
 
@@ -75,6 +78,7 @@ func NewServer(cfg Config) (*Server, error) {
 		pool:         pool,
 		sessionsByID: make(map[uint64]*Session),
 		sessionsByIP: make(map[netip.Addr]*Session),
+		dedup:        newDualDedupRegistry(),
 		squadRooms:   make(map[string]*RelaySquadRoom),
 		bufPool: sync.Pool{
 			New: func() any {
@@ -202,7 +206,7 @@ func (s *Server) loopUDP(ctx context.Context) {
 }
 
 func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
-	req, err := protocol.DecodeHandshakeRequest(s.cfg.PSK, raw)
+	req, groupID, err := protocol.DecodeHandshakeRequestExt(s.cfg.PSK, raw)
 	if err != nil {
 		return // Silent drop on auth / clock skew failure
 	}
@@ -253,6 +257,15 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 
 	sess := NewSession(sessionID, req.ClientID, innerIP, remote, sessCrypto)
 
+	// Dual-path registration (Redundant-lite Phase 1). The group hash is
+	// derived from the PSK, so only authenticated clients can join a group.
+	if groupID != nil {
+		gh := protocol.GroupHash(s.cfg.PSK, groupID[:])
+		sess.GroupHash = gh
+		s.dedup.touch(gh)
+		log.Printf("[Relay] Dual-path group registered: client=%016x group=%08x", req.ClientID, gh)
+	}
+
 	s.mu.Lock()
 	s.sessionsByID[sessionID] = sess
 	s.sessionsByIP[innerIP] = sess
@@ -270,6 +283,18 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		MTU:       uint16(s.cfg.MTU),
 		NonceEcho: req.Nonce,
 	})
+	if sess.GroupHash != 0 {
+		// Advertise dual-path support so a Phase 2 client only duplicates
+		// frames when this relay actually deduplicates them.
+		respBuf = protocol.EncodeHandshakeResponseDual(s.cfg.PSK, protocol.HandshakeResponse{
+			Status:    protocol.StatusOK,
+			SessionID: sessionID,
+			ClientIP:  innerIP,
+			GatewayIP: s.pool.Gateway(),
+			MTU:       uint16(s.cfg.MTU),
+			NonceEcho: req.Nonce,
+		})
+	}
 
 	s.sendUDP(respBuf, remote)
 }
@@ -317,14 +342,33 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 			return
 		}
 
-		sess.BytesUp.Add(uint64(len(payload)))
+		// Dual-path dedup (Redundant-lite): a dual session's frames carry a
+		// sequence trailer; the first copy seen by this relay is forwarded
+		// and later copies of the same (group, seq) are dropped.
+		inner := payload
+		if sess.GroupHash != 0 {
+			var seq, frameGroup uint32
+			var ok bool
+			inner, seq, frameGroup, ok = protocol.SplitDualTrailer(payload)
+			if !ok || frameGroup != sess.GroupHash {
+				sess.DualBadFrames.Add(1)
+				return
+			}
+			if s.dedup.observe(sess.GroupHash, seq) {
+				sess.DualSuppressed.Add(1)
+				return
+			}
+			sess.DualForwarded.Add(1)
+		}
+
+		sess.BytesUp.Add(uint64(len(inner)))
 		if sess.FECDecoder != nil {
 			seq := binary.BigEndian.Uint64(raw[9:17])
-			sess.FECDecoder.RecordPacket(seq, payload)
+			sess.FECDecoder.RecordPacket(seq, inner)
 		}
 
 		// Push packet into Linux TUN device
-		_, _ = s.tunDev.Write(payload)
+		_, _ = s.tunDev.Write(inner)
 
 	case protocol.TypeFEC:
 		if sess.FECDecoder == nil {
@@ -472,6 +516,9 @@ func (s *Server) loopReaper(ctx context.Context) {
 			}
 			s.mu.Unlock()
 
+			// Expire dual-path dedup windows and idle groups.
+			s.dedup.sweep()
+
 			// Reap stale squad rooms (> 24h old or inactive > 2m)
 			s.squadRoomsMu.Lock()
 			for code, room := range s.squadRooms {
@@ -574,18 +621,34 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.RLock()
 	active := len(s.sessionsByID)
+	dualSessions := 0
+	for _, sess := range s.sessionsByID {
+		if sess.GroupHash != 0 {
+			dualSessions++
+		}
+	}
 	s.mu.RUnlock()
 
 	s.squadRoomsMu.RLock()
 	roomsCount := len(s.squadRooms)
 	s.squadRoomsMu.RUnlock()
 
+	var dualForwarded, dualSuppressed uint64
+	for _, stat := range s.dedup.stats() {
+		dualForwarded += stat.Forwarded
+		dualSuppressed += stat.Suppressed
+	}
+
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"status":      "online",
-		"version":     "1.0.0",
-		"activeUsers": active,
-		"squadRooms":  roomsCount,
-		"listen":      s.cfg.ListenAddr,
+		"status":         "online",
+		"version":        "1.0.0",
+		"activeUsers":    active,
+		"squadRooms":     roomsCount,
+		"listen":         s.cfg.ListenAddr,
+		"dualSessions":   dualSessions,
+		"dualGroups":     len(s.dedup.stats()),
+		"dualForwarded":  dualForwarded,
+		"dualSuppressed": dualSuppressed,
 	})
 }
 
