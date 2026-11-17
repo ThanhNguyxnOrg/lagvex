@@ -49,7 +49,7 @@ func TestRunTCPPingAgainstLoopbackListener(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	port := listener.Addr().(*net.TCPAddr).Port
 	result := runTCPPing(context.Background(), net.ParseIP("127.0.0.1"), port, 3, 500*time.Millisecond, 10*time.Millisecond)
