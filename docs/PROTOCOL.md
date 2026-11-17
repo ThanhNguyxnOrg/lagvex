@@ -267,6 +267,27 @@ behaviour and keeps the common case free of duplicate packets at the game
 server: blind duplicate sends would make both relays forward their own first
 copy, since dedup state is per relay and relays do not share state.
 
+### 9.7 Client behaviour (Phase 2, shipped)
+
+- The user opts in from the dashboard; enabling while connected runs a real
+  standby handshake, so the toggle's state reflects an actual session.
+- Data frames are sent **only to the primary relay**, each carrying the dual
+  trailer. FEC parity, Ping/Pong and anchor probes stay primary-only.
+- The primary's contiguous `DualAck` watermarks purge the client ring.
+- A frame unacknowledged past `max(40 ms, 1.5× measured RTT)` (clamped to
+  20–250 ms) is retransmitted with backoff: attempt 1 to the primary relay,
+  attempt 2 to the standby relay, at most twice per frame. Ring entries
+  expire after 1 second and the ring holds at most 256 frames.
+- The standby session receives keepalive Pings; 30 s without a pong, a
+  standby Disconnect, or a relay handover tears the dual session down and
+  the client records the reason in `/api/status` (`dualPath.reason`).
+- Both relays must share one PSK: the dedup scope is
+  `SHA-256(PSK ‖ group ID)`, so different PSKs would give each relay a
+  different group identity and the single trailer could not satisfy both.
+- `/api/status` reports the measured counters (`framed`, `retransmits`,
+  `ackPurged`, `expired`, `ringOverflow`, `inFlight`, `ackedSeq`,
+  `thresholdMs`) — overhead is what was counted, never a fixed multiplier.
+
 ---
 
 🔗 **Navigation**:

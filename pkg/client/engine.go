@@ -78,6 +78,10 @@ type TunnelStats struct {
 	StandbyRttMs     float64 `json:"standbyRttMs,omitempty"`
 	StandbyTotalMs   float64 `json:"standbyTotalMs,omitempty"`
 	StandbyAgeSec    int     `json:"standbyAgeSec,omitempty"`
+
+	// Dual-path redundancy (Redundant-lite Phase 2), opt-in. Nil when the
+	// user never touched the toggle.
+	DualPath *DualPathStatus `json:"dualPath,omitempty"`
 }
 
 // Engine orchestrates the client VPN tunnel and routing lifecycle.
@@ -146,6 +150,23 @@ type Engine struct {
 	standby        *ProbeResult // pre-measured alternative relay
 	standbyAt      time.Time    // when the standby was last measured
 	standbyTriedAt time.Time    // when a standby refresh was last attempted
+
+	// Dual-path (Redundant-lite Phase 2) state; see engine_dual.go.
+	dualEnabled        atomic.Bool            // user intent
+	dualActive         atomic.Bool            // standby session live
+	dualReason         atomic.Pointer[string] // why it is inactive (honest)
+	dualRetryAt        atomic.Int64           // unix nano of the last activation retry
+	dualLastPong       atomic.Int64           // unix nano of the last standby pong
+	dualMu             sync.Mutex
+	groupID            [16]byte
+	dualStandbyAddr    netip.AddrPort
+	dualStandbyConn    *net.UDPConn
+	dualStandbyCrypto  *protocol.SessionCrypto
+	dualStandbySession uint64
+	dualStandbyID      string
+	dualStandbyName    string
+	dualSender         *dualSender
+	dualCancel         context.CancelFunc
 
 	anchorProbeMu   sync.Mutex
 	anchorProbeWait map[uint32]chan anchorProbeResult
@@ -256,6 +277,7 @@ func (e *Engine) Stats() TunnelStats {
 		StandbyRttMs:     standbyRTT,
 		StandbyTotalMs:   standbyTotal,
 		StandbyAgeSec:    standbyAge,
+		DualPath:         e.dualStatusSnapshot(),
 	}
 }
 
@@ -846,6 +868,12 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	}
 
 	log.Printf("[Engine] Tunnel active and accelerating!")
+
+	// Dual path activates after the primary session is fully up, so the
+	// toggle's honest state reflects a real standby handshake.
+	if e.dualEnabled.Load() {
+		go e.SetDualPath(true)
+	}
 	return nil
 }
 
@@ -866,6 +894,9 @@ func (e *Engine) Disconnect() error {
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Disconnecting tunnel...")
+
+	// Tear the dual-path standby session down with the tunnel.
+	e.deactivateDual("tunnel disconnected")
 
 	// Send authenticated Disconnect message to relay
 	if conn != nil && crypto != nil {
@@ -961,8 +992,18 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		isUDP := inBuf[9] == 17
 		isGameTick := !e.l4FilterEnabled.Load() || isUDP
 
+		// Dual-path framing (Redundant-lite Phase 2): when active, every
+		// data frame carries the dual trailer and enters the retransmission
+		// ring. bytesUp still counts only the inner game bytes.
+		var pkt []byte
+		if sender := e.dualSenderSnapshot(); sender != nil && e.dualActive.Load() {
+			framed, _ := sender.frame(inBuf[:n])
+			pkt = crypto.EncodeData(outBuf, sessID, framed)
+		} else {
+			pkt = crypto.EncodeData(outBuf, sessID, inBuf[:n])
+		}
+
 		// Immediate systematic delivery (0 RTT latency overhead on game packets)
-		pkt := crypto.EncodeData(outBuf, sessID, inBuf[:n])
 		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
@@ -1069,6 +1110,12 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			if err == nil {
 				seq, rttUs, lossPct := protocol.DecodeAnchorProbeReply(packed)
 				e.deliverAnchorProbe(seq, rttUs, lossPct)
+			}
+
+		case protocol.TypeDualAck:
+			// Primary relay progress for dual-path retransmission decisions.
+			if seq, err := protocol.DecodeDualAckPayload(payload); err == nil {
+				e.applyDualAck(seq)
 			}
 
 		case protocol.TypeDisconnect:
@@ -1232,6 +1279,10 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 			// Keep an alternative relay pre-measured so failover is instant.
 			e.maybeRefreshStandby(ctx, prober, activeRelayID, activeEndpoint)
 
+			// Re-attempt dual-path activation when the first try had no
+			// fresh standby yet.
+			e.maybeRetryDual()
+
 			currentPing := float64(e.pingMs.Load())
 			if currentPing <= 0 {
 				continue
@@ -1360,6 +1411,15 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 		e.mu.Unlock()
 		return fmt.Errorf("cannot handover when not connected (state: %s)", e.state)
 	}
+	e.mu.Unlock()
+
+	// Dual-path sessions are bound to the outgoing relay pair; tear the
+	// standby down and let the retry logic re-activate after the switch.
+	if e.dualActive.Load() {
+		e.deactivateDual("primary relay handover")
+	}
+
+	e.mu.Lock()
 	clientID := e.clientID
 	oldConn := e.udpConn
 	oldCrypto := e.crypto
@@ -1582,6 +1642,7 @@ func (e *Engine) FailoverController() *FailoverController {
 }
 
 func (e *Engine) resetState() {
+	e.deactivateDual("state reset")
 	e.mu.Lock()
 	e.state = StateDisconnected
 	e.mu.Unlock()

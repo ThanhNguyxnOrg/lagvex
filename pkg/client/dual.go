@@ -55,6 +55,7 @@ type DualSenderStats struct {
 	AckPurged    uint64 `json:"ackPurged"`
 	Expired      uint64 `json:"expired"`
 	RingOverflow uint64 `json:"ringOverflow"`
+	ThresholdMs  int    `json:"thresholdMs"`
 }
 
 type dualFrame struct {
@@ -245,5 +246,6 @@ func (d *dualSender) stats() DualSenderStats {
 		AckPurged:    d.ackPurged,
 		Expired:      d.expired,
 		RingOverflow: d.ringOverflow,
+		ThresholdMs:  int(d.threshold / time.Millisecond),
 	}
 }

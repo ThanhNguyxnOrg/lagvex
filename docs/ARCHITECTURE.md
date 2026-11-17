@@ -116,16 +116,22 @@ Lagvex solves this using the **Smart Process Watcher** ([`pkg/client/watcher.go`
 | **Intranet & Metadata Scanning** | The relay drops packets destined for RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`), and cloud metadata (`169.254.169.254`). |
 | **Dynamic Roaming (Wi-Fi ↔ 4G)** | Client UDP endpoint (`IP:Port`) is dynamically updated on every valid data packet, preventing session disconnects during network switches. |
 
-### Dual-path dedup readiness (Redundant-lite Phase 1)
+### Dual-path redundancy (Redundant-lite Phase 1 + 2)
 
-Relays can now register a PSK-derived connection group from a handshake
-extension and keep a bounded first-copy-wins dedup window (`pkg/relay/dedup.go`:
-2 s TTL, 4096 sequences per group, 10-minute group TTL, 256 groups max). A dual
+Relays register a PSK-derived connection group from a handshake extension and
+keep a bounded first-copy-wins dedup window (`pkg/relay/dedup.go`: 2 s TTL,
+4096 sequences per group, 10-minute group TTL, 256 groups max). A dual
 session's data frames carry an 8-byte sequence trailer that is stripped before
-FEC and TUN delivery. No shipped client sends dual frames yet — the state stays
-empty until the opt-in dual-send mode (Phase 2) lands; `dualSessions`,
-`dualGroups`, `dualForwarded` and `dualSuppressed` on `/health` prove it. The
-full design lives in `docs/PROTOCOL.md` §9.
+FEC and TUN delivery, and the relay reports a contiguous ACK watermark
+(`DualAck`, at most one per 20 ms) so the client knows what arrived.
+
+The client (`pkg/client/engine_dual.go` + `pkg/client/dual.go`) sends data
+frames only to the primary relay and retransmits unacknowledged frames —
+primary first, then the standby relay — with the ring, thresholds and measured
+counters documented in `docs/PROTOCOL.md` §9. The dashboard toggle
+(`/api/dual-path/toggle`) reflects the real standby handshake result, and
+`/health` still reports `dualSessions`, `dualGroups`, `dualForwarded` and
+`dualSuppressed` so operators can watch the relay side.
 
 ---
 
@@ -141,6 +147,7 @@ The frontend (`web/`) is architected as a lightweight, zero-dependency tactical 
                   ├─► POST /api/disconnect  (Tears down routes & releases IP)
                   ├─► POST /api/probe       (UDP tunnel probe + optional ICMP echo)
                   ├─► POST /api/tcping      (TCP handshake RTT to a public IP)
+                  ├─► POST /api/dual-path/toggle (Redundant-lite ARQ mode)
                   └─► Static Assets         (React dashboard build)
 ```
 

@@ -69,6 +69,10 @@ anti-cheat checks the way socket-hooking boosters can.
 - 🛡️ **Adaptive FEC, failover and DSCP marking** — loss recovery and relay failover
   with honest status reporting. While connected, one alternative relay is kept
   pre-measured as a standby, so a degradation promotes it without waiting for a sweep.
+- ♻️ **Dual-path redundancy (experimental, opt-in)** — frames go to the primary relay
+  only; the relay acknowledges progress, and frames it may have missed are
+  retransmitted via the standby relay. Overhead is the measured retransmission
+  counter, not a fixed multiplier. Requires both relays to share one PSK.
 - 🖥️ **Windows, macOS and Linux client** — WinTun, native `utun` and `/dev/net/tun`
   respectively; one Go codebase, one React dashboard.
 

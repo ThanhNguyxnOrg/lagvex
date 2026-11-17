@@ -458,6 +458,23 @@ export type RelayNode = {
   icmpRttMs: number;
 };
 
+export type DualPathStatus = {
+  enabled: boolean;
+  active: boolean;
+  reason?: string;
+  standbyRelayId?: string;
+  standbyRelayName?: string;
+  groupHash?: number;
+  ackedSeq: number;
+  inFlight: number;
+  framed: number;
+  retransmits: number;
+  ackPurged: number;
+  expired: number;
+  ringOverflow: number;
+  thresholdMs?: number;
+};
+
 export type TCPPingSample = {
   attempt: number;
   rttMs: number;
@@ -930,6 +947,7 @@ export default function App() {
   const [peerRouteCount, setPeerRouteCount] = useState(0);
   const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
   const [fullTunnel, setFullTunnel] = useState(false);
+  const [dualPath, setDualPathState] = useState<DualPathStatus | null>(null);
   const [standby, setStandby] = useState<{ id: string; name: string; rttMs: number; totalMs: number; ageSec: number } | null>(null);
   const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
   const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
@@ -1429,6 +1447,35 @@ export default function App() {
     }
   };
 
+  // Dual-path redundancy (Redundant-lite Phase 2): primary-only send with
+  // ACK-driven retransmission to a standby relay.
+  const handleToggleDualPath = async () => {
+    try {
+      const res = await apiFetch("/api/dual-path/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !(dualPath?.enabled === true) })
+      });
+      if (!res.ok) {
+        const message = (await res.text().catch(() => "")) || res.statusText;
+        notify(`❌ Could not change dual path: ${message.trim()}`);
+        return;
+      }
+      const data = await res.json();
+      setDualPathState(data.dualPath ?? null);
+      if (data.active) {
+        notify("Dual path active: unacked frames retransmit via the standby relay.");
+      } else if (data.enabled) {
+        const reason = data.dualPath?.reason ? ` (${data.dualPath.reason})` : "";
+        notify(`Dual path requested but not active${reason}`);
+      } else {
+        notify("Dual path disabled; single-path tunnel restored.");
+      }
+    } catch {
+      notify("Failed to reach the local Lagvex service.");
+    }
+  };
+
   // Full tunnel: opt-in "all IPv4 traffic through the relay" mode
   const handleToggleFullTunnel = async () => {
     try {
@@ -1758,6 +1805,7 @@ export default function App() {
 
         setPeerRouting(data.peerRouting === true);
         setFullTunnel(data.fullTunnel === true);
+        setDualPathState(data.dualPath ?? null);
         if (data.standbyRelayName) {
           setStandby({
             id: typeof data.standbyRelayId === "string" ? data.standbyRelayId : "",
@@ -3218,6 +3266,57 @@ export default function App() {
                         <span className="text-[9px] text-white/30">
                           While a tunnel is up, one alternative relay is probed in the background. Automatic failover
                           promotes it when the active path degrades, so the switch does not wait for a fresh sweep.
+                        </span>
+                      </div>
+
+                      {/* DUAL PATH (REDUNDANT-LITE, OPT-IN) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-brand font-bold text-[#7E42FF] uppercase tracking-wider">
+                              DUAL PATH REDUNDANCY (EXPERIMENTAL)
+                            </span>
+                            <span className="text-[10px] text-white/40">
+                              Frames go to the primary relay only; the relay acknowledges progress, and frames it may
+                              have missed are retransmitted via the standby relay. Requires both relays to share one
+                              PSK.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => void handleToggleDualPath()}
+                            className={`h-[34px] px-4 rounded-xl text-[10px] font-brand font-bold cursor-pointer border-none transition-all shrink-0 ${
+                              dualPath?.enabled
+                                ? "bg-[#7E42FF] text-white shadow-md shadow-[#7E42FF]/20"
+                                : "bg-white/[0.08] text-white/60 hover:bg-white/15"
+                            }`}
+                          >
+                            {dualPath?.enabled ? "DUAL PATH: ON" : "DUAL PATH: OFF"}
+                          </button>
+                        </div>
+
+                        {dualPath?.enabled && dualPath.active && (
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] font-mono">
+                            <span className="text-[#10b981]">
+                              standby: {dualPath.standbyRelayName || "connected"}
+                            </span>
+                            <span className="text-white/45">framed: {dualPath.framed}</span>
+                            <span className={dualPath.retransmits > 0 ? "text-[#f59e0b]" : "text-white/45"}>
+                              retransmits: {dualPath.retransmits}
+                            </span>
+                            <span className="text-white/45">acked: {dualPath.ackedSeq}</span>
+                            <span className="text-white/45">in-flight: {dualPath.inFlight}</span>
+                            {dualPath.thresholdMs ? (
+                              <span className="text-white/45">threshold: {dualPath.thresholdMs} ms</span>
+                            ) : null}
+                          </div>
+                        )}
+                        {dualPath?.enabled && !dualPath.active && dualPath.reason && (
+                          <span className="text-[9px] text-[#f59e0b]">Not active: {dualPath.reason}</span>
+                        )}
+                        <span className="text-[9px] text-white/30">
+                          Measured overhead is the retransmission counter above, not a fixed multiplier. If a relay
+                          ACK is lost after a frame was already delivered, the game server can rarely see one
+                          duplicate; the counter tells you how often retransmissions happen at all.
                         </span>
                       </div>
 

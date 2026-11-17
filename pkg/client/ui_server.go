@@ -103,6 +103,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/failover/toggle", u.handleFailoverToggle)
 	mux.HandleFunc("/api/failover/history", u.handleFailoverHistory)
 	mux.HandleFunc("/api/fec/toggle", u.handleFECToggle)
+	mux.HandleFunc("/api/dual-path/toggle", u.handleDualPathToggle)
 	mux.HandleFunc("/api/optimize-profile", u.handleOptimizeProfile)
 	mux.HandleFunc("/api/system-info", u.handleSystemInfo)
 	mux.HandleFunc("/api/relaunch-admin", u.handleRelaunchAdmin)
