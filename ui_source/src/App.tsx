@@ -865,7 +865,15 @@ export type SquadMember = {
 
 export default function App() {
   // Navigation: HOME is now the primary welcoming dashboard, BOOST opens when a game is chosen!
-  const [activeTab, setActiveTab] = useState<"home" | "boost" | "library" | "squad" | "nodes" | "tweaker">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "boost" | "library" | "squad" | "nodes" | "tweaker">(() => {
+    // Deep-link support: /?tab=boost opens the Boost tab directly, so links
+    // and overlays can land on a specific view.
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return requested === "boost" || requested === "library" || requested === "squad" ||
+      requested === "nodes" || requested === "tweaker"
+      ? (requested as "boost" | "library" | "squad" | "nodes" | "tweaker")
+      : "home";
+  });
 
   // Selection
   const [selectedGameIdx, setSelectedGameIdx] = useState(0);
