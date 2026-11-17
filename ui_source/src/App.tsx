@@ -622,6 +622,18 @@ function mapProbeRelays(data: unknown): RelayNode[] {
     });
 }
 
+/** Relative age of the last measured probe, or a dash when never probed. */
+function formatProbeAge(lastProbeAt: string): string {
+  if (!lastProbeAt) return "never probed";
+  const at = Date.parse(lastProbeAt);
+  if (!Number.isFinite(at)) return "never probed";
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 60) return `probed ${seconds}s ago`;
+  if (seconds < 3600) return `probed ${Math.round(seconds / 60)}m ago`;
+  if (seconds < 86400) return `probed ${Math.round(seconds / 3600)}h ago`;
+  return `probed ${Math.round(seconds / 86400)}d ago`;
+}
+
 /** Small measured-RTT sparkline. Renders a dash until two real samples exist. */
 function RttSparkline({ samples, width = 110, height = 26 }: { samples: number[]; width?: number; height?: number }) {
   if (!samples || samples.length < 2) {
@@ -788,6 +800,7 @@ export default function App() {
 
   // Node Search & Continent Filter
   const [nodeSearchQuery, setNodeSearchQuery] = useState("");
+  const [nodeSort, setNodeSort] = useState<"best" | "loss" | "name" | "recent">("best");
   const [selectedNodeContinent, setSelectedNodeContinent] = useState<"ALL" | "ASIA" | "NORTH AMERICA" | "EUROPE" | "OCEANIA" | "GLOBAL">("ALL");
 
   // Admin & Bufferbloat Diagnostics State
@@ -895,6 +908,32 @@ export default function App() {
       return matchSearch && matchCont;
     });
   }, [relays, nodeSearchQuery, selectedNodeContinent]);
+
+  // Sort the filtered nodes by the selected measured criterion. Unreachable
+  // nodes always sink to the bottom, and equal values keep their order.
+  const sortedRelays = useMemo(() => {
+    const sorted = [...filteredRelays];
+    sorted.sort((a, b) => {
+      if (a.reachable !== b.reachable) return a.reachable ? -1 : 1;
+      switch (nodeSort) {
+        case "loss":
+          return a.packetLoss - b.packetLoss;
+        case "name":
+          return a.cleanName.localeCompare(b.cleanName);
+        case "recent":
+          return Number(b.recent) - Number(a.recent);
+        default: {
+          const aBest = a.totalEstimateMs > 0 ? a.totalEstimateMs : a.pingMs;
+          const bBest = b.totalEstimateMs > 0 ? b.totalEstimateMs : b.pingMs;
+          if (aBest <= 0 && bBest <= 0) return 0;
+          if (aBest <= 0) return 1;
+          if (bBest <= 0) return -1;
+          return aBest - bBest;
+        }
+      }
+    });
+    return sorted;
+  }, [filteredRelays, nodeSort]);
 
   // Keep a valid server region selected for the active game and relay.
   useEffect(() => {
@@ -3649,6 +3688,21 @@ export default function App() {
                   />
                 </div>
 
+                {/* Sort by a measured criterion */}
+                <label className="flex items-center gap-2 text-[10px] font-brand font-bold uppercase tracking-wider text-white/35">
+                  Sort
+                  <select
+                    value={nodeSort}
+                    onChange={(e) => setNodeSort(e.target.value as typeof nodeSort)}
+                    className="h-[36px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
+                  >
+                    <option value="best">Best measured route</option>
+                    <option value="loss">Lowest loss</option>
+                    <option value="name">Name</option>
+                    <option value="recent">Recently used</option>
+                  </select>
+                </label>
+
                 {/* Continent Chips */}
                 <div className="flex items-center gap-2">
                   {(["ALL", "ASIA", "NORTH AMERICA", "EUROPE", "OCEANIA", "GLOBAL"] as const).map((cont) => (
@@ -3677,7 +3731,7 @@ export default function App() {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {filteredRelays.map((relay) => {
+                {sortedRelays.map((relay) => {
                   const originalIdx = relays.findIndex((r) => r.id === relay.id);
                   const isSelected = selectedRelayIdx === originalIdx;
                   return (
@@ -3745,6 +3799,8 @@ export default function App() {
                           </span>
                           <span className="text-[9px] font-mono text-white/35">
                             {relay.historySamples > 0 ? `${relay.historySamples} probe${relay.historySamples === 1 ? "" : "s"} kept` : "No probe history yet"}
+                            {" · "}
+                            {formatProbeAge(relay.lastProbeAt)}
                           </span>
                           {relay.icmpRttMs > 0 && (
                             <span
