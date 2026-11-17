@@ -76,6 +76,32 @@ func TestRunTCPPingAgainstLoopbackListener(t *testing.T) {
 	}
 }
 
+func TestRunTCPPingClosedPortCountsAsMeasured(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+
+	result := runTCPPing(context.Background(), net.ParseIP("127.0.0.1"), port, 1, 500*time.Millisecond, 10*time.Millisecond)
+	if len(result.Samples) != 1 {
+		t.Fatalf("samples = %d, want 1", len(result.Samples))
+	}
+	sample := result.Samples[0]
+	if sample.Outcome != "closed" {
+		t.Fatalf("outcome = %q, want closed (%+v)", sample.Outcome, sample)
+	}
+	if !result.Measured || sample.RTTMs <= 0 {
+		t.Fatalf("RST response was not treated as a measurement: %+v", result)
+	}
+	if !strings.Contains(result.Note, "closed") {
+		t.Fatalf("note does not explain the closed port: %q", result.Note)
+	}
+}
+
 func TestClampTCPPingDefaults(t *testing.T) {
 	port, attempts, timeout, err := clampTCPPingDefaults(0, 0, 0)
 	if err != nil {
