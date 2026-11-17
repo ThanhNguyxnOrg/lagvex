@@ -128,6 +128,39 @@ func TestDualResponseCapability(t *testing.T) {
 	}
 }
 
+func TestDualAckRoundTrip(t *testing.T) {
+	psk := []byte("relay-psk")
+	cl, err := NewClientCrypto(psk, 0xABCD, 42, 7)
+	if err != nil {
+		t.Fatalf("client crypto: %v", err)
+	}
+	rl, err := NewRelayCrypto(psk, 0xABCD, 42, 7)
+	if err != nil {
+		t.Fatalf("relay crypto: %v", err)
+	}
+
+	buf := make([]byte, 256)
+	pkt := cl.EncodeDualAck(buf, 42, 12345)
+	mtype, payload, err := rl.OpenPacket(make([]byte, 256), pkt)
+	if err != nil {
+		t.Fatalf("open ack: %v", err)
+	}
+	if mtype != TypeDualAck {
+		t.Fatalf("type = %s, want DualAck", TypeString(mtype))
+	}
+	seq, err := DecodeDualAckPayload(payload)
+	if err != nil {
+		t.Fatalf("decode ack: %v", err)
+	}
+	if seq != 12345 {
+		t.Fatalf("ack seq = %d, want 12345", seq)
+	}
+
+	if _, err := DecodeDualAckPayload(payload[:4]); !errors.Is(err, ErrPacketTooShort) {
+		t.Fatalf("short ack error = %v", err)
+	}
+}
+
 func TestGroupHashBindsPSKAndGroup(t *testing.T) {
 	psk := []byte("relay-psk")
 	var groupID [DualGroupIDLen]byte

@@ -36,6 +36,12 @@ const (
 	TypeAnchorProbe      = 0x8
 	TypeAnchorProbeReply = 0x9
 
+	// Dual-path ACK (Redundant-lite Phase 2 groundwork): a relay tells a
+	// dual session the highest dual frame sequence it has forwarded, so the
+	// client only retransmits frames the relay may have missed. Relays never
+	// receive this type; clients without dual support never see it.
+	TypeDualAck = 0xA
+
 	// Packet lengths in bytes.
 	HandshakeReqLen  = 57
 	HandshakeRespLen = 60
@@ -252,6 +258,8 @@ func TypeString(mtype byte) string {
 		return "Disconnect"
 	case TypeFEC:
 		return "FECParity"
+	case TypeDualAck:
+		return "DualAck"
 	default:
 		return fmt.Sprintf("Unknown(0x%x)", mtype)
 	}

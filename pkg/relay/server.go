@@ -370,6 +370,17 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 				return
 			}
 			sess.DualForwarded.Add(1)
+			sess.RecordDualForwarded(seq)
+
+			// Dual ACK (Phase 2 groundwork): tell the client the highest
+			// sequence forwarded, rate-limited per session, so its
+			// retransmit logic only fires for frames this relay may have
+			// missed. Single-path sessions never receive ACKs.
+			if ackSeq, ok := sess.TakeDualAck(time.Now()); ok {
+				ackBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
+				ack := sess.Crypto.EncodeDualAck(ackBuf, sessionID, ackSeq)
+				s.sendUDP(ack, remote)
+			}
 		}
 
 		sess.BytesUp.Add(uint64(len(inner)))

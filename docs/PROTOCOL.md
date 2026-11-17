@@ -34,6 +34,7 @@ bits 3..0 : Message Type (0x1 .. 0x9)
 | `0x7` | `FEC` 🛡️ | Client -> Relay | 33 bytes + Parity Payload |
 | `0x8` | `AnchorProbe` 🎯 | Client -> Relay | 41 bytes (Encrypted sequence + anchor id) |
 | `0x9` | `AnchorProbeReply` 🎯 | Relay -> Client | 41 bytes (Encrypted sequence + rtt + loss) |
+| `0xA` | `DualAck` ♻️ | Relay -> Client | 41 bytes (Encrypted highest forwarded dual seq) |
 
 Old relays drop the `0x8`/`0x9` types, so anchor probing degrades to "not
 measured" instead of breaking the tunnel.
@@ -242,6 +243,21 @@ group is dropped and counted as a bad frame.
 The relay `/health` endpoint reports `dualSessions`, `dualGroups`,
 `dualForwarded` and `dualSuppressed` so operators can verify the counters stay
 at zero until Phase 2 exists.
+
+### 9.6 DualAck progress report (Phase 2 groundwork)
+
+For dual sessions the relay sends a `DualAck` (type `0xA`, sealed like Pong)
+after forwarding dual frames. The 8-byte payload carries the **highest dual
+frame sequence** the relay has forwarded to the game server; four bytes are
+reserved. ACKs are rate-limited to at most one per 20 ms per session (50/s),
+and a session that has never forwarded a dual frame never receives one.
+
+The client (Phase 2) keeps a small ring of recent dual frames, purges it on
+ACK, and retransmits only frames that stay unacked beyond a measured
+threshold. This mirrors ExitLag's confirm/`detect_lost_packets` behaviour and
+keeps the common case free of duplicate packets at the game server: blind
+duplicate sends would make both relays forward their own first copy, since
+dedup state is per relay and relays do not share state.
 
 ---
 

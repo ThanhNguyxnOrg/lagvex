@@ -148,3 +148,21 @@ func SplitDualTrailer(payload []byte) (inner []byte, seq, groupHash uint32, ok b
 	groupHash = binary.BigEndian.Uint32(payload[cut+4:])
 	return inner, seq, groupHash, true
 }
+
+// EncodeDualAck seals the relay's dual-path progress report: the highest dual
+// frame sequence the relay has forwarded to the game server. The payload is
+// 8 bytes (sequence + 4 reserved bytes) to match the other control payloads.
+func (c *SessionCrypto) EncodeDualAck(dst []byte, sessionID uint64, highestSeq uint32) []byte {
+	var p [8]byte
+	binary.BigEndian.PutUint32(p[0:4], highestSeq)
+	return c.SealPacket(dst, TypeDualAck, sessionID, p[:])
+}
+
+// DecodeDualAckPayload parses a DualAck payload and returns the highest
+// forwarded sequence.
+func DecodeDualAckPayload(payload []byte) (uint32, error) {
+	if len(payload) < 8 {
+		return 0, ErrPacketTooShort
+	}
+	return binary.BigEndian.Uint32(payload[0:4]), nil
+}

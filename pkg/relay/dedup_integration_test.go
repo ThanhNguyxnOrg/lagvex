@@ -161,6 +161,32 @@ func (c *testClient) send(t *testing.T, payload []byte) {
 	}
 }
 
+// expectAck reads one DualAck control message and returns its sequence.
+func (c *testClient) expectAck(t *testing.T, wantMin uint32) uint32 {
+	t.Helper()
+	buf := make([]byte, 256)
+	_ = c.conn.SetReadDeadline(time.Now().Add(time.Second))
+	n, _, err := c.conn.ReadFromUDP(buf)
+	if err != nil {
+		t.Fatalf("read dual ack: %v", err)
+	}
+	mtype, payload, err := c.crypto.OpenPacket(make([]byte, 256), buf[:n])
+	if err != nil {
+		t.Fatalf("open dual ack: %v", err)
+	}
+	if mtype != protocol.TypeDualAck {
+		t.Fatalf("expected DualAck, got %s", protocol.TypeString(mtype))
+	}
+	seq, err := protocol.DecodeDualAckPayload(payload)
+	if err != nil {
+		t.Fatalf("decode dual ack: %v", err)
+	}
+	if seq < wantMin {
+		t.Fatalf("ack seq = %d, want >= %d", seq, wantMin)
+	}
+	return seq
+}
+
 // buildInnerPacket builds a minimal valid IPv4/UDP packet the relay accepts:
 // correct source (session IP) and a public destination.
 func buildInnerPacket(t *testing.T, src, dst netip.Addr, marker byte) []byte {
@@ -245,8 +271,13 @@ func TestDualDedupEndToEnd(t *testing.T) {
 	inner := buildInnerPacket(t, client.innerIP, netip.MustParseAddr("8.8.8.8"), 1)
 	framed := protocol.AppendDualTrailer(inner, 1, client.groupHash)
 	client.send(t, framed)
-	client.send(t, framed)
 	expectForwarded(t, forwarded, inner)
+
+	// The relay reports progress so the client knows seq 1 needs no
+	// retransmission; this is the Phase 2 ARQ groundwork.
+	client.expectAck(t, 1)
+
+	client.send(t, framed)
 	expectNoForwarded(t, forwarded, "duplicate copy")
 
 	sess := activeSession(t, srv)

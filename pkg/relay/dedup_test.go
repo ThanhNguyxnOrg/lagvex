@@ -119,6 +119,40 @@ func TestDualDedupSweepExpiresGroups(t *testing.T) {
 	}
 }
 
+func TestDualAckRateLimitPerSession(t *testing.T) {
+	now := time.Unix(1_700_000_100, 0)
+	sess := &Session{}
+
+	if _, ok := sess.TakeDualAck(now); ok {
+		t.Fatal("no ACK before the first forwarded dual frame")
+	}
+
+	sess.RecordDualForwarded(5)
+	highest, ok := sess.TakeDualAck(now)
+	if !ok || highest != 5 {
+		t.Fatalf("first ack = %d/%v, want 5/true", highest, ok)
+	}
+
+	// Within the interval: no ACK.
+	sess.RecordDualForwarded(9)
+	if _, ok := sess.TakeDualAck(now.Add(dualAckInterval / 2)); ok {
+		t.Fatal("ACK must be rate limited")
+	}
+
+	// After the interval the highest sequence is reported.
+	highest, ok = sess.TakeDualAck(now.Add(dualAckInterval + time.Millisecond))
+	if !ok || highest != 9 {
+		t.Fatalf("second ack = %d/%v, want 9/true", highest, ok)
+	}
+
+	// Lower sequences never move the high-water mark.
+	sess.RecordDualForwarded(7)
+	highest, _ = sess.TakeDualAck(now.Add(3 * dualAckInterval))
+	if highest != 9 {
+		t.Fatalf("ack after stale frame = %d, want 9", highest)
+	}
+}
+
 func TestDualDedupStatsSnapshot(t *testing.T) {
 	reg, _ := newTestRegistry()
 	reg.touch(0x66666666)
