@@ -331,3 +331,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - check listener close error in TCP ping test ([9926ccc](https://github.com/ThanhNguyxnOrg/lagvex/commit/9926ccc04b127ddadc81f98ce2a0315e4b7c54fa))
 
+## [1.8.0] - 2026-11-17
+
+### Features
+
+- dual-path dedup readiness (Redundant-lite Phase 1) ([3b54e8e](https://github.com/ThanhNguyxnOrg/lagvex/commit/3b54e8ecde73fa8841e95638b4cb17e4699aede0))
+
