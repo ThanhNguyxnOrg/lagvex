@@ -456,6 +456,11 @@ export type RelayNode = {
   unstable: boolean;
   /** Optional ICMP echo RTT to the relay host (0 = not measured). */
   icmpRttMs: number;
+  /** Measurement technique behind pingMs ("tunnel-udp" = the relay's
+   *  authenticated UDP handshake + ping/pong, the same path game traffic uses). */
+  probeMethod: string;
+  /** Local source address the probe socket was bound to ("" = OS-chosen). */
+  sourceAddress: string;
 };
 
 export type DualPathStatus = {
@@ -628,7 +633,9 @@ const EMPTY_RELAY: RelayNode = {
   isOptimal: false,
   recent: false,
   unstable: false,
-  icmpRttMs: 0
+  icmpRttMs: 0,
+  probeMethod: "",
+  sourceAddress: ""
 };
 
 function mapProbeRelays(data: unknown): RelayNode[] {
@@ -671,9 +678,28 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         isOptimal: item.isOptimal === true,
         recent: item.recent === true,
         unstable: item.unstable === true,
-        icmpRttMs: typeof item.icmpRttMs === "number" ? item.icmpRttMs : 0
+        icmpRttMs: typeof item.icmpRttMs === "number" ? item.icmpRttMs : 0,
+        probeMethod: typeof item.probeMethod === "string" ? item.probeMethod : "",
+        sourceAddress: typeof item.sourceAddress === "string" ? item.sourceAddress : ""
       };
     });
+}
+
+/** Relative age of the last measured probe, or a dash when never probed. */
+/** Short tag for the measurement technique behind a node's RTT value. */
+function probeMethodShort(method: string): string {
+  switch (method) {
+    case "tunnel-udp":
+      return "TUN";
+    case "icmp-echo":
+      return "ICMP";
+    case "tcp-connect":
+      return "TCP";
+    case "udp-echo":
+      return "UDP";
+    default:
+      return "";
+  }
 }
 
 /** Relative age of the last measured probe, or a dash when never probed. */
@@ -4060,6 +4086,16 @@ export default function App() {
                                 : "—"}
                           </span>
                         </div>
+                        {relay.reachable && relay.pingMs > 0 && probeMethodShort(relay.probeMethod) && (
+                          <span
+                            className={`shrink-0 text-[9px] font-brand font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${relay.probeMethod === "tunnel-udp" ? "bg-[#00F0FF]/10 text-[#00F0FF]/80" : "bg-white/[0.06] text-white/50"}`}
+                            title={relay.probeMethod === "tunnel-udp"
+                              ? "Measured over the relay's authenticated UDP handshake + ping/pong — the same path game traffic takes"
+                              : "Measured by the local prober"}
+                          >
+                            {probeMethodShort(relay.probeMethod)}
+                          </span>
+                        )}
                         <span className={`shrink-0 font-mono font-black text-xl whitespace-nowrap w-[86px] text-right ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
                           {relay.reachable && relay.pingMs > 0 ? `${relay.pingMs} ms` : "—"}
                         </span>
@@ -4101,8 +4137,16 @@ export default function App() {
                       </div>
 
                       {/* Row 3 (measured extras, only when present) */}
-                      {(relay.icmpRttMs > 0 || relay.totalEstimateMs > 0) && (
+                      {(relay.icmpRttMs > 0 || relay.totalEstimateMs > 0 || relay.sourceAddress) && (
                         <div className="flex items-center gap-3 pl-[58px] text-[9px] font-mono">
+                          {relay.sourceAddress && (
+                            <span
+                              className="text-white/30"
+                              title="Local source address the probe socket was bound to (route-selected on multi-homed machines)"
+                            >
+                              src {relay.sourceAddress}
+                            </span>
+                          )}
                           {relay.icmpRttMs > 0 && (
                             <span
                               className="text-white/40"

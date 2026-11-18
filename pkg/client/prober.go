@@ -57,6 +57,17 @@ type ProbeResult struct {
 	ICMPRTTMs   float64 `json:"icmpRttMs,omitempty"`
 	ICMPLossPct float64 `json:"icmpLossPct,omitempty"`
 
+	// ProbeMethod names the measurement that produced the primary RTT
+	// ("tunnel-udp" = authenticated UDP handshake + ping/pong, the same path
+	// game traffic takes). The dashboard labels values with it so a number is
+	// never mistaken for a different measurement technique.
+	ProbeMethod string `json:"probeMethod,omitempty"`
+
+	// SourceAddress is the local address the probe socket was bound to when
+	// the routed source could be pinned (multi-homed machines). Absent means
+	// the operating system chose the source address.
+	SourceAddress string `json:"sourceAddress,omitempty"`
+
 	// Unstable is derived from retained history: high average loss or a large
 	// RTT spread across at least three probe runs.
 	Unstable bool `json:"unstable,omitempty"`
@@ -65,6 +76,65 @@ type ProbeResult struct {
 // anchorProbeTimeout bounds the wait for a relay anchor-probe reply during a
 // sweep. The relay itself dials two TCP samples with 1.5s timeouts each.
 const anchorProbeTimeout = 3500 * time.Millisecond
+
+// Probe method labels: they name the technique behind an RTT value so the
+// dashboard never implies a number was measured a different way.
+const (
+	ProbeMethodTunnelUDP  = "tunnel-udp"
+	ProbeMethodUDPEcho    = "udp-echo"
+	ProbeMethodICMPEcho   = "icmp-echo"
+	ProbeMethodTCPConnect = "tcp-connect"
+)
+
+// probeSampleTimeoutCeil caps the adaptive probe timeout so a relay that has
+// gone dark cannot stall a whole sweep.
+const probeSampleTimeoutCeil = 3 * time.Second
+
+// routedLocalUDPAddr returns the local UDP address the OS routes to target.
+// The socket is only connected, never written to, so no packet leaves the
+// machine. Both shipped competitors bind their probe sockets this way: GearUP
+// picks the source with GetBestInterface/GetIpAddrTable, ExitLag keeps a
+// bridge->local-endpoint cache — both so a measurement leaves through the same
+// interface the real traffic would use on multi-homed machines.
+func routedLocalUDPAddr(target *net.UDPAddr) (*net.UDPAddr, error) {
+	conn, err := net.DialUDP("udp4", nil, target)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close() }()
+	local, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return nil, fmt.Errorf("unexpected local address type %T", conn.LocalAddr())
+	}
+	return local, nil
+}
+
+// adaptiveSampleTimeout widens the per-sample timeout for endpoints whose last
+// measured RTT is slower than the configured base. It never shrinks below the
+// configured value and never exceeds probeSampleTimeoutCeil. GearUP does the
+// same with its adjust_timeout knob, so a slow but healthy relay is not scored
+// as loss.
+func (p *Prober) adaptiveSampleTimeout(endpoint string) time.Duration {
+	base := p.cfg.SampleTimeout
+	p.histMu.Lock()
+	entries := p.history[endpoint]
+	p.histMu.Unlock()
+	if len(entries) == 0 {
+		return base
+	}
+	last := entries[len(entries)-1]
+	if !last.Reached || last.RTTMs <= 0 {
+		return base
+	}
+	scaled := time.Duration(last.RTTMs * 3 * float64(time.Millisecond))
+	if scaled <= base {
+		return base
+	}
+	if scaled > probeSampleTimeoutCeil {
+		return probeSampleTimeoutCeil
+	}
+	return scaled
+}
 
 // probeHistoryEntry is one completed probe run for an endpoint.
 type probeHistoryEntry struct {
@@ -176,12 +246,28 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 		return result
 	}
 
-	conn, err := net.ListenUDP("udp4", nil)
+	// Pin the probe socket to the routed local address (see
+	// routedLocalUDPAddr) and fall back to an OS-chosen source if that address
+	// disappears between the route lookup and the bind.
+	var bindAddr *net.UDPAddr
+	if local, bindErr := routedLocalUDPAddr(udpAddr); bindErr == nil {
+		bindAddr = local
+	}
+	conn, err := net.ListenUDP("udp4", bindAddr)
+	if err != nil && bindAddr != nil {
+		bindAddr = nil
+		conn, err = net.ListenUDP("udp4", nil)
+	}
 	if err != nil {
 		result.Error = fmt.Sprintf("udp listen failed: %v", err)
 		return result
 	}
 	defer func() { _ = conn.Close() }()
+
+	result.ProbeMethod = ProbeMethodTunnelUDP
+	if bindAddr != nil && bindAddr.IP != nil {
+		result.SourceAddress = bindAddr.IP.String()
+	}
 
 	if relay.PSK == "" {
 		result.Error = "relay PSK is required"
@@ -202,7 +288,9 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 	}
 	reqBuf := protocol.EncodeHandshakeRequest(psk, handshakeReq)
 
-	deadline := time.Now().Add(p.cfg.SampleTimeout)
+	// Scale the per-sample timeout with the endpoint's last measured RTT.
+	sampleTimeout := p.adaptiveSampleTimeout(relay.Endpoint)
+	deadline := time.Now().Add(sampleTimeout)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}
@@ -261,7 +349,7 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 			pingTs := uint64(time.Now().UnixNano())
 			pingPacket := sessCrypto.EncodePing(pingBuf, resp.SessionID, pingTs)
 
-			sDeadline := time.Now().Add(p.cfg.SampleTimeout)
+			sDeadline := time.Now().Add(sampleTimeout)
 			if d, ok := ctx.Deadline(); ok && d.Before(sDeadline) {
 				sDeadline = d
 			}

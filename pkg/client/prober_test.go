@@ -12,6 +12,99 @@ import (
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/protocol"
 )
 
+func TestRoutedLocalUDPAddr(t *testing.T) {
+	// The helper only connects a throwaway datagram socket: no packet is sent.
+	local, err := routedLocalUDPAddr(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1})
+	if err != nil {
+		t.Fatalf("routedLocalUDPAddr loopback: %v", err)
+	}
+	if local == nil || local.IP == nil || !local.IP.IsLoopback() {
+		t.Fatalf("routedLocalUDPAddr loopback = %+v; want a loopback source address", local)
+	}
+
+	if _, err := routedLocalUDPAddr(nil); err == nil {
+		t.Fatal("routedLocalUDPAddr(nil) should fail, got nil error")
+	}
+}
+
+func TestAdaptiveSampleTimeout(t *testing.T) {
+	p := NewProber() // base SampleTimeout 800ms
+	const endpoint = "127.0.0.1:4433"
+
+	// finishProbe creates the history map lazily; seed it here.
+	p.histMu.Lock()
+	p.history = make(map[string][]probeHistoryEntry)
+	p.histMu.Unlock()
+
+	if got := p.adaptiveSampleTimeout(endpoint); got != p.cfg.SampleTimeout {
+		t.Fatalf("no history: adaptiveSampleTimeout = %v; want base %v", got, p.cfg.SampleTimeout)
+	}
+
+	p.histMu.Lock()
+	p.history[endpoint] = []probeHistoryEntry{
+		{RTTMs: 200, Reached: true},
+		{RTTMs: 220, Reached: true},
+	}
+	p.histMu.Unlock()
+
+	// 3x the last measured RTT (220ms) = 660ms, still below the base.
+	if got := p.adaptiveSampleTimeout(endpoint); got != p.cfg.SampleTimeout {
+		t.Fatalf("slow-ish history: adaptiveSampleTimeout = %v; want base %v", got, p.cfg.SampleTimeout)
+	}
+
+	p.histMu.Lock()
+	p.history[endpoint] = []probeHistoryEntry{
+		{RTTMs: 900, Reached: true},
+	}
+	p.histMu.Unlock()
+	// 3x 900ms = 2.7s: widened, but within the ceiling.
+	if got := p.adaptiveSampleTimeout(endpoint); got != 2700*time.Millisecond {
+		t.Fatalf("slow history: adaptiveSampleTimeout = %v; want 2.7s", got)
+	}
+
+	p.histMu.Lock()
+	p.history[endpoint] = []probeHistoryEntry{
+		{RTTMs: 4000, Reached: true},
+	}
+	p.histMu.Unlock()
+	if got := p.adaptiveSampleTimeout(endpoint); got != probeSampleTimeoutCeil {
+		t.Fatalf("very slow history: adaptiveSampleTimeout = %v; want ceiling %v", got, probeSampleTimeoutCeil)
+	}
+
+	p.histMu.Lock()
+	p.history[endpoint] = []probeHistoryEntry{
+		{RTTMs: 4000, Reached: false},
+	}
+	p.histMu.Unlock()
+	if got := p.adaptiveSampleTimeout(endpoint); got != p.cfg.SampleTimeout {
+		t.Fatalf("unreachable history: adaptiveSampleTimeout = %v; want base %v", got, p.cfg.SampleTimeout)
+	}
+}
+
+func TestProbeResultCarriesMethodAndSource(t *testing.T) {
+	// The probe never reaches a relay here; it must still report the method
+	// it used and the local source address it bound.
+	cfg := DefaultProberConfig()
+	cfg.ICMPProbe = false
+	cfg.SampleTimeout = 150 * time.Millisecond
+	relay := profiles.RelayEndpoint{
+		ID:       "local",
+		Name:     "Local",
+		Endpoint: "127.0.0.1:1",
+		PSK:      "test-psk-0123456789abcdef",
+	}
+	result := NewProberWithConfig(cfg).ProbeEndpoint(context.Background(), relay, 1)
+	if result.Error == "" {
+		t.Fatal("probing a closed port should set an error")
+	}
+	if result.ProbeMethod != ProbeMethodTunnelUDP {
+		t.Fatalf("ProbeMethod = %q; want %q", result.ProbeMethod, ProbeMethodTunnelUDP)
+	}
+	if result.SourceAddress == "" || net.ParseIP(result.SourceAddress) == nil {
+		t.Fatalf("SourceAddress = %q; want an IP literal", result.SourceAddress)
+	}
+}
+
 func TestCalculateMedian(t *testing.T) {
 	tests := []struct {
 		input    []float64
