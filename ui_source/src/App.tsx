@@ -4006,7 +4006,7 @@ export default function App() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {sortedRelays.map((relay) => {
                   const originalIdx = relays.findIndex((r) => r.id === relay.id);
                   const isSelected = selectedRelayIdx === originalIdx;
@@ -4017,13 +4017,14 @@ export default function App() {
                         if (originalIdx >= 0) setSelectedRelayIdx(originalIdx);
                         notify(`Switched primary routing node to: ${relay.cleanName}`);
                       }}
-                      className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                      className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col gap-2.5 ${
                         isSelected
                           ? "bg-[#00F0FF]/10 border-[#00F0FF] shadow-[0_0_20px_rgba(0,240,255,0.15)]"
                           : "bg-[#0a0f16] hover:bg-[#0f1622] border-[#1b2636]"
                       }`}
                     >
-                      <div className="flex items-center gap-4">
+                      {/* Row 1: identity + measured RTT (GearUP two-row pattern) */}
+                      <div className="flex items-center gap-3.5 min-w-0">
                         <span
                           className={`w-11 h-11 shrink-0 rounded-xl border flex items-center justify-center font-mono font-black text-xs ${
                             relay.reachable
@@ -4033,88 +4034,90 @@ export default function App() {
                         >
                           {relay.flag}
                         </span>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-brand font-bold text-sm text-white truncate" title={relay.cleanName}>{relay.cleanName}</h3>
-                            {isSelected && (
-                              <span className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#00F0FF]/20 text-[#00F0FF]">
-                                ACTIVE
-                              </span>
-                            )}
-                            {!isSelected && relay.isOptimal && relay.reachable && (
-                              <span
-                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#10b981]/20 text-[#10b981]"
-                                title="Top-ranked by the last measured sweep"
-                              >
-                                BEST ROUTE
-                              </span>
-                            )}
-                            {relay.recent && (
-                              <span
-                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-white/[0.08] text-white/60"
-                                title="You connected through this relay recently"
-                              >
-                                RECENT
-                              </span>
-                            )}
-                            {relay.unstable && (
-                              <span
-                                className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#f59e0b]/20 text-[#f59e0b]"
-                                title="Retained probe history shows high loss or a large RTT spread"
-                              >
-                                UNSTABLE
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-white/40 font-mono mt-0.5">{relay.location || "No location set"}</p>
-                          <p className="text-[10px] text-white/30 font-mono mt-1">{relay.address}</p>
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          <h3 className="font-brand font-bold text-sm text-white truncate" title={relay.cleanName}>{relay.cleanName}</h3>
+                          {isSelected && (
+                            <span className="shrink-0 text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#00F0FF]/20 text-[#00F0FF]">
+                              ACTIVE
+                            </span>
+                          )}
+                          {!isSelected && relay.isOptimal && relay.reachable && (
+                            <span
+                              className="shrink-0 text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#10b981]/20 text-[#10b981]"
+                              title="Top-ranked by the last measured sweep"
+                            >
+                              BEST
+                            </span>
+                          )}
                         </div>
+                        <div className="shrink-0 flex flex-col items-end">
+                          <RttSparkline samples={relay.rttTrend} width={96} />
+                          <span className="text-[9px] font-mono text-white/40 whitespace-nowrap">
+                            {relay.historySamples > 1 && relay.rttAvgMs > 0
+                              ? `avg ${relay.rttAvgMs} ±${relay.rttStdMs}`
+                              : relay.historySamples === 1
+                                ? "1 sample"
+                                : "—"}
+                          </span>
+                        </div>
+                        <span className={`shrink-0 font-mono font-black text-xl whitespace-nowrap w-[86px] text-right ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
+                          {relay.reachable && relay.pingMs > 0 ? `${relay.pingMs} ms` : "—"}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-5">
-                        <div className="flex flex-col items-end gap-1 w-[132px] shrink-0">
-                          <span className={`font-mono font-black text-xl whitespace-nowrap ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
-                            {relay.reachable && relay.pingMs > 0 ? `${relay.pingMs} ms` : "—"}
+                      {/* Row 2: where it is + measured loss/probe age */}
+                      <div className="flex items-center gap-3 min-w-0 pl-[58px]">
+                        <span className="min-w-0 flex-1 text-[10px] font-mono text-white/35 truncate" title={`${relay.location || "No location set"} • ${relay.address}`}>
+                          {relay.location || "No location set"}
+                          <span className="text-white/20"> • </span>
+                          {relay.address}
+                        </span>
+                        {relay.recent && (
+                          <span
+                            className="shrink-0 text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-white/[0.08] text-white/60"
+                            title="You connected through this relay recently"
+                          >
+                            RECENT
                           </span>
-                          <span className={`text-[10px] font-semibold ${relay.reachable ? "text-[#10b981]" : "text-[#ef4444]"}`}>
-                            {relay.reachable
-                              ? `Loss: ${relay.packetLoss.toFixed(1)}%${relay.historySamples > 1 && relay.lossAvgPct > 0 ? ` (avg ${relay.lossAvgPct.toFixed(1)}%)` : ""}`
-                              : "Unreachable"}
+                        )}
+                        {relay.unstable && (
+                          <span
+                            className="shrink-0 text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#f59e0b]/20 text-[#f59e0b]"
+                            title="Retained probe history shows high loss or a large RTT spread"
+                          >
+                            UNSTABLE
                           </span>
-                          <span className="text-[9px] font-mono text-white/35">
-                            {relay.historySamples > 0 ? `${relay.historySamples} probe${relay.historySamples === 1 ? "" : "s"} kept` : "No probe history yet"}
-                            {" · "}
-                            {formatProbeAge(relay.lastProbeAt)}
-                          </span>
+                        )}
+                        <span className={`shrink-0 text-[10px] font-semibold whitespace-nowrap ${relay.reachable ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+                          {relay.reachable
+                            ? `Loss ${relay.packetLoss.toFixed(1)}%`
+                            : "Unreachable"}
+                        </span>
+                        <span className="shrink-0 text-[9px] font-mono text-white/35 whitespace-nowrap">
+                          {relay.historySamples > 0
+                            ? `${relay.historySamples} probes · ${formatProbeAge(relay.lastProbeAt)}`
+                            : formatProbeAge(relay.lastProbeAt)}
+                        </span>
+                      </div>
+
+                      {/* Row 3 (measured extras, only when present) */}
+                      {(relay.icmpRttMs > 0 || relay.totalEstimateMs > 0) && (
+                        <div className="flex items-center gap-3 pl-[58px] text-[9px] font-mono">
                           {relay.icmpRttMs > 0 && (
                             <span
-                              className="text-[9px] font-mono text-white/40"
+                              className="text-white/40"
                               title="ICMP echo measured locally, when the OS allows unprivileged ICMP"
                             >
                               ICMP {relay.icmpRttMs} ms
                             </span>
                           )}
                           {relay.totalEstimateMs > 0 && (
-                            <span className="text-[9px] font-mono text-[#10b981]">
+                            <span className="text-[#10b981]">
                               via relay: {relay.totalEstimateMs} ms total (relay → region {relay.relayAnchorRttMs} ms)
                             </span>
                           )}
                         </div>
-
-                        <div className="flex flex-col items-end gap-1 w-[110px]">
-                          <span className="text-[9px] font-brand font-bold text-white/30 uppercase tracking-wider">
-                            RTT history
-                          </span>
-                          <RttSparkline samples={relay.rttTrend} />
-                          <span className="text-[9px] font-mono text-white/40">
-                            {relay.historySamples > 1 && relay.rttAvgMs > 0
-                              ? `avg ${relay.rttAvgMs} ms \u00b1${relay.rttStdMs}`
-                              : relay.historySamples === 1
-                                ? "1 sample"
-                                : "\u2014"}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
