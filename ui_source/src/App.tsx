@@ -2188,7 +2188,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b10] text-[#E0E6ED] font-sans antialiased selection:bg-[#00F0FF]/30 selection:text-white flex relative overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--lx-bg)] text-[#E0E6ED] font-sans antialiased selection:bg-[#00F0FF]/30 selection:text-white flex relative overflow-x-hidden">
       {/* Dynamic Cyber Glow in Background */}
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(0,240,255,0.06),rgba(255,255,255,0))]" />
 
@@ -2553,7 +2553,7 @@ export default function App() {
               className="h-[38px] pl-3 pr-3.5 rounded-xl bg-[#101722] hover:bg-[#162130] border border-[#1f2b3b] hover:border-[#00F0FF]/50 flex items-center gap-2.5 cursor-pointer transition-all shadow group"
               title="Click to change your Gamer Nickname"
             >
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-[#00F0FF] to-[#7E42FF] flex items-center justify-center text-[10px] font-brand font-extrabold text-black">
+              <div className="w-6 h-6 rounded-lg bg-[#00F0FF] flex items-center justify-center text-[10px] font-brand font-extrabold text-black">
                 {gamerNickname.charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col">
@@ -3024,7 +3024,7 @@ export default function App() {
                       <div className="w-11 h-11 rounded-xl bg-[#111925] border border-[#00F0FF]/40 flex items-center justify-center shadow-lg shadow-[#00F0FF]/15">
                         <span className="font-mono font-black text-xs text-[#00F0FF]">{selectedRelay.flag}</span>
                       </div>
-                      <span className="text-[11px] font-brand font-bold text-white">{selectedRelay.cleanName}</span>
+                      <span className="text-[11px] font-brand font-bold text-white truncate max-w-[180px]" title={selectedRelay.cleanName}>{selectedRelay.cleanName}</span>
                       <span className="text-[9px] font-mono text-[#00F0FF]">Relay Node</span>
                     </div>
 
@@ -3292,7 +3292,7 @@ export default function App() {
                       <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex flex-col">
-                            <span className="text-[10px] font-brand font-bold text-[#7E42FF] uppercase tracking-wider">
+                            <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
                               DUAL PATH REDUNDANCY (EXPERIMENTAL)
                             </span>
                             <span className="text-[10px] text-white/40">
@@ -3305,7 +3305,7 @@ export default function App() {
                             onClick={() => void handleToggleDualPath()}
                             className={`h-[34px] px-4 rounded-xl text-[10px] font-brand font-bold cursor-pointer border-none transition-all shrink-0 ${
                               dualPath?.enabled
-                                ? "bg-[#7E42FF] text-white shadow-md shadow-[#7E42FF]/20"
+                                ? "bg-[#00F0FF] text-black shadow-md shadow-[#00F0FF]/20"
                                 : "bg-white/[0.08] text-white/60 hover:bg-white/15"
                             }`}
                           >
@@ -3520,7 +3520,7 @@ export default function App() {
                                     className={`text-[9px] font-brand font-bold px-1.5 py-0.5 rounded ${
                                       conn.protocol === "udp"
                                         ? "bg-[#00F0FF]/15 text-[#00F0FF]"
-                                        : "bg-[#7E42FF]/15 text-[#a78bfa]"
+                                        : "bg-white/10 text-white/70"
                                     }`}
                                   >
                                     {conn.protocol.toUpperCase()}
@@ -3847,7 +3847,7 @@ export default function App() {
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#00F0FF]/20 to-[#7E42FF]/20 border border-[#00F0FF]/30 flex items-center justify-center font-brand font-bold text-xs text-[#00F0FF]">
+                            <div className="w-9 h-9 rounded-xl bg-[#00F0FF]/15 border border-[#00F0FF]/30 flex items-center justify-center font-brand font-bold text-xs text-[#00F0FF]">
                               {member.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
@@ -4035,7 +4035,7 @@ export default function App() {
                         </span>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-brand font-bold text-sm text-white">{relay.cleanName}</h3>
+                            <h3 className="font-brand font-bold text-sm text-white truncate" title={relay.cleanName}>{relay.cleanName}</h3>
                             {isSelected && (
                               <span className="text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#00F0FF]/20 text-[#00F0FF]">
                                 ACTIVE

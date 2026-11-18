@@ -1,15 +1,60 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens (Design System v2), informed by static analysis of the
+ * competitor clients:
+ * - GearUP DuiLib XML (gearup_skin/v40): white primary text, muted
+ *   lavender-gray secondary, deep navy panels, ONE interactive accent
+ *   family with normal/hot/pushed states, teal reserved for measured
+ *   numbers, 8px corner on inner elements.
+ * - ExitLag strings palette: neutral gray text on near-black, a single
+ *   green accent, semantic red only for errors.
+ * Lagvex keeps its cyan identity as the single interactive accent and
+ * restricts other hues to semantic roles.
+ */
+:root {
+  /* Surfaces: deep navy family instead of pure black (GearUP #0A1A43 family,
+     darkened for OLED-style contrast). */
+  --lx-bg: #060a12;
+  --lx-panel: #0b1120;
+  --lx-panel-2: #0e1626;
+  --lx-border: #1b2740;
+  --lx-border-strong: #24375c;
+
+  /* Text */
+  --lx-text: #eef2f9;
+  --lx-text-2: #b9c2d4; /* GearUP #FFBCC0D4 equivalent */
+  --lx-text-3: #7d88a0;
+
+  /* One interactive accent (normal / hot / pushed), GearUP 3-state pattern */
+  --lx-accent: #00F0FF;
+  --lx-accent-hot: #4df5ff;
+  --lx-accent-pushed: #00c4d6;
+
+  /* Data highlight (measured numbers only) */
+  --lx-data: #17e1ea;
+  /* Semantic */
+  --lx-ok: #22e5a0;
+  --lx-warn: #f5b93c;
+  --lx-err: #f55252;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
   }
   body {
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #0a0d13;
-    color: #edf2f7;
+    background-color: var(--lx-bg);
+    color: var(--lx-text);
     margin: 0;
     padding: 0;
+  }
+  button {
+    transition: transform 80ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  }
+  button:active:not(:disabled) {
+    transform: translateY(0.5px) scale(0.995); /* GearUP "pushed" state feel */
   }
 }
 
