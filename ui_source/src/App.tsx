@@ -4072,8 +4072,8 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-5">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`font-mono font-black text-xl ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
+                        <div className="flex flex-col items-end gap-1 w-[132px] shrink-0">
+                          <span className={`font-mono font-black text-xl whitespace-nowrap ${relay.reachable ? "text-[#00F0FF]" : "text-white/30"}`}>
                             {relay.reachable && relay.pingMs > 0 ? `${relay.pingMs} ms` : "—"}
                           </span>
                           <span className={`text-[10px] font-semibold ${relay.reachable ? "text-[#10b981]" : "text-[#ef4444]"}`}>
