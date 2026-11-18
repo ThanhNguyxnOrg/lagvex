@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,5 +104,48 @@ func TestAddRecentRelay(t *testing.T) {
 	cs.AddRecentRelay("   ")
 	if got := cs.Get().RecentRelays; len(got) != 3 {
 		t.Fatalf("empty input must not change the list: %v", got)
+	}
+}
+
+func TestRecordGameServer(t *testing.T) {
+	tempDir := t.TempDir()
+	cs := NewConfigStore(filepath.Join(tempDir, "user_config.json"))
+
+	// A measurement without a positive RTT is never recorded: failed probes
+	// must not fabricate history.
+	cs.RecordGameServer("valorant", GameServerRecord{Host: "1.2.3.4", Port: 443, AvgMs: 0})
+	if got := cs.GameServersFor("valorant"); len(got) != 0 {
+		t.Fatalf("avgMs<=0 must be rejected, got %v", got)
+	}
+
+	for i := 0; i < gameServerHistoryCap+2; i++ {
+		cs.RecordGameServer("valorant", GameServerRecord{
+			Host:    fmt.Sprintf("10.0.0.%d", i),
+			Port:    443,
+			AvgMs:   float64(20 + i),
+			Samples: 2,
+		})
+	}
+	got := cs.GameServersFor("valorant")
+	if len(got) != gameServerHistoryCap {
+		t.Fatalf("history cap = %d entries, want %d", len(got), gameServerHistoryCap)
+	}
+	if got[0].Host != "10.0.0.9" {
+		t.Fatalf("most recent entry should be first, got %s", got[0].Host)
+	}
+
+	// Re-measuring the same host moves it to the front and refreshes the RTT.
+	cs.RecordGameServer("valorant", GameServerRecord{Host: "10.0.0.2", Port: 443, AvgMs: 55, Samples: 2})
+	got = cs.GameServersFor("valorant")
+	if got[0].Host != "10.0.0.2" || got[0].AvgMs != 55 {
+		t.Fatalf("upsert failed: %+v", got[0])
+	}
+	if len(got) != gameServerHistoryCap {
+		t.Fatalf("upsert must not grow the list: %d entries", len(got))
+	}
+
+	// Other games are unaffected.
+	if got := cs.GameServersFor("cs2"); len(got) != 0 {
+		t.Fatalf("unrelated game history should be empty, got %v", got)
 	}
 }

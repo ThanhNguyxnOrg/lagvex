@@ -6,20 +6,37 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
 )
 
 // UserConfig represents the persistent settings and custom entries of the gamer.
 type UserConfig struct {
-	Nickname          string                    `json:"nickname"`
-	LastSelectedGame  string                    `json:"lastSelectedGame"`
-	LastSelectedRelay string                    `json:"lastSelectedRelay"`
-	CustomGames       []profiles.GameDefinition `json:"customGames"`
-	CustomRelays      []profiles.RelayEndpoint  `json:"customRelays"`
-	Tweaks            map[string]bool           `json:"tweaks"`
-	RecentRelays      []string                  `json:"recentRelays,omitempty"`
+	Nickname          string                        `json:"nickname"`
+	LastSelectedGame  string                        `json:"lastSelectedGame"`
+	LastSelectedRelay string                        `json:"lastSelectedRelay"`
+	CustomGames       []profiles.GameDefinition     `json:"customGames"`
+	CustomRelays      []profiles.RelayEndpoint      `json:"customRelays"`
+	Tweaks            map[string]bool               `json:"tweaks"`
+	RecentRelays      []string                      `json:"recentRelays,omitempty"`
+	GameServers       map[string][]GameServerRecord `json:"gameServers,omitempty"`
 }
+
+// GameServerRecord remembers one measured game-server endpoint (GearUP keeps a
+// per-game server history so a returning player sees the endpoints their
+// sessions actually used, with the last measured RTT next to them).
+type GameServerRecord struct {
+	Host     string    `json:"host"`
+	Port     int       `json:"port"`
+	AvgMs    float64   `json:"avgMs"`
+	LossPct  float64   `json:"lossPct"`
+	Samples  int       `json:"samples"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
+// gameServerHistoryCap bounds the retained endpoints per game.
+const gameServerHistoryCap = 8
 
 // ConfigStore manages reading and writing UserConfig to disk atomically.
 type ConfigStore struct {
@@ -185,4 +202,56 @@ func (cs *ConfigStore) SetTweaks(tweaks map[string]bool) {
 	}
 	cs.mu.Unlock()
 	_ = cs.Save()
+}
+
+// RecordGameServer stores one measured game-server endpoint for a game, most
+// recent first, capped per game. Only real measurements belong here: callers
+// must pass a positive AvgMs, so a failed probe can never fabricate history.
+func (cs *ConfigStore) RecordGameServer(gameID string, rec GameServerRecord) {
+	gameID = strings.TrimSpace(gameID)
+	rec.Host = strings.TrimSpace(rec.Host)
+	if gameID == "" || rec.Host == "" || rec.AvgMs <= 0 {
+		return
+	}
+
+	cs.mu.Lock()
+	if cs.config.GameServers == nil {
+		cs.config.GameServers = make(map[string][]GameServerRecord)
+	}
+	if rec.LastSeen.IsZero() {
+		rec.LastSeen = time.Now().UTC()
+	}
+	if rec.Port <= 0 || rec.Port > 65535 {
+		rec.Port = 443
+	}
+	if rec.Samples <= 0 {
+		rec.Samples = 1
+	}
+	list := make([]GameServerRecord, 0, gameServerHistoryCap)
+	list = append(list, rec)
+	for _, existing := range cs.config.GameServers[gameID] {
+		if strings.EqualFold(existing.Host, rec.Host) && existing.Port == rec.Port {
+			continue
+		}
+		if len(list) >= gameServerHistoryCap {
+			break
+		}
+		list = append(list, existing)
+	}
+	cs.config.GameServers[gameID] = list
+	cs.mu.Unlock()
+	_ = cs.Save()
+}
+
+// GameServersFor returns a copy of the persisted game-server history for a game.
+func (cs *ConfigStore) GameServersFor(gameID string) []GameServerRecord {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	list := cs.config.GameServers[gameID]
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]GameServerRecord, len(list))
+	copy(out, list)
+	return out
 }

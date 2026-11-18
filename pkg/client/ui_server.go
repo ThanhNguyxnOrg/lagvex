@@ -122,6 +122,7 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/shutdown", u.handleShutdown)
 	mux.HandleFunc("/api/diagnose-network", u.handleNetworkDiagnostics)
 	mux.HandleFunc("/api/tcping", u.handleTCPPing)
+	mux.HandleFunc("/api/game-server-history", u.handleGameServerHistory)
 	mux.HandleFunc("/api/diagnose-bufferbloat", u.handleDiagnoseBufferbloat)
 	mux.HandleFunc("/api/diagnostics/export", u.handleDiagnosticsExport)
 	mux.HandleFunc("/api/diagnostics/import", u.handleDiagnosticsImport)
@@ -1315,9 +1316,13 @@ var telemetryAnchors = []telemetryAnchor{
 	{"au", "Sydney", 6, []string{"sydney", "oceania", "oc-"}},
 	{"us-east", "US East", 7, []string{"us-east", "virginia", "chicago", "na-us-east", "na-chicago"}},
 	{"us-west", "US West", 8, []string{"us-west", "california", "na-us-west"}},
-	{"eu", "Frankfurt", 9, []string{"frankfurt", "london", "stockholm", "europe", "eu-"}},
+	{"eu", "Frankfurt", 9, []string{"frankfurt", "stockholm", "europe", "eu-"}},
 	{"sa", "Sao Paulo", 10, []string{"sao paulo", "são paulo", "brazil", "south america", "sa-"}},
 	{"af", "Johannesburg", 11, []string{"johannesburg", "africa", "af-"}},
+	{"eu-west", "Paris", 12, []string{"paris", "france", "eu-west"}},
+	{"uk", "London", 13, []string{"london", "england", "united kingdom"}},
+	{"me", "Middle East", 14, []string{"bahrain", "middle east", "dubai", "uae", "me-"}},
+	{"jp-west", "Osaka", 15, []string{"osaka", "japan-west", "kansai"}},
 }
 
 // anchorTarget resolves the allowlisted probe target for an anchor.

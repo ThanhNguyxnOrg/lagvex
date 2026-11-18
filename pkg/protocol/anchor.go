@@ -17,6 +17,10 @@ var AnchorProbeTargets = map[byte]string{
 	9:  "ec2.eu-central-1.amazonaws.com:443",   // Frankfurt
 	10: "ec2.sa-east-1.amazonaws.com:443",      // São Paulo
 	11: "ec2.af-south-1.amazonaws.com:443",     // Cape Town
+	12: "ec2.eu-west-3.amazonaws.com:443",      // Paris
+	13: "ec2.eu-west-2.amazonaws.com:443",      // London
+	14: "ec2.me-south-1.amazonaws.com:443",     // Bahrain
+	15: "ec2.ap-northeast-3.amazonaws.com:443", // Osaka
 }
 
 // EncodeAnchorProbeRequest packs a sequence number and an allowlisted anchor

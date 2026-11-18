@@ -510,6 +510,16 @@ export type ServerProbe = {
   note: string;
 };
 
+/** Persisted, measured game-server endpoint (GearUP location-history parity). */
+export type GameServerEntry = {
+  host: string;
+  port: number;
+  avgMs: number;
+  lossPct: number;
+  samples: number;
+  lastSeen: string;
+};
+
 export type TCPPingResult = {
   target: string;
   port: number;
@@ -742,6 +752,38 @@ function isPublicIPv4(host: string): boolean {
 function routeHintMsLabel(relay: RelayNode): string {
   const v = relay.totalEstimateMs > 0 ? relay.totalEstimateMs : relay.pingMs;
   return v > 0 ? `${Math.round(v * 10) / 10} ms` : "—";
+}
+
+/** Parse an IPv4 literal into an unsigned 32-bit value, or null. */
+function ipv4ToUint(host: string): number | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return null;
+  const oct = m.slice(1).map(Number);
+  if (oct.some((o) => o > 255)) return null;
+  return ((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | oct[3]) >>> 0;
+}
+
+/** Short relative age for a persisted measurement timestamp. */
+function formatAgeShort(iso: string): string {
+  const at = Date.parse(iso);
+  if (!Number.isFinite(at)) return "unknown";
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+  return `${Math.round(seconds / 86400)}d ago`;
+}
+
+/** True when the IPv4 host falls inside the CIDR block. */
+function isIPv4InCIDR(host: string, cidr: string): boolean {
+  const slash = cidr.indexOf("/");
+  if (slash < 0) return false;
+  const bits = Number(cidr.slice(slash + 1));
+  const ip = ipv4ToUint(host);
+  const net = ipv4ToUint(cidr.slice(0, slash));
+  if (ip === null || net === null || !Number.isFinite(bits) || bits < 0 || bits > 32) return false;
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return (ip & mask) === (net & mask);
 }
 
 /** Relative age of the last measured probe, or a dash when never probed. */
@@ -1047,6 +1089,8 @@ export default function App() {
   // Automatic game-server TCP probe (GearUP DoPingGame parity).
   const [serverProbe, setServerProbe] = useState<ServerProbe | null>(null);
   const serverProbeNextRunRef = useRef(0);
+  // Persisted per-game server history (measured endpoints only).
+  const [serverHistory, setServerHistory] = useState<GameServerEntry[]>([]);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -1105,6 +1149,32 @@ export default function App() {
     (selectedGame.regions || []).find((region) => region.id === selectedRegionId) ||
     (selectedGame.regions || [])[0];
   const selectedGameConnections = gameConnections?.games.find((g) => g.gameId === selectedGame.id);
+
+  // Route-coverage honesty: how many observed game endpoints actually fall
+  // inside the selected region's CIDRs. Measured from the socket table; a
+  // zero-overlap result warns that game traffic may bypass the tunnel.
+  const peerCoverage = useMemo(() => {
+    const cidrs = selectedRegion?.cidrs?.length ? selectedRegion.cidrs : selectedGame.cidrs || [];
+    if (cidrs.length === 0) return null;
+    const hosts = new Set<string>();
+    for (const c of selectedGameConnections?.connections ?? []) {
+      if (!c.remote) continue;
+      const host = c.remote.includes("]")
+        ? c.remote.slice(1, c.remote.indexOf("]"))
+        : c.remote.split(":")[0];
+      if (host && isPublicIPv4(host)) hosts.add(host);
+    }
+    for (const p of recentPeers) {
+      if (isPublicIPv4(p.endpoint)) hosts.add(p.endpoint);
+    }
+    if (hosts.size === 0) return null;
+    let inside = 0;
+    for (const h of hosts) {
+      if (cidrs.some((c) => isIPv4InCIDR(h, c))) inside++;
+    }
+    return { total: hosts.size, inside };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGameConnections, recentPeers, selectedRegion, selectedGame]);
 
   // Filtered games for Library Tab
   const filteredGames = useMemo(() => {
@@ -1518,6 +1588,31 @@ export default function App() {
           at: Date.now(),
           note: typeof data.note === "string" ? data.note : ""
         });
+        if (typeof data.avgMs === "number" && data.avgMs > 0 && selectedGame.id) {
+          // Persist the real measurement into the per-game server history.
+          // Failed probes are never recorded (the API refuses avgMs <= 0).
+          try {
+            await apiFetch("/api/game-server-history", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                gameId: selectedGame.id,
+                host: peer.endpoint,
+                port: typeof data.port === "number" ? data.port : 443,
+                avgMs: data.avgMs,
+                lossPct: typeof data.lossPct === "number" ? data.lossPct : 0,
+                samples: answered
+              })
+            });
+            const hRes = await apiFetch(
+              `/api/game-server-history?gameId=${encodeURIComponent(selectedGame.id)}`
+            );
+            if (!stopped && hRes.ok) {
+              const list = await hRes.json();
+              if (Array.isArray(list)) setServerHistory(list as GameServerEntry[]);
+            }
+          } catch {}
+        }
       } catch {}
     };
     run();
@@ -1526,7 +1621,32 @@ export default function App() {
       stopped = true;
       clearInterval(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentPeers]);
+
+  // Persisted per-game server history follows the selected game and refreshes
+  // after every recorded measurement.
+  useEffect(() => {
+    let stopped = false;
+    const load = async () => {
+      if (!selectedGame.id) {
+        setServerHistory([]);
+        return;
+      }
+      try {
+        const res = await apiFetch(
+          `/api/game-server-history?gameId=${encodeURIComponent(selectedGame.id)}`
+        );
+        if (!res.ok || stopped) return;
+        const list = await res.json();
+        if (!stopped && Array.isArray(list)) setServerHistory(list as GameServerEntry[]);
+      } catch {}
+    };
+    load();
+    return () => {
+      stopped = true;
+    };
+  }, [selectedGame.id, serverProbe?.at]);
 
   // Game server connections: read-only scan of the local OS socket tables
   const handleScanGameConnections = async (silent = false) => {
@@ -3182,6 +3302,40 @@ export default function App() {
                           <span className="text-white/30">
                             {stabilization.paritySent} parity sent · {stabilization.parityRecv} received
                           </span>
+                        </div>
+                      )}
+                      {serverHistory.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                          <span className="text-white/45 font-brand font-bold uppercase tracking-wider">
+                            KNOWN SERVERS (MEASURED)
+                          </span>
+                          {serverHistory.slice(0, 3).map((h) => (
+                            <span
+                              key={`${h.host}:${h.port}`}
+                              className="text-white/40"
+                              title={`${h.host}:${h.port} — avg ${h.avgMs.toFixed(1)} ms, loss ${h.lossPct.toFixed(0)}%, ${h.samples} sample(s), last measured ${new Date(h.lastSeen).toLocaleString()}`}
+                            >
+                              {h.host}:{h.port} ·{" "}
+                              <span className="text-[#10b981]">{h.avgMs.toFixed(1)} ms</span> ·{" "}
+                              {formatAgeShort(h.lastSeen)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {peerCoverage && (
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                          <span className="text-white/45 font-brand font-bold uppercase tracking-wider">
+                            ROUTE COVERAGE
+                          </span>
+                          <span className={peerCoverage.inside > 0 ? "text-[#10b981]" : "text-[#f5b93c]"}>
+                            {peerCoverage.inside}/{peerCoverage.total} observed endpoints inside{" "}
+                            {selectedRegion?.name || selectedGame.name} CIDRs
+                          </span>
+                          {peerCoverage.inside === 0 && (
+                            <span className="text-white/35">
+                              game traffic may bypass the tunnel — check the region or enable Peer Routing
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

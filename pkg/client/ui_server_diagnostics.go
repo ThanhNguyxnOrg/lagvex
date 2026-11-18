@@ -43,12 +43,13 @@ type diagnosticsRelay struct {
 }
 
 type diagnosticsConfig struct {
-	Nickname          string                    `json:"nickname"`
-	LastSelectedGame  string                    `json:"lastSelectedGame,omitempty"`
-	LastSelectedRelay string                    `json:"lastSelectedRelay,omitempty"`
-	CustomGames       []profiles.GameDefinition `json:"customGames"`
-	CustomRelays      []diagnosticsRelay        `json:"customRelays"`
-	Tweaks            map[string]bool           `json:"tweaks"`
+	Nickname          string                        `json:"nickname"`
+	LastSelectedGame  string                        `json:"lastSelectedGame,omitempty"`
+	LastSelectedRelay string                        `json:"lastSelectedRelay,omitempty"`
+	CustomGames       []profiles.GameDefinition     `json:"customGames"`
+	CustomRelays      []diagnosticsRelay            `json:"customRelays"`
+	Tweaks            map[string]bool               `json:"tweaks"`
+	GameServers       map[string][]GameServerRecord `json:"gameServers,omitempty"`
 }
 
 type diagnosticsSnapshot struct {
@@ -118,6 +119,7 @@ func (u *UIServer) handleDiagnosticsExport(w http.ResponseWriter, r *http.Reques
 			CustomGames:       cfg.CustomGames,
 			CustomRelays:      relays,
 			Tweaks:            cfg.Tweaks,
+			GameServers:       cfg.GameServers,
 		},
 	}
 
@@ -214,6 +216,25 @@ func (u *UIServer) handleDiagnosticsImport(w http.ResponseWriter, r *http.Reques
 	if snap.Config.LastSelectedGame != "" || snap.Config.LastSelectedRelay != "" {
 		u.configStore.SetSelections(snap.Config.LastSelectedGame, snap.Config.LastSelectedRelay)
 		result.Applied = append(result.Applied, "last selections")
+	}
+
+	// Game-server history carries only measured endpoints (positive avgMs was
+	// required when each record was written), so merging is safe.
+	serversMerged := 0
+	for gameID, records := range snap.Config.GameServers {
+		if strings.TrimSpace(gameID) == "" {
+			continue
+		}
+		for _, rec := range records {
+			if rec.Host == "" || rec.AvgMs <= 0 {
+				continue
+			}
+			u.configStore.RecordGameServer(gameID, rec)
+			serversMerged++
+		}
+	}
+	if serversMerged > 0 {
+		result.Applied = append(result.Applied, fmt.Sprintf("%d game-server record(s)", serversMerged))
 	}
 
 	_ = json.NewEncoder(w).Encode(result)
