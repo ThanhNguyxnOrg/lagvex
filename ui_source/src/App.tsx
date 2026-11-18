@@ -2929,7 +2929,7 @@ export default function App() {
                 </div>
 
                 {/* ── GEARUP SIGNATURE: NETWORK ROUTING HOPS PIPELINE ── */}
-                <div className="mt-8 pt-6 border-t border-[#172230]">
+                <div className="relative z-10 mt-8 pt-6 border-t border-[#172230]">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-brand font-bold text-white/60 uppercase tracking-wider flex items-center gap-2">
                       <span>NETWORK ROUTING PIPELINE</span>
