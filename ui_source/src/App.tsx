@@ -344,7 +344,7 @@ const OFFICIAL_GAMES: Game[] = [
     publisher: "Blizzard Entertainment",
     processNames: ["Overwatch.exe"],
     cidrs: ["54.207.104.0/21", "24.105.30.0/24"],
-    heroArt: "/assets/overwatch-hero-real.jpg",
+    heroArt: "/assets/overwatch2-hero-real.jpg",
     coverImg: "/assets/games/overwatch2.jpg",
     artType: "cover-keyart",
     region: "Taiwan / Tokyo AWS Core",
