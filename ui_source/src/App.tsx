@@ -488,6 +488,28 @@ export type TCPPingSample = {
   error?: string;
 };
 
+/** Measured FEC counters for the latency-stabilization readout. */
+export type StabilizationReadout = {
+  fecActive: boolean;
+  fecRatio: number;
+  packetsRecovered: number;
+  paritySent: number;
+  parityRecv: number;
+};
+
+/** Automatic TCP probe of an observed game-server endpoint. */
+export type ServerProbe = {
+  endpoint: string;
+  port: number;
+  avgMs: number | null;
+  lossPct: number;
+  attempts: number;
+  answered: number;
+  outcome: "open" | "closed" | "timeout" | "error" | "mixed";
+  at: number;
+  note: string;
+};
+
 export type TCPPingResult = {
   target: string;
   port: number;
@@ -700,6 +722,26 @@ function probeMethodShort(method: string): string {
     default:
       return "";
   }
+}
+
+/** True for routable public IPv4 literals (the TCP ping tool refuses private ones). */
+function isPublicIPv4(host: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (a === 0 || a === 10 || a === 127) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  return a < 224;
+}
+
+/** Best measured metric for a relay, formatted for the route hint. */
+function routeHintMsLabel(relay: RelayNode): string {
+  const v = relay.totalEstimateMs > 0 ? relay.totalEstimateMs : relay.pingMs;
+  return v > 0 ? `${Math.round(v * 10) / 10} ms` : "—";
 }
 
 /** Relative age of the last measured probe, or a dash when never probed. */
@@ -991,6 +1033,20 @@ export default function App() {
   const [failoverEvents, setFailoverEvents] = useState<FailoverEventItem[]>([]);
   const trafficCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [recentPeers, setRecentPeers] = useState<{ endpoint: string; firstSeen: number }[]>([]);
+  // Relay the engine is actually connected to (from /api/status); the
+  // "available route" hint compares it against the best measured relay.
+  const [activeRelayId, setActiveRelayId] = useState("");
+  // Measured FEC counters for the latency-stabilization readout.
+  const [stabilization, setStabilization] = useState<StabilizationReadout>({
+    fecActive: false,
+    fecRatio: 0,
+    packetsRecovered: 0,
+    paritySent: 0,
+    parityRecv: 0
+  });
+  // Automatic game-server TCP probe (GearUP DoPingGame parity).
+  const [serverProbe, setServerProbe] = useState<ServerProbe | null>(null);
+  const serverProbeNextRunRef = useRef(0);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -1023,6 +1079,28 @@ export default function App() {
   // Current items
   const selectedGame = games[selectedGameIdx] || games[0] || OFFICIAL_GAMES[0];
   const selectedRelay = relays[selectedRelayIdx] || relays[0] || EMPTY_RELAY;
+
+  // ExitLag-parity "Available route" hint. Only measured values participate,
+  // and only meaningful wins surface (>= 5 ms and >= 10% better) so the hint
+  // never nags about noise.
+  const routeHint = useMemo(() => {
+    if (!isBoosting || relays.length < 2) return null;
+    const metric = (r: RelayNode) => (r.totalEstimateMs > 0 ? r.totalEstimateMs : r.pingMs);
+    const current =
+      (activeRelayId ? relays.find((r) => r.id === activeRelayId) : undefined) ??
+      (selectedRelay.id !== "none" ? selectedRelay : null);
+    if (!current || !current.reachable || metric(current) <= 0) return null;
+    let best: RelayNode | null = null;
+    for (const r of relays) {
+      if (r.id === current.id || !r.reachable || metric(r) <= 0) continue;
+      if (!best || metric(r) < metric(best)) best = r;
+    }
+    if (!best) return null;
+    const currentMs = metric(current);
+    const bestMs = metric(best);
+    if (bestMs >= currentMs - Math.max(5, currentMs * 0.1)) return null;
+    return { best, current, currentMs, bestMs };
+  }, [isBoosting, relays, activeRelayId, selectedRelay]);
   const selectedRegion =
     (selectedGame.regions || []).find((region) => region.id === selectedRegionId) ||
     (selectedGame.regions || [])[0];
@@ -1392,6 +1470,64 @@ export default function App() {
     setRecentPeers([]);
   }, [selectedGame.id]);
 
+  // Automatic game-server probe (GearUP DoPingGame / ExitLag PingToDS parity):
+  // once the game's traffic reveals a routable server endpoint, measure its
+  // TCP handshake every 2 minutes. Values come from /api/tcping (rate-limited);
+  // private endpoints are never measured and say so.
+  useEffect(() => {
+    const peer = recentPeers.find((p) => isPublicIPv4(p.endpoint));
+    if (!peer) {
+      setServerProbe(null);
+      return;
+    }
+    let stopped = false;
+    const run = async () => {
+      if (stopped || Date.now() < serverProbeNextRunRef.current) return;
+      serverProbeNextRunRef.current = Date.now() + 10_000;
+      try {
+        const res = await apiFetch("/api/tcping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target: peer.endpoint, port: 443, attempts: 2, timeoutMs: 1200 })
+        });
+        if (res.status === 429) {
+          // Hourly budget exhausted: back off instead of retrying into the limiter.
+          serverProbeNextRunRef.current = Date.now() + 10 * 60_000;
+          return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped) return;
+        const samples: { outcome: string }[] = Array.isArray(data.samples) ? data.samples : [];
+        const answered = samples.filter((s) => s.outcome === "open" || s.outcome === "closed").length;
+        const outcomes = new Set(samples.map((s) => s.outcome as string));
+        const outcome: ServerProbe["outcome"] =
+          outcomes.size === 1 && samples.length > 0
+            ? (samples[0].outcome as ServerProbe["outcome"])
+            : samples.length > 0
+              ? "mixed"
+              : "error";
+        setServerProbe({
+          endpoint: typeof data.target === "string" ? data.target : peer.endpoint,
+          port: typeof data.port === "number" ? data.port : 443,
+          avgMs: typeof data.avgMs === "number" && data.avgMs > 0 ? data.avgMs : null,
+          lossPct: typeof data.lossPct === "number" ? data.lossPct : 0,
+          attempts: typeof data.attempts === "number" ? data.attempts : samples.length,
+          answered,
+          outcome,
+          at: Date.now(),
+          note: typeof data.note === "string" ? data.note : ""
+        });
+      } catch {}
+    };
+    run();
+    const timer = setInterval(run, 120_000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [recentPeers]);
+
   // Game server connections: read-only scan of the local OS socket tables
   const handleScanGameConnections = async (silent = false) => {
     if (!silent) setIsScanningConnections(true);
@@ -1724,6 +1860,48 @@ export default function App() {
     };
   }, [isBoosting, activeTab]);
 
+  // Background relay refresh (ExitLag "ping next bridges if due" parity):
+  // every 60 s only the contenders are re-measured — the current relay, the
+  // connected relay and the five best measured so far. The backend caches a
+  // sweep for 20 s, so poll bursts never spam relays with handshakes. Full
+  // sweeps stay on the explicit Refresh All button.
+  useEffect(() => {
+    let stopped = false;
+    const refresh = async () => {
+      if (stopped || relays.length === 0) return;
+      try {
+        const metric = (r: RelayNode) => (r.totalEstimateMs > 0 ? r.totalEstimateMs : r.pingMs);
+        const contenders = [...relays]
+          .filter((r) => r.address)
+          .sort((a, b) => (metric(a) || 999999) - (metric(b) || 999999))
+          .slice(0, 5);
+        const ids = new Set(contenders.map((r) => r.id));
+        if (selectedRelay.id && selectedRelay.id !== "none") ids.add(selectedRelay.id);
+        if (activeRelayId) ids.add(activeRelayId);
+        const qs = new URLSearchParams();
+        if (relays.length > 6 && ids.size > 0) qs.set("ids", [...ids].join(","));
+        if (selectedGame.id) qs.set("gameId", selectedGame.id);
+        const query = qs.toString();
+        const res = await apiFetch(`/api/probe-relays${query ? `?${query}` : ""}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (stopped || !Array.isArray(data) || data.length === 0) return;
+        const mapped = mapProbeRelays(data);
+        setRelays((prev) => {
+          const byId = new Map(prev.map((r) => [r.id, r]));
+          for (const r of mapped) byId.set(r.id, r);
+          return prev.map((r) => byId.get(r.id) || r);
+        });
+      } catch {}
+    };
+    const timer = setInterval(refresh, 60000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relays, selectedRelay.id, activeRelayId, selectedGame.id]);
+
   // Keep the route detail fresh while the routing view is open.
   useEffect(() => {
     if (activeTab !== "boost" || boostSubTab !== "routing") return;
@@ -1843,6 +2021,14 @@ export default function App() {
         setPeerRouting(data.peerRouting === true);
         setFullTunnel(data.fullTunnel === true);
         setDualPathState(data.dualPath ?? null);
+        if (typeof data.activeRelayId === "string") setActiveRelayId(data.activeRelayId);
+        setStabilization({
+          fecActive: data.fecActive === true,
+          fecRatio: typeof data.fecRatio === "number" ? data.fecRatio : 0,
+          packetsRecovered: typeof data.packetsRecovered === "number" ? data.packetsRecovered : 0,
+          paritySent: typeof data.fecParitySent === "number" ? data.fecParitySent : 0,
+          parityRecv: typeof data.fecParityRecv === "number" ? data.fecParityRecv : 0
+        });
         if (data.standbyRelayName) {
           setStandby({
             id: typeof data.standbyRelayId === "string" ? data.standbyRelayId : "",
@@ -2018,6 +2204,44 @@ export default function App() {
   };
 
   // Launch Game Handler
+  // Switch to a better measured route from the "available route" hint. The
+  // backend resolves the configured relay's PSK from the catalog, so the
+  // dashboard only sends the endpoint.
+  const handleSwitchToRelay = async (relay: RelayNode) => {
+    if (!relay.address || isConnecting) return;
+    setIsConnecting(true);
+    setConnectionError(null);
+    notify(`Switching to measured better route: ${relay.cleanName} (${routeHintMsLabel(relay)})...`);
+    try {
+      const res = await apiFetch("/api/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: selectedGame.id,
+          regionId: selectedRegion?.id || "",
+          relayEndpoint: relay.address,
+          relayAddr: relay.address,
+          forceNow: true
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        const message = data.error || `Switch failed (${res.status})`;
+        setConnectionError(message);
+        notify(message);
+        return;
+      }
+      const idx = relays.findIndex((r) => r.id === relay.id);
+      if (idx >= 0) setSelectedRelayIdx(idx);
+      if (data.pingMs > 0) setLivePing(Number(data.pingMs.toFixed(1)));
+      notify(`Now accelerating via ${relay.cleanName}.`);
+    } catch {
+      notify("Could not reach the local Lagvex service.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   const handleLaunchGame = () => {
     if (selectedGame.steamAppId) {
       window.open(`steam://rungameid/${selectedGame.steamAppId}`, "_blank");
@@ -2892,6 +3116,76 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* ExitLag-parity: better measured route available */}
+                    {routeHint && (
+                      <div className="p-3 rounded-xl bg-[#f5b93c]/10 border border-[#f5b93c]/40 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <span className="text-[11px] font-brand font-bold text-[#f5b93c]">
+                            AVAILABLE ROUTE (MEASURED)
+                          </span>
+                          <span className="text-[10px] font-mono text-white/55 truncate">
+                            {routeHint.best.cleanName} — {routeHint.bestMs.toFixed(1)} ms vs{" "}
+                            {routeHint.currentMs.toFixed(1)} ms on {routeHint.current.cleanName}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => void handleSwitchToRelay(routeHint.best)}
+                          disabled={isConnecting}
+                          className="shrink-0 px-4 py-2 rounded-lg bg-[#f5b93c] hover:bg-[#ffc95e] text-black font-brand font-extrabold text-[11px] uppercase tracking-wider cursor-pointer border-none transition-all disabled:opacity-50 disabled:cursor-wait"
+                        >
+                          SWITCH
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Measured game-server probe + stabilization counters */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                        <span className="text-white/45 font-brand font-bold uppercase tracking-wider">
+                          GAME SERVER (TCP)
+                        </span>
+                        {serverProbe ? (
+                          <>
+                            <span className={serverProbe.avgMs ? "text-[#10b981] font-bold" : "text-[#f55252] font-bold"}>
+                              {serverProbe.avgMs
+                                ? `${serverProbe.avgMs.toFixed(1)} ms`
+                                : serverProbe.outcome === "timeout"
+                                  ? "no answer"
+                                  : serverProbe.outcome}
+                            </span>
+                            <span className="text-white/30">
+                              {serverProbe.endpoint}:{serverProbe.port} · {serverProbe.answered}/
+                              {serverProbe.attempts} answered · loss {serverProbe.lossPct.toFixed(0)}% ·{" "}
+                              {Math.max(1, Math.round((Date.now() - serverProbe.at) / 1000))}s ago
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-white/25">
+                            no endpoint observed yet — appears when the game process runs
+                          </span>
+                        )}
+                      </div>
+                      {(stabilization.fecActive || stabilization.packetsRecovered > 0) && (
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                          <span className="text-white/45 font-brand font-bold uppercase tracking-wider">
+                            LATENCY STABILIZATION (MEASURED)
+                          </span>
+                          <span className={stabilization.fecActive ? "text-[#00F0FF]" : "text-white/30"}>
+                            {stabilization.fecActive ? "FEC active" : "FEC idle"}
+                          </span>
+                          {stabilization.fecRatio > 0 && (
+                            <span className="text-white/40">overhead {stabilization.fecRatio.toFixed(1)}%</span>
+                          )}
+                          {stabilization.packetsRecovered > 0 && (
+                            <span className="text-[#10b981]">{stabilization.packetsRecovered} packets repaired</span>
+                          )}
+                          <span className="text-white/30">
+                            {stabilization.paritySent} parity sent · {stabilization.parityRecv} received
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
                     {/* ACTION BUTTONS (BOOST NOW / LAUNCH GAME) */}
                     <div className="flex items-center gap-3 pt-2">
                       <button
@@ -3593,7 +3887,14 @@ export default function App() {
                         )}
                         {recentPeers.length > 0 && (
                           <span className="text-[9px] font-mono text-white/35">
-                            Recent endpoints this session: {recentPeers.map((p) => p.endpoint).join(", ")}
+                            {recentPeers.map((p) => {
+                              const probed =
+                                serverProbe && (serverProbe.endpoint === p.endpoint || serverProbe.endpoint.endsWith(p.endpoint))
+                                  ? serverProbe
+                                  : null;
+                              const measured = probed?.avgMs ? ` — ${probed.avgMs.toFixed(1)} ms (TCP)` : "";
+                              return `${p.endpoint}${measured}`;
+                            }).join(" · ")}
                           </span>
                         )}
                         {gameConnections.note && (
@@ -3924,6 +4225,26 @@ export default function App() {
           {/* ========================================================= */}
           {activeTab === "nodes" && (
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
+              {routeHint && (
+                <div className="p-3 rounded-xl bg-[#f5b93c]/10 border border-[#f5b93c]/40 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex flex-col gap-0.5">
+                    <span className="text-[11px] font-brand font-bold text-[#f5b93c]">
+                      AVAILABLE ROUTE (MEASURED)
+                    </span>
+                    <span className="text-[10px] font-mono text-white/55 truncate">
+                      {routeHint.best.cleanName} — {routeHint.bestMs.toFixed(1)} ms vs{" "}
+                      {routeHint.currentMs.toFixed(1)} ms on {routeHint.current.cleanName}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => void handleSwitchToRelay(routeHint.best)}
+                    disabled={isConnecting}
+                    className="shrink-0 px-4 py-2 rounded-lg bg-[#f5b93c] hover:bg-[#ffc95e] text-black font-brand font-extrabold text-[11px] uppercase tracking-wider cursor-pointer border-none transition-all disabled:opacity-50 disabled:cursor-wait"
+                  >
+                    SWITCH
+                  </button>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-brand font-extrabold text-2xl text-white">Relay Nodes</h2>

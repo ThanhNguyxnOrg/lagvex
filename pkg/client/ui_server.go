@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,18 @@ type UIServer struct {
 	prober         *Prober
 	configStore    *ConfigStore
 	tcpPingLimiter tcpPingLimiter
+
+	// Reusable last sweep (ExitLag re-probes only "when due"): a dashboard
+	// poll burst within the TTL reuses the completed measurement instead of
+	// hammering every relay with fresh handshakes.
+	sweepMu      sync.Mutex
+	sweepKey     string
+	sweepAt      time.Time
+	sweepResults []ProbeResult
 }
+
+// probeSweepCacheTTL bounds how long a completed relay sweep is reused.
+const probeSweepCacheTTL = 20 * time.Second
 
 // NewUIServer creates a new dashboard UI server.
 func NewUIServer(engine *Engine, pm *profiles.Manager, webDir string) *UIServer {
@@ -268,6 +280,27 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 		relays = FilterRelaysByContinent(relays, continent)
 	}
 
+	// Contender subset (ExitLag's background filter): ids=a,b,c sweeps only
+	// the relays named, so periodic auto-refreshes measure what matters
+	// instead of every configured node.
+	if idsParam := r.URL.Query().Get("ids"); idsParam != "" {
+		wanted := map[string]bool{}
+		for _, id := range strings.Split(idsParam, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				wanted[strings.ToLower(id)] = true
+			}
+		}
+		filtered := make([]profiles.RelayEndpoint, 0, len(relays))
+		for _, rel := range relays {
+			if wanted[strings.ToLower(rel.ID)] {
+				filtered = append(filtered, rel)
+			}
+		}
+		if len(filtered) > 0 {
+			relays = filtered
+		}
+	}
+
 	samples := 3
 	if sStr := r.URL.Query().Get("samples"); sStr != "" {
 		if s, err := strconv.Atoi(sStr); err == nil && s > 0 && s <= 10 {
@@ -284,6 +317,28 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), sweepTimeout)
 	defer cancel()
+
+	// A sweep "when due": identical requests inside the TTL reuse the last
+	// completed measurement. force=1 (the dashboard's explicit refresh button)
+	// always measures fresh.
+	endpointKeys := make([]string, 0, len(relays))
+	for _, rel := range relays {
+		endpointKeys = append(endpointKeys, rel.Endpoint)
+	}
+	sort.Strings(endpointKeys)
+	cacheKey := fmt.Sprintf("%s|%d|%d", strings.Join(endpointKeys, ","), samples, anchorID)
+
+	force := r.URL.Query().Get("force") == "1"
+	if !force {
+		u.sweepMu.Lock()
+		if u.sweepKey == cacheKey && u.sweepResults != nil && time.Since(u.sweepAt) < probeSweepCacheTTL {
+			cached := u.sweepResults
+			u.sweepMu.Unlock()
+			_ = json.NewEncoder(w).Encode(cached)
+			return
+		}
+		u.sweepMu.Unlock()
+	}
 
 	prober := u.prober
 	if samples != prober.cfg.DefaultSamples {
@@ -305,6 +360,12 @@ func (u *UIServer) handleProbeRelays(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	u.sweepMu.Lock()
+	u.sweepKey = cacheKey
+	u.sweepAt = time.Now()
+	u.sweepResults = results
+	u.sweepMu.Unlock()
 
 	_ = json.NewEncoder(w).Encode(results)
 }
