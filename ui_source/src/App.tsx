@@ -1091,6 +1091,10 @@ export default function App() {
   const serverProbeNextRunRef = useRef(0);
   // Persisted per-game server history (measured endpoints only).
   const [serverHistory, setServerHistory] = useState<GameServerEntry[]>([]);
+  // Cost & self-host calculator inputs (Nodes tab).
+  const [costHours, setCostHours] = useState(3);
+  const [costSquad, setCostSquad] = useState(1);
+  const [costVps, setCostVps] = useState(3.5);
 
   // Acceleration / Boost State
   const [isBoosting, setIsBoosting] = useState(false);
@@ -4777,6 +4781,131 @@ export default function App() {
                     <p className="text-[10px] text-white/40 leading-relaxed">{tcpPingResult.note}</p>
                   </div>
                 )}
+              </div>
+
+              {/* ── COST & SELF-HOST: the free alternative to paid boosters ── */}
+              <div className="p-6 rounded-3xl bg-[#0b1018] border border-[#1c2738] flex flex-col gap-4 shadow-lg">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-xs font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                    <IconServerNodes className="w-4 h-4" />
+                    <span>COST & SELF-HOST</span>
+                  </div>
+                  <h3 className="font-brand font-extrabold text-xl text-white">
+                    What acceleration actually costs
+                  </h3>
+                  <p className="text-xs text-white/50 max-w-[680px]">
+                    Lagvex is 100% free — no subscription, no per-GB billing, no feature paywall. The
+                    only optional cost is the relay VPS (or a friend's). A game session moves only
+                    ~20–40 MB per hour, so any $3–6 VPS — or a free tier — covers it.
+                  </p>
+                </div>
+
+                {(() => {
+                  const measuredSamples = rateHistory.slice(-20);
+                  const measuredBps =
+                    measuredSamples.length >= 5
+                      ? measuredSamples.reduce((acc, s) => acc + s.up + s.down, 0) / measuredSamples.length
+                      : 0;
+                  const measured = measuredBps > 0;
+                  const monthlyGb = measured
+                    ? (measuredBps * costHours * 30 * 3600) / 1e9
+                    : 0.03 * costHours * 30;
+                  const perPlayer = costVps / costSquad;
+                  const competitor = 9;
+                  return (
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <label className="flex flex-col gap-1.5 text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                          Play per day
+                          <span className="font-mono text-sm text-white font-bold">{costHours} h/day</span>
+                          <input
+                            type="range"
+                            min={0.5}
+                            max={10}
+                            step={0.5}
+                            value={costHours}
+                            onChange={(e) => setCostHours(Number(e.target.value))}
+                            className="accent-[#00F0FF] cursor-pointer"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5 text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                          Squad sharing the VPS
+                          <span className="font-mono text-sm text-white font-bold">{costSquad} player{costSquad > 1 ? "s" : ""}</span>
+                          <input
+                            type="range"
+                            min={1}
+                            max={8}
+                            step={1}
+                            value={costSquad}
+                            onChange={(e) => setCostSquad(Number(e.target.value))}
+                            className="accent-[#00F0FF] cursor-pointer"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5 text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                          Your VPS price ($/mo)
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            step={0.5}
+                            value={costVps}
+                            onChange={(e) => setCostVps(Math.max(0, Number(e.target.value) || 0))}
+                            className="h-9 rounded-lg bg-[#0f1722] border border-[#1c293a] px-3 text-sm text-white font-mono font-bold outline-none focus:border-[#00F0FF]/60"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-3.5 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40]">
+                          <span className="text-[9px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                            Projected transfer
+                          </span>
+                          <div className="font-mono font-black text-2xl text-white mt-0.5">
+                            {monthlyGb < 1 ? `${Math.round(monthlyGb * 1000)} MB` : `${monthlyGb.toFixed(1)} GB`}
+                            <span className="text-xs text-white/40 font-bold"> /mo</span>
+                          </div>
+                          <span className="text-[9px] font-mono text-white/35">
+                            {measured
+                              ? "from your measured session rate"
+                              : "documented typical — connect to measure yours"}
+                          </span>
+                        </div>
+                        <div className="p-3.5 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40]">
+                          <span className="text-[9px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                            Cost per player
+                          </span>
+                          <div className="font-mono font-black text-2xl text-[#10b981] mt-0.5">
+                            ${perPlayer.toFixed(2)}
+                            <span className="text-xs text-white/40 font-bold"> /mo</span>
+                          </div>
+                          <span className="text-[9px] font-mono text-white/35">
+                            ${costVps.toFixed(2)} VPS ÷ {costSquad} · free tiers exist ($0)
+                          </span>
+                        </div>
+                        <div className="p-3.5 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40]">
+                          <span className="text-[9px] font-brand font-bold text-white/45 uppercase tracking-wider">
+                            vs. typical booster
+                          </span>
+                          <div className="font-mono font-black text-2xl text-[#10b981] mt-0.5">
+                            {perPlayer < competitor ? `save $${(competitor - perPlayer).toFixed(2)}` : "—"}
+                            <span className="text-xs text-white/40 font-bold"> /mo</span>
+                          </div>
+                          <span className="text-[9px] font-mono text-white/35">
+                            typical public plan ≈ ${competitor}.00/mo
+                          </span>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] font-mono text-white/35 leading-relaxed">
+                        {monthlyGb < 500
+                          ? "Fits every mainstream VPS egress allowance (typically 0.5–4 TB/mo). "
+                          : "Above typical egress allowances — pick a provider with more transfer. "}
+                        Transfer projection is an estimate; VPS prices are market estimates, not
+                        measured values. Full guide: docs/COST.md in the repository.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
