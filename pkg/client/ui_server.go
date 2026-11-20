@@ -734,12 +734,29 @@ func (u *UIServer) handleAddRelay(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "relay": publicRelay})
 }
 
+// tweakReq carries the requested tweaks.
+//
+// Every flag is a pointer: an absent field means "leave this alone", while a
+// present field (true or false) is an explicit request. Without this the
+// zero value would silently disable the Smart L4 filter on every request that
+// never mentioned it, and the response would claim an optimisation that the
+// user did not ask for.
 type tweakReq struct {
-	TCPNoDelay    bool `json:"tcpNoDelay"`
-	DisableNagle  bool `json:"disableNagle"`
-	MMCSSPriority bool `json:"mmcssPriority"`
-	MTUClamping   bool `json:"mtuClamping"`
-	SmartL4Filter bool `json:"smartL4Filter"`
+	TCPNoDelay    *bool `json:"tcpNoDelay"`
+	DisableNagle  *bool `json:"disableNagle"`
+	MMCSSPriority *bool `json:"mmcssPriority"`
+	MTUClamping   *bool `json:"mtuClamping"`
+	SmartL4Filter *bool `json:"smartL4Filter"`
+}
+
+// wanted reports whether the request explicitly asked for a true flag.
+func wanted(flag *bool) bool {
+	return flag != nil && *flag
+}
+
+// explicitlySet reports whether the request mentioned the flag at all.
+func explicitlySet(flag *bool) bool {
+	return flag != nil
 }
 
 func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
@@ -773,7 +790,7 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 3. MMCSS Gaming Priority & Network Throttling
-		if req.MMCSSPriority {
+		if wanted(req.MMCSSPriority) {
 			throttleErr := execHidden("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "NetworkThrottlingIndex", "/t", "REG_DWORD", "/d", "0xffffffff", "/f").Run()
 			responseErr := execHidden("reg", "add", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, "/v", "SystemResponsiveness", "/t", "REG_DWORD", "/d", "0", "/f").Run()
 			if throttleErr == nil && responseErr == nil {
@@ -790,7 +807,7 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = execHidden("killall", "-HUP", "mDNSResponder").Run()
 
-		if req.TCPNoDelay || req.DisableNagle {
+		if wanted(req.TCPNoDelay) || wanted(req.DisableNagle) {
 			if err := execHidden("sysctl", "-w", "net.inet.tcp.delayed_ack=0").Run(); err == nil {
 				applied = append(applied, "TCP delayed ACK disabled")
 			} else {
@@ -812,7 +829,7 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if req.TCPNoDelay || req.DisableNagle {
+		if wanted(req.TCPNoDelay) || wanted(req.DisableNagle) {
 			lowLatencyErr := execHidden("sysctl", "-w", "net.ipv4.tcp_low_latency=1").Run()
 			slowStartErr := execHidden("sysctl", "-w", "net.ipv4.tcp_slow_start_after_idle=0").Run()
 			if lowLatencyErr == nil && slowStartErr == nil {
@@ -825,30 +842,46 @@ func (u *UIServer) handleTweak(w http.ResponseWriter, r *http.Request) {
 
 	// TCP_NODELAY and MTU clamping are not global OS switches. Record them as
 	// preferences and describe exactly where they take effect.
-	if req.TCPNoDelay || req.DisableNagle {
+	if wanted(req.TCPNoDelay) || wanted(req.DisableNagle) {
 		preferences = append(preferences, "TCP_NODELAY preference saved; it applies to TCP sockets owned by the client, not system-wide.")
 	}
-	if req.MTUClamping {
+	if wanted(req.MTUClamping) {
 		preferences = append(preferences, "MTU clamping preference saved; the virtual adapter uses the relay-negotiated MTU when a tunnel connects.")
 	}
 
-	if u.engine != nil {
-		u.engine.SetL4FilterEnabled(req.SmartL4Filter)
-		if req.SmartL4Filter {
+	// The Smart L4 filter only changes when the request explicitly mentions
+	// it; an absent field leaves the current state untouched.
+	if u.engine != nil && explicitlySet(req.SmartL4Filter) {
+		u.engine.SetL4FilterEnabled(*req.SmartL4Filter)
+		if *req.SmartL4Filter {
 			applied = append(applied, "Smart L4 game-tick filter enabled (UDP prioritized)")
 		} else {
 			applied = append(applied, "Smart L4 game-tick filter disabled")
 		}
 	}
 
+	// Persist only the flags the request actually mentioned, so an unrelated
+	// request never clears a stored preference.
 	if u.configStore != nil {
-		u.configStore.SetTweaks(map[string]bool{
-			"tcpNoDelay":    req.TCPNoDelay,
-			"disableNagle":  req.DisableNagle,
-			"mmcssPriority": req.MMCSSPriority,
-			"mtuClamping":   req.MTUClamping,
-			"smartL4Filter": req.SmartL4Filter,
-		})
+		tweaks := map[string]bool{}
+		if explicitlySet(req.TCPNoDelay) {
+			tweaks["tcpNoDelay"] = *req.TCPNoDelay
+		}
+		if explicitlySet(req.DisableNagle) {
+			tweaks["disableNagle"] = *req.DisableNagle
+		}
+		if explicitlySet(req.MMCSSPriority) {
+			tweaks["mmcssPriority"] = *req.MMCSSPriority
+		}
+		if explicitlySet(req.MTUClamping) {
+			tweaks["mtuClamping"] = *req.MTUClamping
+		}
+		if explicitlySet(req.SmartL4Filter) {
+			tweaks["smartL4Filter"] = *req.SmartL4Filter
+		}
+		if len(tweaks) > 0 {
+			u.configStore.SetTweaks(tweaks)
+		}
 	}
 
 	status := "No changes requested"

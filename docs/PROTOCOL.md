@@ -1,7 +1,7 @@
 # 📡 Lagvex Wire Protocol v1 Specification ⚡
 
 > **Lightweight Binary Wire Protocol for Competitive Gaming**  
-> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [💸 Running Cost](COST.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 

@@ -1,7 +1,7 @@
 # 🌐 Lagvex Game Profiles & CIDR Routing Guide 🎮
 
 > **Comprehensive Network Maps for Competitive Esports & Online Titles**  
-> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [Legal Disclaimer](DISCLAIMER.md)
+> 🔗 [Back to Project README.md](../README.md) | [🤝 Contributor Guide](../CONTRIBUTING.md) | [💸 Running Cost](COST.md) | [Legal Disclaimer](DISCLAIMER.md)
 
 ---
 

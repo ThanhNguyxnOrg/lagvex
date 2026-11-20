@@ -1053,6 +1053,8 @@ export default function App() {
   const [disableNagle, setDisableNagle] = useState(true);
   const [mmcssPriority, setMmcssPriority] = useState(true);
   const [mtuClamping, setMtuClamping] = useState(true);
+  // Smart L4 filter: on = FEC parity and hedging cover UDP game traffic only.
+  const [smartL4Filter, setSmartL4Filter] = useState(true);
   const [dnsFlushed, setDnsFlushed] = useState(false);
   const [snapshotResult, setSnapshotResult] = useState<{ applied: string[]; warnings: string[] } | null>(null);
   const snapshotFileRef = useRef<HTMLInputElement | null>(null);
@@ -2456,7 +2458,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentSquadRoom, gamerNickname, livePing, selectedGame.name]);
 
-  // Apply Windows System Tweaks via API
+  // Apply the system network tweaks via API
   const handleApplyTweaks = async () => {
     try {
       const res = await apiFetch("/api/tweak", {
@@ -2466,7 +2468,8 @@ export default function App() {
           tcpNoDelay,
           disableNagle,
           mmcssPriority,
-          mtuClamping
+          mtuClamping,
+          smartL4Filter
         })
       });
       const data = await res.json().catch(() => ({}));
@@ -2811,7 +2814,7 @@ export default function App() {
                 {activeTab === "library" && "Game Library"}
                 {activeTab === "squad" && "Squad Multi-Hop Sync"}
                 {activeTab === "nodes" && "Global Relay Nodes"}
-                {activeTab === "tweaker" && "Windows Network Tweaks"}
+                {activeTab === "tweaker" && "System Network Tweaks"}
               </span>
             </h1>
             {isBoosting && (
@@ -4923,9 +4926,12 @@ export default function App() {
 
               <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0d1624] to-[#0a121e] border border-[#1d2b3d] shadow-xl flex items-center justify-between">
                 <div>
-                  <h2 className="font-brand font-extrabold text-2xl text-white">Windows Network Tweaks</h2>
+                  <h2 className="font-brand font-extrabold text-2xl text-white">System Network Tweaks</h2>
                   <p className="text-xs text-white/60 mt-1 max-w-[600px]">
-                    Runs supported Windows network commands: DNS cache flush, TCP auto-tuning, and optional MMCSS registry values. The result list shows exactly which commands succeeded. TCP_NODELAY and MTU preferences apply only to Lagvex sockets and its virtual adapter.
+                    Runs the network commands this OS actually supports: DNS cache flush on Windows, macOS and
+                    Linux, TCP auto-tuning on Windows, and optional MMCSS registry values on Windows. The result
+                    list shows exactly which commands succeeded. TCP_NODELAY and MTU preferences apply only to
+                    Lagvex sockets and its virtual adapter.
                   </p>
                 </div>
                 <button
@@ -4953,7 +4959,7 @@ export default function App() {
                   },
                   {
                     title: "Kernel Socket TCP_NODELAY Flag",
-                    desc: "Saved as a preference; TCP_NODELAY is not a global Windows switch and is applied only to Lagvex-owned sockets.",
+                    desc: "Saved as a preference; TCP_NODELAY is not a global OS switch and is applied only to Lagvex-owned sockets.",
                     state: tcpNoDelay,
                     setter: setTcpNoDelay
                   },
@@ -4962,6 +4968,12 @@ export default function App() {
                     desc: "Saved for the virtual adapter. On connect the adapter uses the MTU negotiated with the relay instead of a fixed value.",
                     state: mtuClamping,
                     setter: setMtuClamping
+                  },
+                  {
+                    title: "Smart L4 Game-Tick Filter",
+                    desc: "Restricts FEC parity and packet hedging to UDP game traffic, so TCP sessions are forwarded without extra parity frames. Turn it off to treat every packet as a game tick. The effect shows up in the measured FEC counters.",
+                    state: smartL4Filter,
+                    setter: setSmartL4Filter
                   }
                 ].map((tweak, i) => (
                   <div

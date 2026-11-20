@@ -13,6 +13,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.0] - Unreleased
+
+### 🧪 Test, correctness and docs sync
+
+- The relay integration test is deterministic again: the userspace TUN discards
+  writes until the write sink is attached, so the harness now waits for the sink
+  before sending traffic (previously the first forwarded packet could be lost).
+- **Anchor mapping fix**: a generic `eu-` prefix no longer shadows specific
+  cities, so `eu-london` measures the London anchor and `eu-paris` the Paris
+  anchor instead of Frankfurt. Added a US Central (Ohio) anchor and mappings
+  for the remaining regions; the client table and the relay allowlist are now
+  guarded by a test that walks every shipped game region.
+- **Tweak honesty fix**: `/api/tweak` used to treat an absent field as "false",
+  so applying tweaks silently disabled the Smart L4 filter and reported it as
+  an applied optimisation. Absent fields now mean "leave unchanged", and the
+  dashboard exposes the filter explicitly.
+- New dashboard unit tests (`node:test`, no new dependencies) cover the CIDR
+  and coverage helpers, the display formatters and the cost projection; CI
+  gained a dashboard job (tests, type-check, asset build, embedded-asset guard).
+- Docs now match the code: the protocol lists the `0xA` message type and the
+  16-entry anchor allowlist, the architecture carries the full local API table
+  and no longer implies a bundled relay fleet, and the cost guide states that
+  relay hosting is Linux-only and that the traffic figure is a planning
+  estimate.
+
+---
+
+## [1.8.0] - 2026-11-18
+
+### ♻️ Dual-path readiness (Redundant-lite Phase 1)
+
+- The relay accepts a dual-handshake extension, derives a PSK-keyed dedup
+  scope from the group id, forwards the first copy of a `(group, sequence)`
+  pair and suppresses later copies inside a 2-second TTL.
+- `DualAck` progress reports the **highest contiguous** forwarded sequence, so
+  a client can tell exactly which frames still need retransmission.
+- Dual path stays opt-in and both relays must share one PSK.
+
+---
+
+## [1.7.0] - 2026-11-17
+
+### 🛡️ Loopback API guard
+
+- Every state-changing request must carry `X-Lagvex-Request: 1`, and requests
+  with an `Origin` header must come from a loopback origin; a cross-site page
+  can no longer drive the local dashboard API.
+
+### 🧪 TCP ping tool
+
+- A bounded TCP ping tool (min/avg/max/loss) for explicit public game-server
+  IPs, with private/loopback/link-local addresses refused, rate limiting and
+  RST-on-closed-port handling. Observed game endpoints can be sent to it with
+  one click.
+
+### 📈 Measured node ordering
+
+- Relay nodes can be sorted by measured route, loss or recency, and sparkline
+  points show sample number, RTT and change from the previous sample.
+
+---
+
+## [1.6.0] - 2026-11-16
+
+### ⚡ Pre-measured standby relay
+
+- While connected, one alternative relay is kept pre-measured as a standby, so
+  a degradation promotes it without waiting for a sweep.
+
+### 🏓 Unprivileged ICMP echo measurement
+
+- When the OS permits unprivileged ICMP, the prober adds an ICMP echo RTT next
+  to the tunnel probe; it is labelled with its measurement method.
+
+---
+
+## [1.5.0] - 2026-11-16
+
+### 🔁 Stability-aware ranking and failover history
+
+- Relay ranking now accounts for measured stability (jitter and loss), not just
+  the latest RTT, and the dashboard keeps a history of relay handovers with
+  the old/new ping and the handover outcome.
+
+---
+
+## [1.4.0] - 2026-11-16
+
+### 📍 Measured per-segment ranking
+
+- Relays are ranked by the measured client→relay **and** relay→region segment
+  RTT instead of a flat ping, so the recommended node reflects the real path.
+
+### 🌐 Opt-in full tunnel
+
+- Full-tunnel mode routes all IPv4 traffic through the relay; split tunnelling
+  remains the default.
+
+### ⭐ Recent relays and best-route badge
+
+- The Nodes tab keeps a recent-relay shortcut and marks the best measured
+  route from the latest sweep.
+
+---
+
 ## [1.3.0] - 2026-11-16
 
 ### 🎯 Relay-measured anchor probe
