@@ -159,7 +159,7 @@ Every route below is served by the loopback HTTP server (`pkg/client/ui_server*.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/status` | Engine state, active relay/game, measured counters |
+| GET | `/api/status` | Engine state, active relay/game, measured counters (RTT plus `pingAgeMs`/`pongTotal` so callers can label a stale sample) |
 | GET | `/api/games` | Game catalog with regions and CIDRs |
 | GET | `/api/relays` | Configured relays (public + custom) |
 | GET | `/api/best-relay` | Best relay by the current measured ranking |
@@ -168,7 +168,7 @@ Every route below is served by the loopback HTTP server (`pkg/client/ui_server*.
 | GET | `/api/game-telemetry` | Cached regional reference telemetry |
 | GET | `/api/game-connections` | Remote endpoints of running games, read from the local OS socket table |
 | GET | `/api/game-server-history` | Persisted per-game measured game-server endpoints (`?gameId=`) |
-| GET | `/api/detected-processes` | Known game processes currently running |
+| GET | `/api/detected-processes` | Known game processes currently running, each with a measured per-core CPU % when the OS exposes one (`cpuSupported`, `cpuPercent`; otherwise labelled "not measured") |
 | GET | `/api/system-info` | OS, interfaces and tun support |
 | GET | `/api/failover/history` | Recent relay handovers |
 | GET | `/api/diagnostics/export` | Portable settings snapshot (never contains PSKs) |

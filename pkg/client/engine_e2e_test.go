@@ -167,6 +167,12 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	if stats.ActiveGame != "" || stats.ActiveRegion != "" {
 		t.Fatalf("connect without a game reported activeGame=%q activeRegion=%q", stats.ActiveGame, stats.ActiveRegion)
 	}
+	if stats.PongTotal != 0 {
+		t.Fatalf("pongTotal = %d before any keepalive, want 0", stats.PongTotal)
+	}
+	if stats.PingAgeMs < 0 {
+		t.Fatalf("pingAgeMs = %d, want a non-negative age", stats.PingAgeMs)
+	}
 	// The engine must name the adapter it actually used. On a host without a
 	// usable TUN device this is the userspace fallback, which the dashboard
 	// labels as control-only rather than acceleration.
@@ -195,6 +201,12 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	stats = eng.Stats()
 	if !stats.PingSampled {
 		t.Fatal("pong arrived but pingSampled stayed false")
+	}
+	if stats.PongTotal == 0 {
+		t.Fatal("pong arrived but pongTotal stayed 0")
+	}
+	if stats.PingAgeMs > 6000 {
+		t.Fatalf("pingAgeMs = %d after a fresh pong, want <= 6000", stats.PingAgeMs)
 	}
 	if got := stats.PingMs; got < 0 {
 		t.Fatalf("ping = %dms, want a measured value >= 0", got)

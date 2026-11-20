@@ -84,6 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   RTT as that game's latency: the Boost page states which game the tunnel is
   active for, and that the newly selected game must be boosted after stopping
   the current tunnel.
+- RTT samples now carry an age (`pingAgeMs`, `pongTotal`): a sample older than
+  three keepalive periods shows as a dash with "last sample is stale" instead
+  of being presented as live, mirroring how ExitLag hides a frame stat when
+  its own counter and the sample disagree.
+- The process scan reports a measured per-core CPU % per game process
+  (`/api/detected-processes`: `cpuSupported`, `cpuPercent`), read from the OS's
+  own counters (`/proc` on Linux, `GetProcessTimes` on Windows) with no
+  injection. macOS reports "not measured" because no portable,
+  injection-free counter exists there. Cards and the Boost hop show
+  `CPU 12.3%`, or `CPU —` with an explicit tooltip.
 - Route advice reports the relay's measured loss instead of a hardcoded "0%
   packet loss"; a lossy but faster relay is described with its actual loss.
 - A new client↔relay end-to-end test performs a real UDP handshake, waits for

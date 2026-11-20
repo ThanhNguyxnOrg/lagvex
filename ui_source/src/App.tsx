@@ -6,6 +6,7 @@ import {
   isPublicIPv4,
 } from "./lib/net.ts";
 import { formatAgeShort, probeMethodShort, routeHintMsLabel } from "./lib/format.ts";
+import { isRttFresh, cpuPercentLabel } from "./lib/telemetry.ts";
 import { MIN_MEASURED_SAMPLES, TYPICAL_BOOSTER_PRICE_PER_MONTH, projectMonthlyCost } from "./lib/cost.ts";
 
 // The dashboard API requires this header on state-changing requests so a
@@ -549,6 +550,9 @@ export type DetectedGame = {
   matchedProcess?: string;
   pid?: number;
   running: boolean;
+  // Per-core CPU % between two polls; absent until a second sample exists
+  // or the platform has no counter (then cpuSupported is false).
+  cpuPercent?: number | null;
 };
 
 export type GameConnection = {
@@ -1001,6 +1005,9 @@ export default function App() {
 
   // Detected game processes (measured by one local process-table scan)
   const [detectedGames, setDetectedGames] = useState<Record<string, DetectedGame>>({});
+  // null = not measured yet. false = this OS has no per-process CPU counter,
+  // so the UI says "not measured" instead of inventing a load figure.
+  const [cpuSupported, setCpuSupported] = useState<boolean | null>(null);
   const [gameConnections, setGameConnections] = useState<GameConnectionReport | null>(null);
   const [isScanningConnections, setIsScanningConnections] = useState(false);
   const [routeDetail, setRouteDetail] = useState<RouteDetail | null>(null);
@@ -1044,6 +1051,10 @@ export default function App() {
   // True once the tunnel engine has produced a real Pong sample. Without it,
   // 0 ms would be ambiguous between a sub-millisecond RTT and "no sample".
   const [pingSampled, setPingSampled] = useState(false);
+  // Age of the last real Pong. A RTT older than ~3 keepalive periods is shown
+  // as stale (—), not as a live number, mirroring ExitLag hiding a frame stat
+  // when its own counter and the sample disagree.
+  const [pingAgeMs, setPingAgeMs] = useState(0);
   // Game ID reported by the tunnel engine, not by the dashboard selection.
   // The UI must not claim to accelerate a game the engine has no routes for.
   const [engineGameId, setEngineGameId] = useState("");
@@ -1086,6 +1097,11 @@ export default function App() {
   // so the UI must not present it as acceleration.
   const userspaceFallback = isBoosting && driverMode === "Userspace QoS";
   const kernelTunnelActive = isBoosting && driverMode.startsWith("Kernel");
+  // An RTT sample is only "live" while a Pong arrived recently (three
+  // keepalive periods). After that the number describes the past, so the UI
+  // shows a dash instead, like ExitLag hides a frame stat whose counter and
+  // sample disagree.
+  const rttFresh = isRttFresh(pingSampled, pingAgeMs);
   // The page can show a newly selected game while the engine still routes the
   // previously boosted one. Never present selected-game content as active.
   const engineGameMismatch = isBoosting && engineGameId !== "" && engineGameId !== selectedGame.id;
@@ -1796,6 +1812,11 @@ export default function App() {
   // "<1 ms" instead of rounding down to an ambiguous 0.
   const formatRtt = (ms: number) => (ms < 1 ? "<1 ms" : `${Math.round(ms)} ms`);
 
+  // Per-core CPU label from the process scan. null means "not measured" (no
+  // second sample yet, or the OS exposes no counter) so callers render
+  // nothing rather than an invented load figure.
+  const cpuLabelFor = (g?: DetectedGame) => cpuPercentLabel(g?.cpuPercent);
+
   // Turn an API error response into the message the person should read. The
   // Go handlers answer {"error":"..."}; surfacing the raw JSON blob in a
   // toast is needlessly opaque.
@@ -1877,6 +1898,7 @@ export default function App() {
             if (typeof data.driverMode === "string") setDriverMode(data.driverMode);
             if (data.pingSampled) {
               setPingSampled(true);
+              setPingAgeMs(Number(data.pingAgeMs) || 0);
               setLivePing(Number(data.pingMs) || 0);
             }
             if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
@@ -1902,6 +1924,7 @@ export default function App() {
         if (!res.ok) return;
         const data = await res.json();
         if (stopped || !Array.isArray(data.games)) return;
+        if (typeof data.cpuSupported === "boolean") setCpuSupported(data.cpuSupported);
         const next: Record<string, DetectedGame> = {};
         for (const g of data.games) {
           if (g && typeof g.gameId === "string") next[g.gameId] = g as DetectedGame;
@@ -2157,12 +2180,14 @@ export default function App() {
           if (typeof data.driverMode === "string") setDriverMode(data.driverMode);
           if (data.pingSampled) {
             setPingSampled(true);
+            setPingAgeMs(Number(data.pingAgeMs) || 0);
             setLivePing(Number(data.pingMs) || 0);
           }
           if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
         } else if (data.state === "disconnected" || data.state === "error") {
           setIsBoosting(false);
           setPingSampled(false);
+          setPingAgeMs(0);
           setEngineGameId("");
           setDriverMode("");
           setPeerRoutes([]);
@@ -3145,8 +3170,26 @@ export default function App() {
                             {game.tag}
                           </span>
                           {detectedGames[game.id]?.running && (
-                            <span className="absolute top-3 left-3 px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
-                              RUNNING
+                            <span className="absolute top-3 left-3 flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
+                                RUNNING
+                              </span>
+                              {cpuLabelFor(detectedGames[game.id]) && (
+                                <span
+                                  className="px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono font-bold text-[#00F0FF] border border-white/10"
+                                  title="Per-core CPU measured between two process scans"
+                                >
+                                  CPU {cpuLabelFor(detectedGames[game.id])}
+                                </span>
+                              )}
+                              {cpuSupported === false && (
+                                <span
+                                  className="px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-white/50 border border-white/10"
+                                  title="Per-process CPU is not measured on this OS"
+                                >
+                                  CPU —
+                                </span>
+                              )}
                             </span>
                           )}
                         </div>
@@ -3162,7 +3205,7 @@ export default function App() {
                               <>
                                 <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                   <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                  <span>{pingSampled ? formatRtt(livePing) : "—"}</span>
+                                  <span>{rttFresh ? formatRtt(livePing) : "—"}</span>
                                 </div>
                                 <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                   TUNNEL LIVE
@@ -3269,7 +3312,7 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
-                            {isBoosting && pingSampled
+                            {isBoosting && rttFresh
                               ? livePing < 1
                                 ? "<1"
                                 : Math.round(livePing)
@@ -3280,10 +3323,10 @@ export default function App() {
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-brand text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
-                          <IconBolt className="w-4 h-4 text-[#00F0FF]" /> {isBoosting && pingSampled
+                          <IconBolt className="w-4 h-4 text-[#00F0FF]" /> {isBoosting && rttFresh
                             ? "Live RTT measured by the tunnel engine"
                             : isBoosting
-                            ? "Waiting for the first tunnel RTT sample"
+                            ? pingSampled ? "Last tunnel RTT sample is stale" : "Waiting for the first tunnel RTT sample"
                             : `Relay probe via ${selectedRelay.name || "Auto"} • Not connected`}
                         </span>
                       </div>
@@ -3320,7 +3363,7 @@ export default function App() {
                         <span className="text-[10px] font-mono text-[#00F0FF] mt-1 font-semibold">
                           {isBoosting && jitter > 0
                             ? "Mean RTT variation"
-                            : isBoosting && pingSampled
+                            : isBoosting && rttFresh
                             ? "Measured RTT samples vary by less than 1 ms"
                             : isBoosting
                             ? "Waiting for RTT samples"
@@ -3546,7 +3589,7 @@ export default function App() {
                         }
                       >
                         {detectedGames[selectedGame.id]?.running
-                          ? `${detectedGames[selectedGame.id]?.matchedProcess || "game"} running`
+                          ? `${detectedGames[selectedGame.id]?.matchedProcess || "game"} running${cpuLabelFor(detectedGames[selectedGame.id]) ? ` • CPU ${cpuLabelFor(detectedGames[selectedGame.id])}` : ""}`
                           : "game process not detected"}
                       </span>
                     </div>
@@ -3580,7 +3623,7 @@ export default function App() {
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-[#00F0FF] font-bold mt-1">
-                        {isBoosting && pingSampled
+                        {isBoosting && rttFresh
                           ? formatRtt(livePing)
                           : selectedRelay.pingMs > 0
                           ? `${selectedRelay.pingMs} ms`
@@ -3948,7 +3991,7 @@ export default function App() {
                           LIVE ENGINE RTT SAMPLES
                         </span>
                         <span className="text-[10px] font-mono text-white/45">
-                          Latest: {pingSampled ? formatRtt(livePing) : "—"} &bull; Jitter: {isBoosting && jitter > 0 ? `±${jitter}ms` : "—"}
+                          Latest: {rttFresh ? formatRtt(livePing) : "—"} &bull; Jitter: {isBoosting && jitter > 0 ? `±${jitter}ms` : "—"}
                         </span>
                       </div>
                       <div className="h-[120px] w-full rounded-lg overflow-hidden bg-black/40">
@@ -4234,8 +4277,26 @@ export default function App() {
                           {game.tag}
                         </span>
                         {detectedGames[game.id]?.running && (
-                          <span className="absolute top-3 left-3 px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
-                            RUNNING
+                          <span className="absolute top-3 left-3 flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded bg-[#10b981] text-[10px] font-brand font-bold text-black">
+                              RUNNING
+                            </span>
+                            {cpuLabelFor(detectedGames[game.id]) && (
+                              <span
+                                className="px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono font-bold text-[#00F0FF] border border-white/10"
+                                title="Per-core CPU measured between two process scans"
+                              >
+                                CPU {cpuLabelFor(detectedGames[game.id])}
+                              </span>
+                            )}
+                            {cpuSupported === false && (
+                              <span
+                                className="px-2 py-0.5 rounded bg-black/70 text-[9px] font-mono text-white/50 border border-white/10"
+                                title="Per-process CPU is not measured on this OS"
+                              >
+                                CPU —
+                              </span>
+                            )}
                           </span>
                         )}
                       </div>
@@ -4253,7 +4314,7 @@ export default function App() {
                             <>
                               <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                 <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                <span>{pingSampled ? formatRtt(livePing) : "—"}</span>
+                                <span>{rttFresh ? formatRtt(livePing) : "—"}</span>
                               </div>
                               <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                 TUNNEL LIVE

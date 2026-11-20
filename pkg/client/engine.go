@@ -40,7 +40,14 @@ type TunnelStats struct {
 	// PingSampled reports whether PingMs came from a real Pong in this
 	// session. Without it a 0 ms value is ambiguous: it can mean a measured
 	// sub-millisecond RTT or no sample at all.
-	PingSampled      bool           `json:"pingSampled"`
+	PingSampled bool `json:"pingSampled"`
+	// PingAgeMs is how long ago the last authenticated Pong arrived. A RTT
+	// whose sample is old is reported next to its age so callers can label
+	// it stale instead of presenting an old measurement as live.
+	PingAgeMs int64 `json:"pingAgeMs"`
+	// PongTotal counts authenticated Pongs received in this session, so a
+	// dashboard can tell a fresh tunnel from one that never answered.
+	PongTotal        uint64         `json:"pongTotal"`
 	BytesUp          uint64         `json:"bytesUp"`
 	BytesDown        uint64         `json:"bytesDown"`
 	UpRateBps        int64          `json:"upRateBps"`
@@ -126,6 +133,7 @@ type Engine struct {
 	bytesDown           atomic.Uint64
 	pingMs              atomic.Int64
 	pingSampled         atomic.Bool
+	pongTotal           atomic.Uint64
 	upRate              atomic.Int64
 	downRate            atomic.Int64
 	lastPong            atomic.Int64 // Unix nanoseconds of the last authenticated Pong
@@ -210,6 +218,18 @@ func NewEngine(pm *profiles.Manager) (*Engine, error) {
 }
 
 // Stats returns a snapshot of current telemetry.
+// pingAgeMs reports how long ago the last authenticated Pong arrived. A
+// negative value while connected means the keepalive is behind, not that the
+// measurement is broken.
+func (e *Engine) pingAgeMs() int64 {
+	last := time.Unix(0, e.lastPong.Load())
+	age := time.Since(last)
+	if age < 0 {
+		return 0
+	}
+	return age.Milliseconds()
+}
+
 func (e *Engine) Stats() TunnelStats {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -251,6 +271,8 @@ func (e *Engine) Stats() TunnelStats {
 		GatewayIP:        e.gatewayIP.String(),
 		PingMs:           e.pingMs.Load(),
 		PingSampled:      e.pingSampled.Load(),
+		PingAgeMs:        e.pingAgeMs(),
+		PongTotal:        e.pongTotal.Load(),
 		BytesUp:          e.bytesUp.Load(),
 		BytesDown:        e.bytesDown.Load(),
 		UpRateBps:        e.upRate.Load(),
@@ -812,6 +834,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.cancelFunc = cancel
 	e.lastPong.Store(time.Now().UnixNano())
 	e.pingSampled.Store(false)
+	e.pongTotal.Store(0)
 	e.lastErr.Store(nil)
 	if e.fecEncoder != nil {
 		e.fecEncoder.Reset()
@@ -946,6 +969,7 @@ func (e *Engine) Disconnect() error {
 	e.driverMode = ""
 	e.pingMs.Store(0)
 	e.pingSampled.Store(false)
+	e.pongTotal.Store(0)
 	e.bytesUp.Store(0)
 	e.bytesDown.Store(0)
 	e.upRate.Store(0)
@@ -1117,6 +1141,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 				e.pingMs.Store(rtt.Milliseconds())
 				e.pingSampled.Store(true)
 				e.lastPong.Store(time.Now().UnixNano())
+				e.pongTotal.Add(1)
 			}
 
 		case protocol.TypeAnchorProbeReply:

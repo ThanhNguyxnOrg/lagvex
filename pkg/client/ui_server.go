@@ -36,6 +36,9 @@ type UIServer struct {
 	prober         *Prober
 	configStore    *ConfigStore
 	tcpPingLimiter tcpPingLimiter
+	// cpuSampler turns two reads of the OS's own counters into a per-process
+	// CPU percentage (ExitLag/PDH-style), with no injection into any game.
+	cpuSampler *processCPUSampler
 
 	// Reusable last sweep (ExitLag re-probes only "when due"): a dashboard
 	// poll burst within the TTL reuses the completed measurement instead of
@@ -86,6 +89,7 @@ func NewUIServer(engine *Engine, pm *profiles.Manager, webDir string) *UIServer 
 		webDir:      webDir,
 		prober:      NewProber(),
 		configStore: cs,
+		cpuSampler:  NewProcessCPUSampler(),
 	}
 }
 
@@ -172,6 +176,8 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"gatewayIP":        stats.GatewayIP,
 		"pingMs":           stats.PingMs,
 		"pingSampled":      stats.PingSampled,
+		"pingAgeMs":        stats.PingAgeMs,
+		"pongTotal":        stats.PongTotal,
 		"bytesUp":          stats.BytesUp,
 		"bytesDown":        stats.BytesDown,
 		"upRateBps":        stats.UpRateBps,
@@ -227,6 +233,9 @@ func (u *UIServer) handleDetectedProcesses(w http.ResponseWriter, r *http.Reques
 		Running        bool     `json:"running"`
 		MatchedProcess string   `json:"matchedProcess,omitempty"`
 		PID            int      `json:"pid,omitempty"`
+		// CPUPercent is the per-core usage since the previous poll, or null
+		// until two samples exist or the OS cannot measure it.
+		CPUPercent *float64 `json:"cpuPercent,omitempty"`
 	}
 
 	var targets []string
@@ -234,6 +243,18 @@ func (u *UIServer) handleDetectedProcesses(w http.ResponseWriter, r *http.Reques
 		targets = append(targets, g.ProcessNames...)
 	}
 	matches := findRunningProcesses(targets)
+
+	// Keep only PIDs we just saw, so a restarted game is sampled from scratch.
+	live := make(map[int]bool, len(matches))
+	for _, pid := range matches {
+		live[pid] = true
+	}
+
+	// A UIServer built without the constructor (tests) still gets honest data.
+	sampler := u.cpuSampler
+	if sampler == nil {
+		sampler = NewProcessCPUSampler()
+	}
 
 	statuses := make([]gameProcessStatus, 0, len(catalog.Games))
 	for _, g := range catalog.Games {
@@ -247,15 +268,22 @@ func (u *UIServer) handleDetectedProcesses(w http.ResponseWriter, r *http.Reques
 				status.Running = true
 				status.MatchedProcess = p
 				status.PID = pid
+				if pct, ok := sampler.Sample(pid); ok {
+					val := pct
+					status.CPUPercent = &val
+				}
 				break
 			}
 		}
 		statuses = append(statuses, status)
 	}
 
+	sampler.Prune(live)
+
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"scannedAt": time.Now().UTC().Format(time.RFC3339),
-		"games":     statuses,
+		"scannedAt":    time.Now().UTC().Format(time.RFC3339),
+		"cpuSupported": sampler.Supported(),
+		"games":        statuses,
 	})
 }
 
