@@ -56,6 +56,22 @@ anti-cheat checks the way socket-hooking boosters can.
 - 🗺️ **Route detail** — per-hop measurement (gateway, direct relay probe, live tunnel
   echo, region cloud anchor) with explicit "not measured" reasons for segments the
   client cannot observe.
+- 📡 **Relay-measured game-server segment** — while a tunnel is up, the relay itself
+  measures the TCP handshake to your game's server (`/probe/gameserver`, one probe
+  per source IP per two seconds, public IP literals only) and the Boost page shows
+  the relay→server segment plus the combined you→relay→server total, but only when
+  both halves are actually measured.
+- 📈 **Tail latency** — probe history reports p50/p95 percentiles computed from real
+  retained runs, next to the average and spread, so a relay's worst moments are
+  visible instead of hidden inside an average.
+- ⏱️ **Stale-aware RTT** — a sample older than three keepalive periods is shown as
+  `—` with "last sample is stale" rather than presented as live; the age of the last
+  Pong and the count of Pongs are part of `/api/status`.
+- 🔥 **Measured per-process CPU** — the process scan reports each game process's
+  per-core CPU percentage read from the OS's own counters (`/proc` on Linux,
+  `GetProcessTimes` on Windows). Without a portable injection-free counter
+  (macOS today) the API says so explicitly and the UI shows `CPU —` with a
+  "not measured on this OS" tooltip.
 - 🧪 **TCP ping tool** — measures the TCP handshake RTT (min/avg/max/loss) to an
   explicit public game-server IP. Hostnames and private, loopback or link-local
   addresses are refused, and runs are limited to one every 2 seconds and 60 per

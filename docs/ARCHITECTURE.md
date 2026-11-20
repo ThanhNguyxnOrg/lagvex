@@ -243,6 +243,14 @@ region — see [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [docs/COST.md](COST.md).
   room lookups per source IP, caps the number of live rooms, and generates
   cryptographically random room codes (a room code grants access to the
   roster and must not be guessable).
+- **Relay game-server probe** (`POST /probe/gameserver`) lives on the same
+  public HTTP port: the connected relay measures the TCP handshake RTT to an
+  explicit public game-server IP so the dashboard can show the relay→server
+  segment (ExitLag's `PingToDS` equivalent). It takes no PSK (the
+  measurement is exactly what the client's own TCP ping tool performs
+  locally), rate-limits one request per source IP per two seconds on a
+  limiter of its own so it cannot starve squad polling, and refuses private,
+  loopback and bogon hosts before dialing.
 
 ---
 
