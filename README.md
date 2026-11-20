@@ -62,10 +62,18 @@ anti-cheat checks the way socket-hooking boosters can.
   hour. A closed port still reports a real RTT when the host answers with RST.
   Endpoints observed in the game-connections panel can be sent to the tool with
   one click.
-- 🪟 **Floating HUD** — an always-on-top overlay that reads the same `/api/status`
-  values and shows dashes until a sample exists.
+- 🪟 **Floating HUD** — a draggable latency panel inside the dashboard that reads the
+  same `/api/status` values and shows dashes until a sample exists.
 - 🧾 **Diagnostics snapshot** — export measured state plus non-secret settings for bug
   reports; import merges them back (relay PSKs are never included).
+- 🗂️ **Measured game-server history** — up to eight measured game endpoints per game
+  are remembered (positive RTT only, IP literals only) and shown on the Boost card;
+  the dashboard also warns when observed peers fall outside the selected region's
+  CIDRs, so a mis-picked region is visible instead of silent.
+- 💸 **Cost & self-host calculator** — project the monthly relay transfer from your
+  own measured session rate, split the VPS price across a squad, and compare with a
+  typical paid plan. Every price and traffic figure is labelled as an estimate;
+  see [`docs/COST.md`](docs/COST.md).
 - 🛡️ **Adaptive FEC, failover and DSCP marking** — loss recovery and relay failover
   with honest status reporting. While connected, one alternative relay is kept
   pre-measured as a standby, so a degradation promotes it without waiting for a sweep.
@@ -138,6 +146,7 @@ connected, a room exists only on that machine.
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Component layout, routing design, anti-cheat safety |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Relay VPS installation, hardening and operations |
+| [`docs/COST.md`](docs/COST.md) | Relay VPS cost, traffic estimates and self-hosting |
 | [`docs/PROFILES.md`](docs/PROFILES.md) | Game profile schema and how to add a game |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | Packet format, handshake and FEC |
 | [`docs/WHY_VPS.md`](docs/WHY_VPS.md) | Why a relay is needed and what it can/cannot fix |
@@ -159,6 +168,7 @@ npm --prefix ui_source run build
 # Tests
 go test ./...
 npx --prefix ui_source tsc --noEmit
+npm --prefix ui_source test          # dashboard unit tests (node:test, no extra deps)
 ```
 
 The dashboard is a React/Vite app in `ui_source/`; the build writes hashed bundles into

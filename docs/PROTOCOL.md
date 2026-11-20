@@ -20,7 +20,7 @@ Every packet begins with a 1-byte header:
 
 ```text
 bits 7..4 : Protocol Version (currently 0x1)
-bits 3..0 : Message Type (0x1 .. 0x9)
+bits 3..0 : Message Type (0x1 .. 0xA)
 ```
 
 | Type Code | 🏷️ Message Name | ↔️ Direction | 📏 Packet Size |
@@ -149,10 +149,17 @@ Safety rules that keep a relay from becoming a scanner or amplifier:
 
 - The relay only accepts ids from the fixed `protocol.AnchorProbeTargets`
   allowlist; unknown ids are rejected and logged. A client can never request an
-  arbitrary host or port.
+  arbitrary host or port. The allowlist currently holds 16 AWS endpoints:
+  Singapore, Tokyo, Seoul, Hong Kong, Mumbai, Sydney, US East, US West,
+  Frankfurt, São Paulo, Cape Town, Paris, London, Bahrain, Osaka and US
+  Central (Ohio).
 - Each session is rate limited to one probe every 2 seconds and 60 per hour.
 - A probe is only two TCP handshakes with a 1.5s timeout each; failures are
   reported as loss, never as invented latency.
+- The client maps a game region to an anchor by matching the region id and
+  name against anchor keys; the **longest matching key wins**, so a specific
+  city (e.g. `eu-london` → London) always beats a generic continental prefix
+  (e.g. `eu-` → Frankfurt).
 
 ---
 
@@ -177,12 +184,14 @@ iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp
 
 ---
 
-## 9. ♻️ Dual-Path Dedup (Redundant-lite, Phase 1)
+## 9. ♻️ Dual-Path Dedup (Redundant-lite)
 
-Phase 1 makes relays ready for an opt-in dual-send client (Phase 2): the same
-data frame is transmitted to two relays and the first copy seen is forwarded,
-while later copies are dropped. **No shipped client sends dual frames yet** —
-until Phase 2, every session uses a single path and the dedup state stays empty.
+The relay side is Phase 1 and the client side is Phase 2; **both are shipped**
+and opt-in from the dashboard. The same data frame can travel through two
+relays: the first copy a relay sees is forwarded, later copies are dropped.
+A shipped client does not blind-duplicate traffic — it sends each frame to the
+primary relay once and retransmits only frames that stay unacknowledged, so
+the game server never receives a duplicate copy of the same frame.
 
 ### 9.1 Handshake extension (request)
 
@@ -241,8 +250,9 @@ group is dropped and counted as a bad frame.
   creates group state.
 
 The relay `/health` endpoint reports `dualSessions`, `dualGroups`,
-`dualForwarded` and `dualSuppressed` so operators can verify the counters stay
-at zero until Phase 2 exists.
+`dualForwarded` and `dualSuppressed`. The counters stay at zero for
+single-path sessions; they only move once a client opts into dual path and a
+dual handshake has been accepted.
 
 ### 9.6 DualAck progress report (Phase 2 groundwork)
 
@@ -295,5 +305,6 @@ copy, since dedup state is per relay and relays do not share state.
 - 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📐 [**Architecture Overview**](ARCHITECTURE.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
+- 💸 [**Running Cost & Self-Hosting**](COST.md)
 - 🌐 [**Game Profiles & CIDRs**](PROFILES.md)
 - ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)

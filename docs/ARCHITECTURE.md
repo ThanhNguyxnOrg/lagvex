@@ -137,7 +137,8 @@ counters documented in `docs/PROTOCOL.md` §9. The dashboard toggle
 
 ## 6. 🎨 Esports Cockpit HUD & Telemetry Architecture
 
-The frontend (`web/`) is architected as a lightweight, zero-dependency tactical gaming interface:
+The frontend (`ui_source/`) is a React + Vite dashboard built into static assets
+that are embedded in the Go binary and served from `web/`:
 
 ```text
   [ Embedded Go HTTP Server (:18888) ]
@@ -145,11 +146,50 @@ The frontend (`web/`) is architected as a lightweight, zero-dependency tactical 
                   ├─► GET /api/status       (Engine state, active game, active relay)
                   ├─► POST /api/connect     (Triggers handshake & dynamic routing)
                   ├─► POST /api/disconnect  (Tears down routes & releases IP)
-                  ├─► POST /api/probe       (UDP tunnel probe + optional ICMP echo)
+                  ├─► GET  /api/probe-relays (Measures & ranks the configured relays)
                   ├─► POST /api/tcping      (TCP handshake RTT to a public IP)
                   ├─► POST /api/dual-path/toggle (Redundant-lite ARQ mode)
                   └─► Static Assets         (React dashboard build)
 ```
+
+### Local dashboard API
+
+Every route below is served by the loopback HTTP server (`pkg/client/ui_server*.go`).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/status` | Engine state, active relay/game, measured counters |
+| GET | `/api/games` | Game catalog with regions and CIDRs |
+| GET | `/api/relays` | Configured relays (public + custom) |
+| GET | `/api/best-relay` | Best relay by the current measured ranking |
+| GET | `/api/probe-relays` | Measures configured relays (`?ids=` subset, `?force=1` bypasses the 20 s cache) |
+| GET | `/api/route-detail` | Per-hop route detail for the active session |
+| GET | `/api/game-telemetry` | Cached regional reference telemetry |
+| GET | `/api/game-connections` | Remote endpoints of running games, read from the local OS socket table |
+| GET | `/api/game-server-history` | Persisted per-game measured game-server endpoints (`?gameId=`) |
+| GET | `/api/detected-processes` | Known game processes currently running |
+| GET | `/api/system-info` | OS, interfaces and tun support |
+| GET | `/api/failover/history` | Recent relay handovers |
+| GET | `/api/diagnostics/export` | Portable settings snapshot (never contains PSKs) |
+| GET | `/api/advisor` | Route advice for the current selection |
+| POST | `/api/game-server-history` | Records one measured game-server endpoint (`avgMs > 0`, IP literal only) |
+| POST | `/api/connect` | Connects to a relay (`relayEndpoint` + `psk`) |
+| POST | `/api/disconnect` | Tears the session down |
+| POST | `/api/add-game` / `/api/add-relay` | Adds a custom game or relay |
+| POST | `/api/tcping` | TCP handshake RTT to a public IP |
+| POST | `/api/ping-relay` / `/api/test-relay` | Relay reachability checks |
+| POST | `/api/dual-path/toggle` | Opt-in redundant-lite ARQ mode |
+| POST | `/api/fec/toggle` | FEC parity on/off |
+| POST | `/api/peer-routing/toggle` | Peer routing on/off |
+| POST | `/api/full-tunnel/toggle` | Full tunnel on/off |
+| POST | `/api/failover/toggle` | Automatic relay failover on/off |
+| POST | `/api/tweak` | Applies a system tweak |
+| POST | `/api/optimize-profile` | Runs the profile optimizer |
+| POST | `/api/diagnose-network` / `/api/diagnose-bufferbloat` | Network diagnostics |
+| POST | `/api/relaunch-admin` | Relaunches the client with elevated rights |
+| POST | `/api/shutdown` | Stops the client |
+| POST | `/api/diagnostics/import` | Applies a settings snapshot |
+| POST | `/api/squad/create` / `/join` / `/leave` / `/room` / `/heartbeat` | Squad signalling |
 
 ### Local API guard
 
@@ -171,30 +211,29 @@ the TCP ping tool, are POST-only so this guard also covers them.
 
 ---
 
-## 7. 🌐 Global Multi-Continent Relay Topology
+## 7. 🌐 Relay Topology (self-hosted)
 
-To deliver competitive latency for players worldwide, Lagvex structures its server infrastructure into **5 continental tiers**:
+**Lagvex ships no relay fleet.** The bundled relay catalog is empty and the
+client never silently routes traffic through infrastructure the project does
+not control. A relay is something the user (or a squad) deploys near the game
+region — see [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [docs/COST.md](COST.md).
 
 ```text
-                                  ┌──────────────────────────┐
-                                  │      LAGVEX CLIENT       │
-                                  └────────────┬─────────────┘
-                                               │
-                        ┌──────────────────────┴──────────────────────┐
-                        │ Dynamic Continental Routing Selector       │
-                        ▼                                             ▼
-             [ 🌏 Asia-Pacific ]                             [ 🌍 Europe ]
-        Singapore / Tokyo / Hong Kong                   Frankfurt / London / Paris
-        Seoul / Mumbai / Sydney                         Helsinki / Madrid
-                        │                                             │
-                        ├──────────────────────┬──────────────────────┤
-                        ▼                      ▼                      ▼
-             [ 🌎 North America ]     [ 🌎 South America ]    [ 🌍 Middle East ]
-             US-East / US-West        São Paulo / Santiago    Bahrain / Dubai
+                    ┌──────────────────────────┐
+                    │      LAGVEX CLIENT       │
+                    └────────────┬─────────────┘
+                                 │
+              ┌──────────────────┴──────────────────┐
+              │  Measured Relay Ranking Selector   │
+              ▼                                     ▼
+   [ self-hosted relay A ]              [ self-hosted relay B ]
+   (e.g. Singapore / Tokyo /             (standby for redundant-lite
+    Frankfurt / Sydney …)                 ARQ, opt-in)
 ```
 
 - **Continent-grouped region selector**: The dashboard groups the catalog's regional server clusters by their `continent` label (Asia-Pacific, Europe, North America, South America, Oceania, Middle East & Africa) and only offers regions that have verified CIDRs.
-- **Relay Proximity Priority**: Built-in relay selection prioritizes geographically proximate nodes, minimizing intermediate undersea hops before entering dedicated game backbones (Riot Direct, Valve SDR, AWS Global Accelerator).
+- **Measured selection, not geography**: relay selection ranks the relays the user configured by **measured** path quality (RTT, jitter, loss and the relay→region-anchor segment), not by geographic proximity. A relay in the wrong city can rank below a nearby one, and the dashboard shows why.
+- **Relay hosting is Linux-only**: the relay needs `/dev/net/tun`; Windows and macOS can run the client but cannot host a relay.
 
 ---
 
@@ -203,5 +242,6 @@ To deliver competitive latency for players worldwide, Lagvex structures its serv
 - 🤝 [**Contributor Guide**](../CONTRIBUTING.md)
 - 📡 [**Protocol Specification**](PROTOCOL.md)
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md)
+- 💸 [**Running Cost & Self-Hosting**](COST.md)
 - 🌐 [**Game Profiles & CIDRs**](PROFILES.md)
 - ⚖️ [**Legal Disclaimer**](DISCLAIMER.md)

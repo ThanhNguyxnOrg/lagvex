@@ -11,13 +11,16 @@
 - 🐧 **Operating System**: Ubuntu 20.04+, Debian 11+, CentOS 8+, Rocky Linux, AlmaLinux 9+, or Arch Linux.
 - ⚙️ **Kernel**: Linux 5.4 or newer with `tun` module support.
 - 🛡️ **Firewall**: `iptables` or `firewalld` with root / `sudo` access.
-- ⚡ **Hardware**: 1 vCPU, 512 MB RAM, 10 GB Disk (Lagvex is ultra-lightweight; a $3.50/month VPS can easily support 100+ concurrent players).
+- ⚡ **Hardware**: 1 vCPU, 512 MB RAM, 10 GB Disk. Lagvex is lightweight, but capacity depends on your uplink bandwidth, MTU and packet rate — no fixed player-count guarantee is benchmarked, so test with your own workload before a tournament.
 
 ---
 
 ## 2. 🌍 Choosing Optimal Worldwide Relay Locations
 
-Lagvex supports a global network across 5 continents. Choose a relay location closest to your target game datacenter:
+**Lagvex ships no relay fleet** — the bundled relay catalog is empty and every
+relay is one you (or your squad) deploys. The table below lists the cities that
+work best for each game region; pick the one closest to the datacenter your
+game actually uses:
 
 | Continent | 📍 Prime Relay Hubs | 🎯 Target Esports & Game Clusters |
 |---|---|---|

@@ -84,9 +84,9 @@ Lagvex is engineered with three clear tiers of access:
 3. 🛠️ **Tier 3: Dedicated Self-Hosters & Cyber Cafes**:  
    Players who want a private relay, or net cafe owners optimising 50+ LAN PCs, run their own node on a Linux VPS near the game region.
 
-### ⚡ Ultra-Efficient Server Capacity:
-- 📊 **Resource Footprint**: The relay daemon consumes less than **15 MB of RAM** and negligible CPU overhead (< 2% on a single core).
-- 🎮 **Capacity**: A single modest Linux server comfortably carries **20 to 50 concurrent players** playing simultaneously without packet drops.
+### ⚡ Server Capacity:
+- 📊 **Resource Footprint**: The relay daemon is a small Go binary with a userspace-friendly footprint; the exact RAM and CPU use depend on packet rate and MTU, so measure it on your own box (`top`/`htop` on the relay).
+- 🎮 **Capacity**: Concurrent capacity scales with uplink bandwidth, CPU and packet rate. `-max-clients` caps the number of concurrent sessions, but there is **no benchmarked player-count guarantee** — validate with your own workload before a tournament.
 
 ---
 
@@ -102,7 +102,7 @@ Lagvex is 100% open-source, vendor-neutral, and does not partner with or adverti
 | **Memory (RAM)** | 💾 512 MB – 1 GB | Extremely lightweight; 512 MB is more than adequate. |
 | **Disk Space** | 💽 5 GB – 10 GB SSD | The compiled binary is under 10 MB. |
 | **Networking** | 🌐 1 Public IPv4 Address | Static IP with UDP traffic allowed (default port `4433/udp`). |
-| **Bandwidth** | 📈 500 GB – 1 TB monthly transfer | An intense gaming session uses only ~20–40 MB per hour. |
+| **Bandwidth** | 📈 500 GB – 1 TB monthly transfer | Planning estimate: ~20–40 MB per hour of accelerated gaming (varies by game and packet rate) — not a measured guarantee. |
 | **Location** | 📍 Geographically close to target game servers | E.g., Singapore for SEA servers; Tokyo for JP/KR servers; Frankfurt for EU servers. |
 
 ---

@@ -24,8 +24,14 @@ type testClient struct {
 }
 
 // startTestRelay boots a relay on loopback UDP with a userspace TUN sink and
-// returns the server, its UDP address and the forwarded-packet channel.
-func startTestRelay(t *testing.T, psk []byte) (*Server, netip.AddrPort, chan []byte) {
+// returns the server, its UDP address, the forwarded-packet channel and a
+// channel that is closed once the write sink is installed.
+//
+// The sink is installed asynchronously (the tunnel device only exists after
+// Start opens it), so callers MUST wait for sinkReady before sending traffic:
+// the userspace device discards writes while no sink is attached, which would
+// otherwise drop the first forwarded packet and make the test flaky.
+func startTestRelay(t *testing.T, psk []byte) (*Server, netip.AddrPort, chan []byte, <-chan struct{}) {
 	t.Helper()
 
 	if runtime.GOOS != "linux" {
@@ -49,7 +55,9 @@ func startTestRelay(t *testing.T, psk []byte) (*Server, netip.AddrPort, chan []b
 	}
 
 	forwarded := make(chan []byte, 64)
+	sinkReady := make(chan struct{})
 	go func() {
+		defer close(sinkReady)
 		deadline := time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
 			if dev := srv.TUN(); dev != nil {
@@ -89,7 +97,17 @@ func startTestRelay(t *testing.T, psk []byte) (*Server, netip.AddrPort, chan []b
 	if !udpAddr.IsValid() {
 		t.Fatal("relay did not bind UDP in time")
 	}
-	return srv, udpAddr, forwarded
+	return srv, udpAddr, forwarded, sinkReady
+}
+
+// waitForSink blocks until the relay's TUN write sink is installed.
+func waitForSink(t *testing.T, sinkReady <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-sinkReady:
+	case <-time.After(5 * time.Second):
+		t.Fatal("relay TUN write sink was not installed in time")
+	}
 }
 
 func dialTestClient(t *testing.T, udpAddr netip.AddrPort, psk []byte, clientID uint64, groupID *[protocol.DualGroupIDLen]byte) *testClient {
@@ -253,7 +271,10 @@ func activeSession(t *testing.T, srv *Server) *Session {
 
 func TestDualDedupEndToEnd(t *testing.T) {
 	psk := []byte("integration-psk-0123456789ab")
-	srv, udpAddr, forwarded := startTestRelay(t, psk)
+	srv, udpAddr, forwarded, sinkReady := startTestRelay(t, psk)
+	// The userspace tunnel discards writes until the sink is attached, so the
+	// sink must be live before the first data frame is sent.
+	waitForSink(t, sinkReady)
 
 	var groupID [protocol.DualGroupIDLen]byte
 	for i := range groupID {

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/clean-assets.mjs && vite build",
+    "test": "node --test src/lib/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "format": "oxfmt"
   },

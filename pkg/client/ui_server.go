@@ -1307,22 +1307,29 @@ type telemetryAnchor struct {
 // references. They are not game servers, so the API never presents their RTT
 // as a game-server ping. The probeID lets the relay measure the same target
 // from its side without accepting an arbitrary host from a client.
+//
+// Keys are matched against the lower-cased region id + name; the anchor with
+// the LONGEST matching key wins, so a specific city always beats a generic
+// continental prefix (e.g. "eu-london" matches "london" and not "eu-").
 var telemetryAnchors = []telemetryAnchor{
-	{"sg", "Singapore", 1, []string{"singapore", "asia-sg", "sg-"}},
+	{"sg", "Singapore", 1, []string{"singapore", "asia-sg", "sg-", "vietnam"}},
 	{"jp", "Tokyo", 2, []string{"tokyo", "japan", "asia-jp"}},
 	{"kr", "Seoul", 3, []string{"seoul", "korea", "asia-kr"}},
-	{"hk", "Hong Kong", 4, []string{"hong kong", "hongkong", "asia-hk"}},
+	{"hk", "Hong Kong", 4, []string{"hong kong", "hongkong", "asia-hk", "taiwan"}},
 	{"in", "Mumbai", 5, []string{"mumbai", "india", "asia-mumbai"}},
 	{"au", "Sydney", 6, []string{"sydney", "oceania", "oc-"}},
 	{"us-east", "US East", 7, []string{"us-east", "virginia", "chicago", "na-us-east", "na-chicago"}},
 	{"us-west", "US West", 8, []string{"us-west", "california", "na-us-west"}},
-	{"eu", "Frankfurt", 9, []string{"frankfurt", "stockholm", "europe", "eu-"}},
+	// "europe" is deliberately absent: it is a generic word that ties with
+	// city keys such as "london" and would shadow them.
+	{"eu", "Frankfurt", 9, []string{"frankfurt", "stockholm", "eu-"}},
 	{"sa", "Sao Paulo", 10, []string{"sao paulo", "são paulo", "brazil", "south america", "sa-"}},
 	{"af", "Johannesburg", 11, []string{"johannesburg", "africa", "af-"}},
 	{"eu-west", "Paris", 12, []string{"paris", "france", "eu-west"}},
 	{"uk", "London", 13, []string{"london", "england", "united kingdom"}},
 	{"me", "Middle East", 14, []string{"bahrain", "middle east", "dubai", "uae", "me-"}},
 	{"jp-west", "Osaka", 15, []string{"osaka", "japan-west", "kansai"}},
+	{"us-central", "US Central", 16, []string{"na-us-central", "us-central", "dallas", "ohio"}},
 }
 
 // anchorTarget resolves the allowlisted probe target for an anchor.
@@ -1336,16 +1343,31 @@ func (u *UIServer) resolveAnchorProbeID(gameID, regionID string) byte {
 	return anchorProbeIDForRegion(u.profileMgr, gameID, regionID)
 }
 
+// matchTelemetryAnchor resolves the anchor for a region id/name pair.
+//
+// The anchor whose key matches most specifically (longest key) wins, so a
+// city key always beats a generic continental prefix. Without this rule the
+// generic "eu-" key would swallow "eu-london" and "eu-paris" and silently
+// measure the wrong segment.
 func matchTelemetryAnchor(regionID, regionName string) (telemetryAnchor, bool) {
 	haystack := strings.ToLower(regionID + " " + regionName)
+	best := telemetryAnchor{}
+	bestLen := -1
 	for _, anchor := range telemetryAnchors {
 		for _, key := range anchor.keys {
-			if strings.Contains(haystack, key) {
-				return anchor, true
+			if !strings.Contains(haystack, key) {
+				continue
+			}
+			if len(key) > bestLen {
+				best = anchor
+				bestLen = len(key)
 			}
 		}
 	}
-	return telemetryAnchor{}, false
+	if bestLen < 0 {
+		return telemetryAnchor{}, false
+	}
+	return best, true
 }
 
 var (

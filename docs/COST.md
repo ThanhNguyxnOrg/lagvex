@@ -10,15 +10,16 @@
 |---|---|---|
 | Software | 💵 subscription (see below) | ✅ **100% free, open source** |
 | Server network | 💵 included, their VPS fleet | 🫵 **your own VPS** (or a friend's) |
-| Typical total | **~$6.50–$12 / month, forever** | **$0 – $5 / month**, cancel anytime |
+| Typical total | **~$6.50–$12 / month, forever** | **$0 – $6 / month**, cancel anytime |
 
 Lagvex never charges for the client, never gates features behind a plan, and
 never asks for a payment method. The **only** optional cost is the relay VPS —
 and that is the part you control.
 
-> ℹ️ Competitor prices below are their **publicly listed** subscription prices,
-> observed during the design study, and may change. They are listed only as a
-> size reference, not as an offer.
+> ℹ️ Competitor prices are **publicly listed subscription prices** observed
+> during the 2026 design study, and may change; they are listed only as a size
+> reference, not as an offer. The dashboard compares against an illustrative
+> **$9/month** reference plan, which is a constant in the UI, not a quote.
 
 ---
 
@@ -29,7 +30,14 @@ An accelerated game session is tiny compared to streaming:
 | Activity | Data used |
 |---|---|
 | Video streaming (1080p) | ~3 GB / hour |
-| **Accelerated game session** | **~20–40 MB / hour** |
+| **Accelerated game session** | **~20–40 MB / hour** (planning estimate) |
+
+The 20–40 MB/hour figure is a **planning estimate**, not a measured guarantee:
+it depends on the game, the packet rate and how chatty the session is. The
+dashboard therefore prefers **your own measured rate** — once a session has
+produced at least five samples, the COST & SELF-HOST panel projects the month
+from the measured byte rate; before that it falls back to the documented
+typical and labels the number as such.
 
 Even a heavy player (4 hours every day) transfers **well under 5 GB/month**
 through the relay. Every mainstream VPS includes **500 GB – 4 TB** of monthly
@@ -59,7 +67,9 @@ no database, no control plane.
 
 `lagvex-relay -max-clients N` accepts several players on the **same** VPS with
 the **same pre-shared key** — treat that PSK like a group secret. Game traffic
-per player is small (table above), so a 1 vCPU box comfortably serves a group.
+per player is small (table above), so a small box is usually enough for a
+group; how many sessions fit depends on your uplink and packet rate, so test
+before a tournament.
 
 | Squad size | $5 VPS per person |
 |---|---|
@@ -77,11 +87,14 @@ humans, not software.
 
 Sometimes the honest answer is "not today":
 
-- The dashboard compares **direct measured RTT vs. best measured relay route**
-  on every sweep (`RouteAdvice`). If your direct path is already clean, routing
-  through a VPS adds no value — Lagvex tells you so instead of selling you one.
-- The relay probe (`via relay: X ms total`) is measured, not estimated, so the
-  "is it worth $5?" decision is a number, not a marketing promise.
+- **Route Detail** compares a *measured* direct regional-anchor RTT with a
+  *via-relay estimate* when you refresh it. The estimate is the sum of the
+  measured tunnel RTT and the relay→anchor RTT, so it is a region-anchor
+  estimate — never presented as a measured game-server ping.
+- The optional `/api/advisor` endpoint returns `RouteAdvice` on request; the
+  dashboard does not run it on every sweep.
+- The **Nodes** tab ranks relays by measured path quality, so a relay that
+  does not actually improve your route will not sit at the top of the list.
 - Idle sessions time out after 90 s, and dual-path redundancy is **opt-in** with
   measured retransmit counters — you never pay bandwidth for a feature you did
   not enable.
@@ -113,7 +126,8 @@ sudo ./lagvex-relay -listen :51820 -psk-file lagvex.psk
 #    endpoint = your-vps-ip:51820, PSK = the contents of lagvex.psk
 ```
 
-A systemd unit and a Docker run line are in [docs/DEPLOYMENT.md](DEPLOYMENT.md).
+A systemd unit and a Docker Compose example are in
+[docs/DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
@@ -126,3 +140,8 @@ A systemd unit and a Docker run line are in [docs/DEPLOYMENT.md](DEPLOYMENT.md).
   as a lab, not as a tournament-grade dependency.
 - Lagvex publishes no infrastructure of its own and never will bundle a paid
   one into the client.
+- **Relay hosting is Linux-only** and needs `/dev/net/tun`. Windows and macOS
+  can run the client, but they cannot host a relay.
+- The traffic figure is a planning estimate and the VPS prices are market
+  estimates; the only measured numbers in the panel are your own session's
+  byte rate.

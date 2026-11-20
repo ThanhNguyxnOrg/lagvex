@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import FloatingHUD from "./FloatingHUD";
+import {
+  countEndpointsInCIDRs,
+  hostFromEndpoint,
+  isPublicIPv4,
+} from "./lib/net.ts";
+import { formatAgeShort, probeMethodShort, routeHintMsLabel } from "./lib/format.ts";
+import { MIN_MEASURED_SAMPLES, TYPICAL_BOOSTER_PRICE_PER_MONTH, projectMonthlyCost } from "./lib/cost.ts";
 
 // The dashboard API requires this header on state-changing requests so a
 // cross-site page cannot drive the loopback API (custom headers force a CORS
@@ -718,75 +725,6 @@ function mapProbeRelays(data: unknown): RelayNode[] {
 }
 
 /** Relative age of the last measured probe, or a dash when never probed. */
-/** Short tag for the measurement technique behind a node's RTT value. */
-function probeMethodShort(method: string): string {
-  switch (method) {
-    case "tunnel-udp":
-      return "TUN";
-    case "icmp-echo":
-      return "ICMP";
-    case "tcp-connect":
-      return "TCP";
-    case "udp-echo":
-      return "UDP";
-    default:
-      return "";
-  }
-}
-
-/** True for routable public IPv4 literals (the TCP ping tool refuses private ones). */
-function isPublicIPv4(host: string): boolean {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (!m) return false;
-  const a = Number(m[1]);
-  const b = Number(m[2]);
-  if (a === 0 || a === 10 || a === 127) return false;
-  if (a === 169 && b === 254) return false;
-  if (a === 172 && b >= 16 && b <= 31) return false;
-  if (a === 192 && b === 168) return false;
-  if (a === 100 && b >= 64 && b <= 127) return false;
-  return a < 224;
-}
-
-/** Best measured metric for a relay, formatted for the route hint. */
-function routeHintMsLabel(relay: RelayNode): string {
-  const v = relay.totalEstimateMs > 0 ? relay.totalEstimateMs : relay.pingMs;
-  return v > 0 ? `${Math.round(v * 10) / 10} ms` : "—";
-}
-
-/** Parse an IPv4 literal into an unsigned 32-bit value, or null. */
-function ipv4ToUint(host: string): number | null {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (!m) return null;
-  const oct = m.slice(1).map(Number);
-  if (oct.some((o) => o > 255)) return null;
-  return ((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | oct[3]) >>> 0;
-}
-
-/** Short relative age for a persisted measurement timestamp. */
-function formatAgeShort(iso: string): string {
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return "unknown";
-  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
-  return `${Math.round(seconds / 86400)}d ago`;
-}
-
-/** True when the IPv4 host falls inside the CIDR block. */
-function isIPv4InCIDR(host: string, cidr: string): boolean {
-  const slash = cidr.indexOf("/");
-  if (slash < 0) return false;
-  const bits = Number(cidr.slice(slash + 1));
-  const ip = ipv4ToUint(host);
-  const net = ipv4ToUint(cidr.slice(0, slash));
-  if (ip === null || net === null || !Number.isFinite(bits) || bits < 0 || bits > 32) return false;
-  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
-  return (ip & mask) === (net & mask);
-}
-
-/** Relative age of the last measured probe, or a dash when never probed. */
 function formatProbeAge(lastProbeAt: string): string {
   if (!lastProbeAt) return "never probed";
   const at = Date.parse(lastProbeAt);
@@ -1163,20 +1101,14 @@ export default function App() {
     const hosts = new Set<string>();
     for (const c of selectedGameConnections?.connections ?? []) {
       if (!c.remote) continue;
-      const host = c.remote.includes("]")
-        ? c.remote.slice(1, c.remote.indexOf("]"))
-        : c.remote.split(":")[0];
+      const host = hostFromEndpoint(c.remote);
       if (host && isPublicIPv4(host)) hosts.add(host);
     }
     for (const p of recentPeers) {
       if (isPublicIPv4(p.endpoint)) hosts.add(p.endpoint);
     }
     if (hosts.size === 0) return null;
-    let inside = 0;
-    for (const h of hosts) {
-      if (cidrs.some((c) => isIPv4InCIDR(h, c))) inside++;
-    }
-    return { total: hosts.size, inside };
+    return countEndpointsInCIDRs(hosts, cidrs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGameConnections, recentPeers, selectedRegion, selectedGame]);
 
@@ -4803,15 +4735,16 @@ export default function App() {
                 {(() => {
                   const measuredSamples = rateHistory.slice(-20);
                   const measuredBps =
-                    measuredSamples.length >= 5
+                    measuredSamples.length >= MIN_MEASURED_SAMPLES
                       ? measuredSamples.reduce((acc, s) => acc + s.up + s.down, 0) / measuredSamples.length
                       : 0;
-                  const measured = measuredBps > 0;
-                  const monthlyGb = measured
-                    ? (measuredBps * costHours * 30 * 3600) / 1e9
-                    : 0.03 * costHours * 30;
-                  const perPlayer = costVps / costSquad;
-                  const competitor = 9;
+                  const cost = projectMonthlyCost({
+                    measuredBytesPerSecond: measuredBps,
+                    hoursPerDay: costHours,
+                    squadSize: costSquad,
+                    vpsPricePerMonth: costVps,
+                  });
+                  const { measured, monthlyGb, perPlayer, savingsVsBooster, transferLabel } = cost;
                   return (
                     <div className="flex flex-col gap-4">
                       <div className="grid grid-cols-3 gap-4">
@@ -4861,7 +4794,7 @@ export default function App() {
                             Projected transfer
                           </span>
                           <div className="font-mono font-black text-2xl text-white mt-0.5">
-                            {monthlyGb < 1 ? `${Math.round(monthlyGb * 1000)} MB` : `${monthlyGb.toFixed(1)} GB`}
+                            {transferLabel}
                             <span className="text-xs text-white/40 font-bold"> /mo</span>
                           </div>
                           <span className="text-[9px] font-mono text-white/35">
@@ -4887,11 +4820,11 @@ export default function App() {
                             vs. typical booster
                           </span>
                           <div className="font-mono font-black text-2xl text-[#10b981] mt-0.5">
-                            {perPlayer < competitor ? `save $${(competitor - perPlayer).toFixed(2)}` : "—"}
+                            {savingsVsBooster > 0 ? `save $${savingsVsBooster.toFixed(2)}` : "—"}
                             <span className="text-xs text-white/40 font-bold"> /mo</span>
                           </div>
                           <span className="text-[9px] font-mono text-white/35">
-                            typical public plan ≈ ${competitor}.00/mo
+                            typical public plan ≈ ${TYPICAL_BOOSTER_PRICE_PER_MONTH}.00/mo
                           </span>
                         </div>
                       </div>
