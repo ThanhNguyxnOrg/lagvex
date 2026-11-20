@@ -943,6 +943,7 @@ func (e *Engine) Disconnect() error {
 	e.activeRegion = ""
 	e.activeRelayID = ""
 	e.activeRelayName = ""
+	e.driverMode = ""
 	e.pingMs.Store(0)
 	e.pingSampled.Store(false)
 	e.bytesUp.Store(0)

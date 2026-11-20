@@ -164,6 +164,15 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	if stats.PingSampled {
 		t.Fatal("ping was reported as sampled before any keepalive pong")
 	}
+	if stats.ActiveGame != "" || stats.ActiveRegion != "" {
+		t.Fatalf("connect without a game reported activeGame=%q activeRegion=%q", stats.ActiveGame, stats.ActiveRegion)
+	}
+	// The engine must name the adapter it actually used. On a host without a
+	// usable TUN device this is the userspace fallback, which the dashboard
+	// labels as control-only rather than acceleration.
+	if !strings.HasPrefix(stats.DriverMode, "Kernel (") && stats.DriverMode != "Userspace QoS" {
+		t.Fatalf("driver mode = %q, want a kernel mode or Userspace QoS", stats.DriverMode)
+	}
 
 	// The relay must see exactly one session. This proves the handshake went
 	// over the wire and was accepted; a client-local state flip would not.
@@ -213,6 +222,9 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	}
 	if stats.PingSampled {
 		t.Fatal("pingSampled stayed true after disconnect")
+	}
+	if stats.DriverMode != "" {
+		t.Fatalf("driverMode = %q after disconnect, want it cleared with the session", stats.DriverMode)
 	}
 	// The relay destroys the session on the authenticated Disconnect frame.
 	waitActiveUsers(t, httpAddr, 0)
