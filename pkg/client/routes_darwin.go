@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/netip"
-	"os/exec"
 	"strings"
 	"sync"
 )

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/netip"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
