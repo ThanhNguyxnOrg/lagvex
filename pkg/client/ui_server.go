@@ -1708,8 +1708,19 @@ func (u *UIServer) proxyRelaySquad(w http.ResponseWriter, path, method string, b
 	if relayURL == "" {
 		return false
 	}
-	targetURL := relayURL + path
-	client := &http.Client{Timeout: 1500 * time.Millisecond}
+	return proxySquadHTTP(w, relayURL+path, method, body)
+}
+
+// proxySquadHTTP forwards one squad request to the relay's signaling hub.
+//
+// It returns true whenever the relay answered, including 4xx/5xx answers:
+// those are the relay's real verdict (rate limited, room full, room gone)
+// and must reach the dashboard. Falling back to a local-only room on such
+// errors would silently create a room no teammate can join. Only an absent
+// relay (handled by the caller) or an unreachable signaling port produces
+// a locally generated response, and that response is an explicit 502.
+func proxySquadHTTP(w http.ResponseWriter, targetURL, method string, body []byte) bool {
+	client := &http.Client{Timeout: 2500 * time.Millisecond}
 	var req *http.Request
 	var err error
 	if len(body) > 0 {
@@ -1718,21 +1729,20 @@ func (u *UIServer) proxyRelaySquad(w http.ResponseWriter, path, method string, b
 		req, err = http.NewRequest(method, targetURL, nil)
 	}
 	if err != nil {
-		return false
+		writeJSONError(w, http.StatusBadGateway, "invalid relay signaling request")
+		return true
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil || resp == nil {
-		return false
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
+		writeJSONError(w, http.StatusBadGateway, "relay signaling is unreachable; no room was changed")
 		return true
 	}
-	return false
+	defer func() { _ = resp.Body.Close() }()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+	return true
 }
 
 func (u *UIServer) handleSquadCreate(w http.ResponseWriter, r *http.Request) {

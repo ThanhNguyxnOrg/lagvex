@@ -1778,6 +1778,21 @@ export default function App() {
   // "<1 ms" instead of rounding down to an ambiguous 0.
   const formatRtt = (ms: number) => (ms < 1 ? "<1 ms" : `${Math.round(ms)} ms`);
 
+  // Turn an API error response into the message the person should read. The
+  // Go handlers answer {"error":"..."}; surfacing the raw JSON blob in a
+  // toast is needlessly opaque.
+  const apiErrorMessage = async (res: Response) => {
+    const raw = await res.text().catch(() => "");
+    if (!raw) return res.statusText;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.error === "string" && parsed.error) return parsed.error;
+    } catch {
+      // Not JSON: use the text below.
+    }
+    return raw.trim() || res.statusText;
+  };
+
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes <= 0) return "0 MB";
     const mb = bytes / (1024 * 1024);
@@ -2359,8 +2374,7 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`Could not create squad room: ${message.trim()}`);
+        notify(`Could not create squad room: ${await apiErrorMessage(res)}`);
         return;
       }
       const data = await res.json().catch(() => ({}));
@@ -2411,8 +2425,7 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        const message = (await res.text().catch(() => "")) || res.statusText;
-        notify(`Could not join squad room: ${message.trim()}`);
+        notify(`Could not join squad room: ${await apiErrorMessage(res)}`);
         return;
       }
       const data = await res.json();

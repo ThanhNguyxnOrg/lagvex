@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Math.random` in the dashboard. Room creation and lookups are rate limited
   per source IP, the number of live rooms is capped, and codes can be sent in a
   query parameter or a JSON body.
+- Relay errors reach the dashboard instead of being swallowed: a 429 rate
+  limit, a full room or a room that no longer exists keeps its real status and
+  message, and an unreachable signaling port returns an explicit 502. The
+  client no longer creates a local-only room that teammates cannot join.
 - The dashboard footer shows the running build version from `/api/system-info`
   instead of a hardcoded `v1.0.0`, and it no longer wraps when the version is
   long.
