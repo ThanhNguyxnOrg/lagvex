@@ -62,6 +62,11 @@ type Server struct {
 	// udpBound is the resolved UDP listen address, set under mu in Start.
 	udpBound netip.AddrPort
 
+	// httpBound is the resolved signaling HTTP listen address, set once the
+	// listener is up. Keeping it allows callers (tests, tooling) to use a
+	// port of 0 and still reach the signaling hub.
+	httpBound atomic.Pointer[netip.AddrPort]
+
 	squadRoomsMu sync.RWMutex
 	squadRooms   map[string]*RelaySquadRoom
 
@@ -592,6 +597,15 @@ func (s *Server) UDPAddr() netip.AddrPort {
 	return s.udpBound
 }
 
+// HTTPAddr returns the bound squad-signaling HTTP address once Start has
+// opened it, or an invalid address before that.
+func (s *Server) HTTPAddr() netip.AddrPort {
+	if bound := s.httpBound.Load(); bound != nil {
+		return *bound
+	}
+	return netip.AddrPort{}
+}
+
 func (s *Server) sendUDP(data []byte, to netip.AddrPort) {
 	udpAddr := net.UDPAddrFromAddrPort(to)
 	_, _ = s.conn.WriteToUDP(data, udpAddr)
@@ -644,6 +658,20 @@ func (s *Server) startSignalingHTTP(ctx context.Context, wg *sync.WaitGroup) {
 		Handler: s.squadRateLimitMiddleware(mux),
 	}
 
+	// Listen explicitly so the bound address is known even when the config
+	// asked for port 0. Tools and tests rely on HTTPAddr().
+	listener, err := net.Listen("tcp", httpAddr)
+	if err != nil {
+		log.Printf("[Relay] Warning: signaling HTTP listen on %s failed: %v", httpAddr, err)
+		return
+	}
+	if tcpAddr, ok := listener.Addr().(*net.TCPAddr); ok {
+		if addr, ok := netip.AddrFromSlice(tcpAddr.IP); ok {
+			bound := netip.AddrPortFrom(addr.Unmap(), uint16(tcpAddr.Port))
+			s.httpBound.Store(&bound)
+		}
+	}
+
 	go func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -651,8 +679,8 @@ func (s *Server) startSignalingHTTP(ctx context.Context, wg *sync.WaitGroup) {
 		_ = srv.Shutdown(shutCtx)
 	}()
 
-	log.Printf("[Relay] Squad Signaling Hub active on HTTP %s", httpAddr)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	log.Printf("[Relay] Squad Signaling Hub active on HTTP %s", listener.Addr())
+	if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 		log.Printf("[Relay] Warning: signaling HTTP server closed: %v", err)
 	}
 }

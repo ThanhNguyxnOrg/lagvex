@@ -38,6 +38,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relay hosting is Linux-only and that the traffic figure is a planning
   estimate.
 
+### 🛡️ Squad signaling and release honesty
+
+- Squad rooms actually reach the relay again. The client built the signaling
+  URL from the relay's data-plane address, but a dual-stack dialer reports an
+  IPv4-mapped IPv6 form (`[::ffff:127.0.0.1]:4433`) that produced an invalid
+  URL; every room silently fell back to a local-only room no teammate could
+  join. The address is unmapped before the URL is built, with tests for each
+  form.
+- Room codes are unguessable: the relay generates them with a CSPRNG (and the
+  client for its local fallback), replacing a four-digit counter driven by
+  `Math.random` in the dashboard. Room creation and lookups are rate limited
+  per source IP, the number of live rooms is capped, and codes can be sent in a
+  query parameter or a JSON body.
+- The dashboard footer shows the running build version from `/api/system-info`
+  instead of a hardcoded `v1.0.0`, and it no longer wraps when the version is
+  long.
+- A new client↔relay end-to-end test performs a real UDP handshake, waits for
+  an authenticated keepalive Pong, verifies the relay sees and then loses the
+  session on disconnect, and covers the pre-flight refusal paths (bad PSK,
+  game without a region, missing profiles). Client package coverage rose from
+  49.6% to 57.8%.
+
 ---
 
 ## [1.8.0] - 2026-11-18
