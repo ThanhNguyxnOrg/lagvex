@@ -1086,6 +1086,10 @@ export default function App() {
   // so the UI must not present it as acceleration.
   const userspaceFallback = isBoosting && driverMode === "Userspace QoS";
   const kernelTunnelActive = isBoosting && driverMode.startsWith("Kernel");
+  // The page can show a newly selected game while the engine still routes the
+  // previously boosted one. Never present selected-game content as active.
+  const engineGameMismatch = isBoosting && engineGameId !== "" && engineGameId !== selectedGame.id;
+  const selectedTunnelActive = kernelTunnelActive && !engineGameMismatch;
   const selectedRelay = relays[selectedRelayIdx] || relays[0] || EMPTY_RELAY;
 
   // ExitLag-parity "Available route" hint. Only measured values participate,
@@ -2604,6 +2608,25 @@ export default function App() {
     </div>
   ) : null;
 
+  // A tunnel can stay up while the user browses to another game. Say which
+  // game is actually routed instead of attaching its live RTT to the new one.
+  const gameMismatchNotice = engineGameMismatch && !userspaceFallback ? (
+    <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#00F0FF]/10 border border-[#00F0FF]/30">
+      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[#00F0FF]/20 border border-[#00F0FF]/50 text-[#00F0FF] text-[11px] font-black flex items-center justify-center">
+        i
+      </span>
+      <div className="flex flex-col gap-1 min-w-0">
+        <span className="text-xs font-brand font-bold uppercase tracking-wider text-[#00F0FF]">
+          Tunnel active for {engineGameName}
+        </span>
+        <span className="text-[11px] leading-relaxed text-white/60">
+          {selectedGame.name} is only selected. Live RTT below belongs to the
+          active tunnel; stop it before boosting {selectedGame.name}.
+        </span>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="min-h-screen bg-[var(--lx-bg)] text-[#E0E6ED] font-sans antialiased selection:bg-[#00F0FF]/30 selection:text-white flex relative overflow-x-hidden">
       {/* Dynamic Cyber Glow in Background */}
@@ -3171,6 +3194,7 @@ export default function App() {
           {activeTab === "boost" && (
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {userspaceNotice}
+              {gameMismatchNotice}
               {/* GearUP Cinematic Banner */}
               <div className="relative rounded-[32px] overflow-hidden bg-[#0a0f16] border border-[#1c2738] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8">
                 {/* Backdrop Game Art */}
@@ -3241,7 +3265,7 @@ export default function App() {
                       {/* 1. ESTIMATED PING */}
                       <div className="p-4 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40] flex flex-col">
                         <span className="text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
-                          {isBoosting ? (userspaceFallback ? "LIVE RELAY RTT" : "LIVE ACCELERATED PING") : "TARGET ROUTE LATENCY"}
+                          {isBoosting ? (userspaceFallback ? "LIVE RELAY RTT" : selectedTunnelActive ? "LIVE ACCELERATED PING" : "LIVE TUNNEL RTT") : "TARGET ROUTE LATENCY"}
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
@@ -3619,7 +3643,7 @@ export default function App() {
 
                       <div className="p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
                         <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
-                          {kernelTunnelActive ? "ACTIVE IP CIDR SUBNETS" : "CONFIGURED IP CIDR SUBNETS"}
+                          {selectedTunnelActive ? "ACTIVE IP CIDR SUBNETS" : "CONFIGURED IP CIDR SUBNETS"}
                         </span>
                         <div className="flex flex-col gap-1.5 font-mono text-xs text-white/80 max-h-[110px] overflow-y-auto">
                           {(selectedRegion?.cidrs || []).map((cidr) => (
@@ -3628,8 +3652,8 @@ export default function App() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]" />
                                 <span>{cidr}</span>
                               </span>
-                              <span className={`text-[10px] ${kernelTunnelActive ? "text-[#00F0FF]" : "text-[#f59e0b]"}`}>
-                                {kernelTunnelActive ? "Split-Tunnel" : "Not routed"}
+                              <span className={`text-[10px] ${selectedTunnelActive ? "text-[#00F0FF]" : "text-[#f59e0b]"}`}>
+                                {selectedTunnelActive ? "Split-Tunnel" : "Not routed"}
                               </span>
                             </div>
                           ))}

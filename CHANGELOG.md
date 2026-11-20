@@ -80,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accelerated ping" to "live relay RTT", CIDR rows read "Not routed", and the
   pipeline shows "No TUN routes". The engine log no longer claims to be
   accelerating in that state.
+- Selecting another game while a tunnel is active no longer relabels the live
+  RTT as that game's latency: the Boost page states which game the tunnel is
+  active for, and that the newly selected game must be boosted after stopping
+  the current tunnel.
 - Route advice reports the relay's measured loss instead of a hardcoded "0%
   packet loss"; a lossy but faster relay is described with its actual loss.
 - A new client↔relay end-to-end test performs a real UDP handshake, waits for
