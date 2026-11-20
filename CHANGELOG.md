@@ -84,6 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   RTT as that game's latency: the Boost page states which game the tunnel is
   active for, and that the newly selected game must be boosted after stopping
   the current tunnel.
+- The relay gained a game-server TCP probe (`POST /probe/gameserver`, one
+  request per IP per two seconds, public IP literals only) and the dashboard
+  gained `POST /api/relay-tcpping`, so the Boost page can show the
+  **relay→game-server** segment measured by the relay itself — the last
+  unmeasured segment of the route (ExitLag's `PingToDS` equivalent). The
+  panel also shows the combined "you→relay→server" total only when both
+  segments are measured.
+- Probe history reports percentiles (`rttP50Ms`, `rttP95Ms`) computed with
+  linear interpolation over the retained runs, so tail latency is visible
+  next to the average — no value appears without samples.
 - RTT samples now carry an age (`pingAgeMs`, `pongTotal`): a sample older than
   three keepalive periods shows as a dash with "last sample is stale" instead
   of being presented as live, mirroring how ExitLag hides a frame stat when

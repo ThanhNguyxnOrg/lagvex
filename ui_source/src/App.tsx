@@ -528,6 +528,16 @@ export type GameServerEntry = {
   lastSeen: string;
 };
 
+export type RelayServerProbe = {
+  host: string;
+  port: number;
+  rttMs?: number;
+  lossPct: number;
+  samples: number;
+  error?: string;
+  at: number;
+};
+
 export type TCPPingResult = {
   target: string;
   port: number;
@@ -1039,6 +1049,9 @@ export default function App() {
   const serverProbeNextRunRef = useRef(0);
   // Persisted per-game server history (measured endpoints only).
   const [serverHistory, setServerHistory] = useState<GameServerEntry[]>([]);
+  // Relay-measured TCP handshake to the selected game's server (the
+  // relay->server segment). null = not measured yet; the panel says so.
+  const [relayServerProbe, setRelayServerProbe] = useState<RelayServerProbe | null>(null);
   // Cost & self-host calculator inputs (Nodes tab).
   const [costHours, setCostHours] = useState(3);
   const [costSquad, setCostSquad] = useState(1);
@@ -1625,6 +1638,47 @@ export default function App() {
       stopped = true;
     };
   }, [selectedGame.id, serverProbe?.at]);
+
+  // While a tunnel is up, let the connected relay measure the TCP handshake
+  // to this game's newest measured server (ExitLag's PingToDS segment). One
+  // relay-side probe per minute; the relay itself allows one per 2s per IP.
+  useEffect(() => {
+    if (!isBoosting || serverHistory.length === 0) {
+      setRelayServerProbe(null);
+      return;
+    }
+    let stopped = false;
+    const latest = serverHistory[0];
+    if (!latest) return;
+    const run = async () => {
+      if (stopped) return;
+      try {
+        const res = await apiFetch("/api/relay-tcping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ host: latest.host, port: latest.port })
+        });
+        const data = res.ok ? await res.json().catch(() => ({})) : {};
+        if (stopped) return;
+        setRelayServerProbe({
+          host: latest.host,
+          port: latest.port,
+          rttMs: typeof data.rttMs === "number" && data.rttMs > 0 ? Number(data.rttMs) : undefined,
+          lossPct: typeof data.lossPct === "number" ? Number(data.lossPct) : 0,
+          samples: typeof data.samples === "number" ? Number(data.samples) : 0,
+          error: typeof data.error === "string" && data.error ? data.error : undefined,
+          at: Date.now()
+        });
+      } catch {}
+    };
+    run();
+    const timer = setInterval(run, 60_000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBoosting, serverHistory]);
 
   // Game server connections: read-only scan of the local OS socket tables
   const handleScanGameConnections = async (silent = false) => {
@@ -3835,6 +3889,73 @@ export default function App() {
                               </span>
                             ))}
                           </>
+                        )}
+                      </div>
+
+                      {/* RELAY → GAME SERVER (MEASURED BY THE RELAY) */}
+                      <div className="col-span-2 p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
+                            RELAY &rarr; GAME SERVER (MEASURED BY THE RELAY)
+                          </span>
+                          {relayServerProbe?.at && (
+                            <span className="text-[10px] font-mono text-white/35">
+                              {new Date(relayServerProbe.at).toLocaleTimeString()}
+                            </span>
+                          )}
+                        </div>
+
+                        {!isBoosting ? (
+                          <span className="text-[10px] text-white/40">
+                            Connect through a relay so it can measure the game-server segment.
+                          </span>
+                        ) : relayServerProbe ? (
+                          <>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-xs font-brand font-bold text-white">
+                                TCP handshake to {relayServerProbe.host}:{relayServerProbe.port}
+                              </span>
+                              <span className="font-mono text-xs font-bold text-[#00F0FF]">
+                                {relayServerProbe.rttMs
+                                  ? relayServerProbe.rttMs < 1
+                                    ? "<1 ms"
+                                    : `${Math.round(relayServerProbe.rttMs)} ms`
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {relayServerProbe.samples > 0 && (
+                                <span className="text-[10px] font-mono text-white/60 bg-white/[0.04] px-2 py-1 rounded">
+                                  {relayServerProbe.samples} samples &bull; loss {relayServerProbe.lossPct}% &bull; tcp-handshake
+                                </span>
+                              )}
+                              {relayServerProbe.error && (
+                                <span className="text-[10px] font-mono text-[#f59e0b]/80">
+                                  {relayServerProbe.error}
+                                </span>
+                              )}
+                              {!relayServerProbe.rttMs && !relayServerProbe.error && (
+                                <span className="text-[10px] font-mono text-[#f59e0b]/80">
+                                  The relay dialed the server but measured no answer &mdash; not shown as 0 ms.
+                                </span>
+                              )}
+                            </div>
+                            <div className="pt-1 border-t border-white/5">
+                              <span className="text-[10px] font-mono text-white/60">
+                                {(() => {
+                                  const total =
+                                    rttFresh && relayServerProbe.rttMs ? livePing + relayServerProbe.rttMs : null;
+                                  return total === null
+                                    ? "You → relay → server: — (both segments must be measured)"
+                                    : `You → relay → server: ${total < 1 ? "<1" : Math.round(total)} ms (you→relay + relay→server, both measured)`;
+                                })()}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-white/40">
+                            No game endpoint measured yet — one appears once the game is running.
+                          </span>
                         )}
                       </div>
 

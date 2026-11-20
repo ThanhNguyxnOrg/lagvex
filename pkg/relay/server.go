@@ -78,6 +78,11 @@ type Server struct {
 	squadRate     map[string]*squadRateEntry
 	squadRoomsCap int
 
+	// gameServerProbeLimiter bounds how often one source IP may ask the relay
+	// to dial a game server. It is separate from squadRate so the two
+	// endpoints cannot starve each other.
+	gameServerProbeLimiter probeRateLimiter
+
 	bufPool sync.Pool
 
 	activeSessions atomic.Int64
@@ -652,6 +657,7 @@ func (s *Server) startSignalingHTTP(ctx context.Context, wg *sync.WaitGroup) {
 	mux.HandleFunc("/squad/room", s.handleSquadRoom)
 	mux.HandleFunc("/squad/heartbeat", s.handleSquadHeartbeat)
 	mux.HandleFunc("/squad/leave", s.handleSquadLeave)
+	mux.HandleFunc("/probe/gameserver", s.handleProbeGameServer)
 
 	srv := &http.Server{
 		Addr:    httpAddr,

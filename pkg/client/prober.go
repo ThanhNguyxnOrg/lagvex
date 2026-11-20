@@ -35,8 +35,12 @@ type ProbeResult struct {
 	// Retained measurements from earlier probe runs for the same endpoint. They
 	// let the dashboard show an average, spread and trend that a single sweep
 	// cannot provide. All values are measured locally by this client.
-	RTTAvgMs       float64   `json:"rttAvgMs,omitempty"`
-	RTTStdMs       float64   `json:"rttStdMs,omitempty"`
+	RTTAvgMs float64 `json:"rttAvgMs,omitempty"`
+	RTTStdMs float64 `json:"rttStdMs,omitempty"`
+	// Percentiles of the retained measured RTTs (linear interpolation), so a
+	// dashboard can show tail latency rather than an average only.
+	RTTP50Ms       float64   `json:"rttP50Ms,omitempty"`
+	RTTP95Ms       float64   `json:"rttP95Ms,omitempty"`
 	LossAvgPct     float64   `json:"lossAvgPct,omitempty"`
 	RTTTrend       []float64 `json:"rttTrend,omitempty"`
 	HistorySamples int       `json:"historySamples,omitempty"`
@@ -501,6 +505,8 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 	}
 	if len(stored) > 0 {
 		result.LossAvgPct = lossAvgPct
+		result.RTTP50Ms = rttPercentile(stored, 0.5)
+		result.RTTP95Ms = rttPercentile(stored, 0.95)
 	}
 
 	// Mark relays whose retained history shows sustained instability, so
@@ -526,6 +532,34 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 		unstableSpread := result.RTTAvgMs >= 2.0 && result.RTTStdMs >= result.RTTAvgMs*0.35
 		result.Unstable = unstableLoss || unstableSpread
 	}
+}
+
+// rttPercentile returns the q-quantile (0 <= q <= 1) of the positive measured
+// RTTs in entries, using linear interpolation between samples. It returns 0
+// when nothing was measured: a missing value must stay missing, not 0 ms.
+func rttPercentile(entries []probeHistoryEntry, q float64) float64 {
+	rtts := make([]float64, 0, len(entries))
+	for _, e := range entries {
+		if e.Reached && e.RTTMs > 0 {
+			rtts = append(rtts, e.RTTMs)
+		}
+	}
+	if len(rtts) == 0 {
+		return 0
+	}
+	sort.Float64s(rtts)
+	if len(rtts) == 1 {
+		return roundTo(rtts[0], 2)
+	}
+	pos := q * float64(len(rtts)-1)
+	lo := int(math.Floor(pos))
+	hi := int(math.Ceil(pos))
+	if lo == hi {
+		return roundTo(rtts[lo], 2)
+	}
+	frac := pos - float64(lo)
+	val := rtts[lo] + (rtts[hi]-rtts[lo])*frac
+	return roundTo(val, 2)
 }
 
 // summarizeHistory computes measured statistics from retained probe runs.
@@ -557,6 +591,8 @@ type ProbeHistoryReport struct {
 	Endpoint       string    `json:"endpoint"`
 	RTTAvgMs       float64   `json:"rttAvgMs,omitempty"`
 	RTTStdMs       float64   `json:"rttStdMs,omitempty"`
+	RTTP50Ms       float64   `json:"rttP50Ms,omitempty"`
+	RTTP95Ms       float64   `json:"rttP95Ms,omitempty"`
 	LossAvgPct     float64   `json:"lossAvgPct,omitempty"`
 	HistorySamples int       `json:"historySamples"`
 	LastProbeAt    string    `json:"lastProbeAt,omitempty"`
@@ -582,6 +618,8 @@ func (p *Prober) HistoryFor(endpoint string) (ProbeHistoryReport, bool) {
 		Endpoint:       key,
 		RTTAvgMs:       avgMs,
 		RTTStdMs:       stdMs,
+		RTTP50Ms:       rttPercentile(stored, 0.5),
+		RTTP95Ms:       rttPercentile(stored, 0.95),
 		LossAvgPct:     lossAvgPct,
 		HistorySamples: len(stored),
 		RTTTrend:       trend,
@@ -608,6 +646,8 @@ func (p *Prober) HistorySnapshot() []ProbeHistoryReport {
 			Endpoint:       endpoint,
 			RTTAvgMs:       avgMs,
 			RTTStdMs:       stdMs,
+			RTTP50Ms:       rttPercentile(stored, 0.5),
+			RTTP95Ms:       rttPercentile(stored, 0.95),
 			LossAvgPct:     lossAvgPct,
 			HistorySamples: len(stored),
 			RTTTrend:       trend,

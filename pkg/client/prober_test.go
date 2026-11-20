@@ -560,6 +560,68 @@ func TestProbeEndpointWithoutAnchorReplyDegradesGracefully(t *testing.T) {
 	}
 }
 
+func TestRTTPercentiles(t *testing.T) {
+	now := time.Now()
+
+	if got := rttPercentile(nil, 0.5); got != 0 {
+		t.Fatalf("empty history p50 = %v, want 0 (not measured)", got)
+	}
+
+	entries := []probeHistoryEntry{
+		{RTTMs: 10, Loss: 0, Reached: true, At: now},
+		{RTTMs: 100, Loss: 0, Reached: true, At: now},
+		{RTTMs: 1000, Loss: 0, Reached: true, At: now},
+	}
+	if got := rttPercentile(entries, 0.5); got != 100 {
+		t.Fatalf("p50 = %v, want 100 (the middle sample)", got)
+	}
+	if got := rttPercentile(entries, 0.95); got != 910 {
+		t.Fatalf("p95 = %v, want 910 (interpolated between 100 and 1000)", got)
+	}
+
+	// Only reached samples with a positive RTT count; a failed run has no RTT.
+	withFailure := append(append([]probeHistoryEntry{}, entries...),
+		probeHistoryEntry{RTTMs: 0, Loss: 100, Reached: false, At: now})
+	if got := rttPercentile(withFailure, 0.5); got != 100 {
+		t.Fatalf("p50 with one failed run = %v, want 100", got)
+	}
+
+	single := []probeHistoryEntry{{RTTMs: 42, Loss: 0, Reached: true, At: now}}
+	if got := rttPercentile(single, 0.95); got != 42 {
+		t.Fatalf("p95 of one sample = %v, want 42", got)
+	}
+}
+
+func TestProbeResultCarriesPercentiles(t *testing.T) {
+	now := time.Now()
+	p := NewProber()
+	p.history = map[string][]probeHistoryEntry{
+		"relay:p": {
+			{RTTMs: 10, Loss: 0, Reached: true, At: now},
+			{RTTMs: 20, Loss: 0, Reached: true, At: now},
+			{RTTMs: 30, Loss: 0, Reached: true, At: now},
+		},
+	}
+	result := ProbeResult{Endpoint: "relay:p", Reachable: true, RTTMedianMs: 20}
+	p.finishProbe(&result)
+	if result.RTTP50Ms != 20 {
+		t.Fatalf("p50 = %v, want 20", result.RTTP50Ms)
+	}
+	// finishProbe appends the current sample (20ms) to the history, so the
+	// four sorted samples are 10/20/20/30 and p95 lands at 28.5.
+	if result.RTTP95Ms != 28.5 {
+		t.Fatalf("p95 = %v, want 28.5 (interpolated over history + current sample)", result.RTTP95Ms)
+	}
+
+	report, ok := p.HistoryFor("relay:p")
+	if !ok {
+		t.Fatal("history report missing")
+	}
+	if report.RTTP50Ms != 20 || report.RTTP95Ms != 28.5 {
+		t.Fatalf("report percentiles = %v/%v, want 20/28.5", report.RTTP50Ms, report.RTTP95Ms)
+	}
+}
+
 func TestUnstableRelayMarking(t *testing.T) {
 	now := time.Now()
 

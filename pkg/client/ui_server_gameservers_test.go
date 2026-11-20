@@ -9,6 +9,9 @@ import (
 )
 
 func TestGameServerHistoryEndpoint(t *testing.T) {
+	// Isolate the config store so a live dashboard run on this machine
+	// cannot change what this test expects to find in history.
+	t.Setenv("LAGVEX_CONFIG_DIR", t.TempDir())
 	server := NewUIServer(nil, nil, "")
 	handler := server.setupRoutes()
 

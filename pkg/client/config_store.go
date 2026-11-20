@@ -49,14 +49,22 @@ type ConfigStore struct {
 func NewConfigStore(customPath string) *ConfigStore {
 	path := customPath
 	if path == "" {
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			home, _ := os.UserHomeDir()
-			appData = filepath.Join(home, ".config")
+		// A relocated config directory keeps portable installs (and tests)
+		// from sharing one machine-wide file, so two builds cannot overwrite
+		// each other's settings or history.
+		if dir := os.Getenv("LAGVEX_CONFIG_DIR"); dir != "" {
+			_ = os.MkdirAll(dir, 0755)
+			path = filepath.Join(dir, "user_config.json")
+		} else {
+			appData := os.Getenv("APPDATA")
+			if appData == "" {
+				home, _ := os.UserHomeDir()
+				appData = filepath.Join(home, ".config")
+			}
+			dir := filepath.Join(appData, "Lagvex")
+			_ = os.MkdirAll(dir, 0755)
+			path = filepath.Join(dir, "user_config.json")
 		}
-		dir := filepath.Join(appData, "Lagvex")
-		_ = os.MkdirAll(dir, 0755)
-		path = filepath.Join(dir, "user_config.json")
 	}
 
 	cs := &ConfigStore{
