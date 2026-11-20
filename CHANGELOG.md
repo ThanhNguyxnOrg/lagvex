@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relay hosting is Linux-only and that the traffic figure is a planning
   estimate.
 
-### 🛡️ Squad signaling and release honesty
+### 🛡️ Squad signaling
 
 - Squad rooms actually reach the relay again. The client built the signaling
   URL from the relay's data-plane address, but a dual-stack dialer reports an
@@ -46,44 +46,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   URL; every room silently fell back to a local-only room no teammate could
   join. The address is unmapped before the URL is built, with tests for each
   form.
+
 - Room codes are unguessable: the relay generates them with a CSPRNG (and the
   client for its local fallback), replacing a four-digit counter driven by
   `Math.random` in the dashboard. Room creation and lookups are rate limited
   per source IP, the number of live rooms is capped, and codes can be sent in a
   query parameter or a JSON body.
+
 - Relay errors reach the dashboard instead of being swallowed: a 429 rate
   limit, a full room or a room that no longer exists keeps its real status and
   message, and an unreachable signaling port returns an explicit 502. The
   client no longer creates a local-only room when a connected relay rejects the
   request; the deliberately offline fallback still exists, is labelled in the
   squad panel, and only runs when no relay is connected at all.
+
 - The dashboard footer shows the running build version from `/api/system-info`
   instead of a hardcoded `v1.0.0`, and it no longer wraps when the version is
   long.
+
+### 📊 Measured telemetry and route honesty
+
 - Tunnel RTT is only shown once the engine has received a real keepalive Pong
   (`pingSampled`), so a stale ISP measurement can no longer appear as "TUNNEL
   LIVE" latency. Sub-millisecond loopback/LAN RTT is shown as `<1 ms`, and the
   jitter card no longer tells a connected user to "Connect to measure" when the
   measured variation is simply below 1 ms.
+
 - Relay instability now requires repeated recent loss (two of the last three
   runs), so the embedded relay's first sweep before it starts no longer brands
   it UNSTABLE for the session. Sub-millisecond timing noise is ignored when
   judging RTT spread.
+
 - The dashboard header names the game reported by the engine
   (`activeGame`), not the game merely selected in the UI. With a connected
   tunnel but no active game it says "TUNNEL CONNECTED", and the system-ready
   badge shows the real adapter for the OS (WinTun NDIS, macOS utun, Linux
   dev/net/tun) instead of a fixed "kernel accelerator" claim.
+
 - When the kernel adapter cannot be created (for example a non-root Linux
   session), the dashboard now shows an amber **userspace fallback** banner and
   badge: "game traffic is not routed". Ping labels switch from "live
   accelerated ping" to "live relay RTT", CIDR rows read "Not routed", and the
   pipeline shows "No TUN routes". The engine log no longer claims to be
   accelerating in that state.
+
 - Selecting another game while a tunnel is active no longer relabels the live
   RTT as that game's latency: the Boost page states which game the tunnel is
   active for, and that the newly selected game must be boosted after stopping
   the current tunnel.
+
 - The relay gained a game-server TCP probe (`POST /probe/gameserver`, one
   request per IP per two seconds, public IP literals only) and the dashboard
   gained `POST /api/relay-tcpping`, so the Boost page can show the
@@ -91,30 +102,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unmeasured segment of the route (ExitLag's `PingToDS` equivalent). The
   panel also shows the combined "you→relay→server" total only when both
   segments are measured.
+
 - Probe history reports percentiles (`rttP50Ms`, `rttP95Ms`) computed with
   linear interpolation over the retained runs, so tail latency is visible
   next to the average — no value appears without samples.
+
 - RTT samples now carry an age (`pingAgeMs`, `pongTotal`): a sample older than
   three keepalive periods shows as a dash with "last sample is stale" instead
   of being presented as live, mirroring how ExitLag hides a frame stat when
   its own counter and the sample disagree.
+
 - The process scan reports a measured per-core CPU % per game process
   (`/api/detected-processes`: `cpuSupported`, `cpuPercent`), read from the OS's
   own counters (`/proc` on Linux, `GetProcessTimes` on Windows) with no
   injection. macOS reports "not measured" because no portable,
   injection-free counter exists there. Cards and the Boost hop show
   `CPU 12.3%`, or `CPU —` with an explicit tooltip.
+
 - Route advice reports the relay's measured loss instead of a hardcoded "0%
   packet loss"; a lossy but faster relay is described with its actual loss.
+
 - A new client↔relay end-to-end test performs a real UDP handshake, waits for
   an authenticated keepalive Pong, verifies the relay sees and then loses the
   session on disconnect, and covers the pre-flight refusal paths (bad PSK,
   game without a region, missing profiles). Client package coverage rose from
   49.6% to 57.8%.
+
 - Windows and macOS cross-compilation is green again. A console-window fix left
   an unused `os/exec` import in both OS-specific route managers, which only the
   cross-compile jobs caught; local verification now includes `GOOS=windows` and
   `GOOS=darwin` builds and vet passes.
+
 
 ---
 
