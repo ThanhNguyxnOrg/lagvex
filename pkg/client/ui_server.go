@@ -1172,6 +1172,7 @@ func (u *UIServer) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		"os":                runtime.GOOS,
 		"arch":              runtime.GOARCH,
 		"driverName":        driverName,
+		"version":           BuildVersion(),
 	}
 	if u.configStore != nil {
 		res["savedTweaks"] = u.configStore.Get().Tweaks

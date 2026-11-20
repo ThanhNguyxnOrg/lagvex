@@ -148,6 +148,7 @@ func main() {
 	}
 
 	// Web Dashboard Mode
+	client.SetBuildVersion(version)
 	uiServer := client.NewUIServer(engine, pm, "")
 
 	if !*noBrowserFlag {

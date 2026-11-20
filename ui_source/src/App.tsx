@@ -938,6 +938,9 @@ export default function App() {
   const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [tempNickname, setTempNickname] = useState(gamerNickname);
   const [pcHostname, setPcHostname] = useState("Local-PC");
+  // Real build version reported by the client; "dev" until the API answers,
+  // never a hardcoded release number.
+  const [appVersion, setAppVersion] = useState("dev");
 
   // Boost Hub Sub-Tab (GearUP Style)
   const [boostSubTab, setBoostSubTab] = useState<"routing" | "history">("routing");
@@ -1783,6 +1786,7 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           if (data.hostname) setPcHostname(data.hostname);
+          if (typeof data.version === "string" && data.version) setAppVersion(data.version);
           if (data.isAdmin !== undefined) setIsAdmin(data.isAdmin);
           if (data.driverName) setDriverName(data.driverName);
           const savedNick = localStorage.getItem("lagvex_nickname");
@@ -2807,7 +2811,7 @@ export default function App() {
         <div className="mt-auto flex flex-col items-center gap-1">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] shadow-[0_0_6px_#10b981]" />
-            <span className="font-mono text-[9px] text-white/45 font-semibold">v1.0.0</span>
+            <span className="font-mono text-[9px] text-white/45 font-semibold whitespace-nowrap">v{appVersion}</span>
           </div>
         </div>
       </aside>
