@@ -570,6 +570,52 @@ func TestUnstableRelayMarking(t *testing.T) {
 		t.Fatalf("a steady relay must not be marked unstable: %+v", steadyResult)
 	}
 
+	spread := NewProber()
+	spread.history = map[string][]probeHistoryEntry{
+		"relay:5": {
+			{RTTMs: 10, Loss: 0, Reached: true, At: now},
+			{RTTMs: 50, Loss: 0, Reached: true, At: now},
+			{RTTMs: 20, Loss: 0, Reached: true, At: now},
+		},
+	}
+	spreadResult := ProbeResult{Endpoint: "relay:5", Reachable: true, RTTMedianMs: 20, PacketLoss: 0}
+	spread.finishProbe(&spreadResult)
+	if !spreadResult.Unstable {
+		t.Fatalf("a relay with a large RTT spread must be marked unstable: %+v", spreadResult)
+	}
+
+	// Sub-millisecond samples on loopback/LAN are dominated by scheduler
+	// noise; a large relative spread there is not a real relay problem.
+	subMs := NewProber()
+	subMs.history = map[string][]probeHistoryEntry{
+		"relay:4": {
+			{RTTMs: 0.1, Loss: 0, Reached: true, At: now},
+			{RTTMs: 0.4, Loss: 0, Reached: true, At: now},
+			{RTTMs: 0.2, Loss: 0, Reached: true, At: now},
+		},
+	}
+	subMsResult := ProbeResult{Endpoint: "relay:4", Reachable: true, RTTMedianMs: 0.2, PacketLoss: 0}
+	subMs.finishProbe(&subMsResult)
+	if subMsResult.Unstable {
+		t.Fatalf("sub-millisecond timing noise must not mark a relay unstable: %+v", subMsResult)
+	}
+
+	// A single startup failure followed by successful probes is not a
+	// sustained-loss pattern.
+	oneFailure := NewProber()
+	oneFailure.history = map[string][]probeHistoryEntry{
+		"relay:6": {
+			{RTTMs: 0, Loss: 100, Reached: false, At: now},
+			{RTTMs: 0.3, Loss: 0, Reached: true, At: now},
+			{RTTMs: 0.2, Loss: 0, Reached: true, At: now},
+		},
+	}
+	oneFailureResult := ProbeResult{Endpoint: "relay:6", Reachable: true, RTTMedianMs: 0.2, PacketLoss: 0}
+	oneFailure.finishProbe(&oneFailureResult)
+	if oneFailureResult.Unstable {
+		t.Fatalf("one failed run must not mark a relay unstable: %+v", oneFailureResult)
+	}
+
 	fresh := NewProber()
 	firstRun := ProbeResult{Endpoint: "relay:3", Reachable: true, RTTMedianMs: 40, PacketLoss: 0}
 	fresh.finishProbe(&firstRun)

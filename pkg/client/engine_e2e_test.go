@@ -161,6 +161,9 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	if stats.LastError != "" {
 		t.Fatalf("unexpected last error after connect: %q", stats.LastError)
 	}
+	if stats.PingSampled {
+		t.Fatal("ping was reported as sampled before any keepalive pong")
+	}
 
 	// The relay must see exactly one session. This proves the handshake went
 	// over the wire and was accepted; a client-local state flip would not.
@@ -180,7 +183,11 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	}
 	// Loopback RTT may legitimately round down to 0ms, so only reject a
 	// negative value (which would mean fabricated telemetry).
-	if got := eng.Stats().PingMs; got < 0 {
+	stats = eng.Stats()
+	if !stats.PingSampled {
+		t.Fatal("pong arrived but pingSampled stayed false")
+	}
+	if got := stats.PingMs; got < 0 {
 		t.Fatalf("ping = %dms, want a measured value >= 0", got)
 	}
 
@@ -203,6 +210,9 @@ func TestEngineConnectKeepaliveDisconnect(t *testing.T) {
 	if stats.PingMs != 0 || stats.BytesUp != 0 || stats.BytesDown != 0 {
 		t.Fatalf("telemetry was not reset after disconnect: ping=%d up=%d down=%d",
 			stats.PingMs, stats.BytesUp, stats.BytesDown)
+	}
+	if stats.PingSampled {
+		t.Fatal("pingSampled stayed true after disconnect")
 	}
 	// The relay destroys the session on the authenticated Disconnect frame.
 	waitActiveUsers(t, httpAddr, 0)

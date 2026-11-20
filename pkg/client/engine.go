@@ -32,11 +32,15 @@ const (
 
 // TunnelStats holds real-time telemetry.
 type TunnelStats struct {
-	State            TunnelState    `json:"state"`
-	RelayAddr        string         `json:"relayAddr"`
-	ClientIP         string         `json:"clientIP"`
-	GatewayIP        string         `json:"gatewayIP"`
-	PingMs           int64          `json:"pingMs"`
+	State     TunnelState `json:"state"`
+	RelayAddr string      `json:"relayAddr"`
+	ClientIP  string      `json:"clientIP"`
+	GatewayIP string      `json:"gatewayIP"`
+	PingMs    int64       `json:"pingMs"`
+	// PingSampled reports whether PingMs came from a real Pong in this
+	// session. Without it a 0 ms value is ambiguous: it can mean a measured
+	// sub-millisecond RTT or no sample at all.
+	PingSampled      bool           `json:"pingSampled"`
 	BytesUp          uint64         `json:"bytesUp"`
 	BytesDown        uint64         `json:"bytesDown"`
 	UpRateBps        int64          `json:"upRateBps"`
@@ -121,6 +125,7 @@ type Engine struct {
 	bytesUp             atomic.Uint64
 	bytesDown           atomic.Uint64
 	pingMs              atomic.Int64
+	pingSampled         atomic.Bool
 	upRate              atomic.Int64
 	downRate            atomic.Int64
 	lastPong            atomic.Int64 // Unix nanoseconds of the last authenticated Pong
@@ -245,6 +250,7 @@ func (e *Engine) Stats() TunnelStats {
 		ClientIP:         e.clientIP.String(),
 		GatewayIP:        e.gatewayIP.String(),
 		PingMs:           e.pingMs.Load(),
+		PingSampled:      e.pingSampled.Load(),
 		BytesUp:          e.bytesUp.Load(),
 		BytesDown:        e.bytesDown.Load(),
 		UpRateBps:        e.upRate.Load(),
@@ -805,6 +811,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.cancelCtx = ctx
 	e.cancelFunc = cancel
 	e.lastPong.Store(time.Now().UnixNano())
+	e.pingSampled.Store(false)
 	e.lastErr.Store(nil)
 	if e.fecEncoder != nil {
 		e.fecEncoder.Reset()
@@ -933,6 +940,7 @@ func (e *Engine) Disconnect() error {
 	e.activeRelayID = ""
 	e.activeRelayName = ""
 	e.pingMs.Store(0)
+	e.pingSampled.Store(false)
 	e.bytesUp.Store(0)
 	e.bytesDown.Store(0)
 	e.upRate.Store(0)
@@ -1102,6 +1110,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			if err == nil {
 				rtt := time.Since(time.Unix(0, int64(ts)))
 				e.pingMs.Store(rtt.Milliseconds())
+				e.pingSampled.Store(true)
 				e.lastPong.Store(time.Now().UnixNano())
 			}
 
@@ -1538,6 +1547,7 @@ func (e *Engine) ExecuteSeamlessHandover(candidate *ProbeResult, reason string) 
 	e.lastPong.Store(time.Now().UnixNano())
 	candRTT := int64(candidate.RTTMedianMs)
 	e.pingMs.Store(candRTT)
+	e.pingSampled.Store(true)
 	e.baselinePingMs = float64(candRTT)
 	e.mu.Unlock()
 

@@ -54,6 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The dashboard footer shows the running build version from `/api/system-info`
   instead of a hardcoded `v1.0.0`, and it no longer wraps when the version is
   long.
+- Tunnel RTT is only shown once the engine has received a real keepalive Pong
+  (`pingSampled`), so a stale ISP measurement can no longer appear as "TUNNEL
+  LIVE" latency. Sub-millisecond loopback/LAN RTT is shown as `<1 ms`, and the
+  jitter card no longer tells a connected user to "Connect to measure" when the
+  measured variation is simply below 1 ms.
+- Relay instability now requires repeated recent loss (two of the last three
+  runs), so the embedded relay's first sweep before it starts no longer brands
+  it UNSTABLE for the session. Sub-millisecond timing noise is ignored when
+  judging RTT spread.
 - A new client↔relay end-to-end test performs a real UDP handshake, waits for
   an authenticated keepalive Pong, verifies the relay sees and then loses the
   session on disconnect, and covers the pre-flight refusal paths (bad PSK,

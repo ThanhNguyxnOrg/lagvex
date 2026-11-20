@@ -503,11 +503,27 @@ func (p *Prober) finishProbe(result *ProbeResult) {
 		result.LossAvgPct = lossAvgPct
 	}
 
-	// Mark relays whose retained history shows instability, so ranking can
-	// prefer a slightly slower but steady path.
+	// Mark relays whose retained history shows sustained instability, so
+	// ranking can prefer a slightly slower but steady path. One failed run is
+	// not enough: a relay that simply was not listening yet when the first
+	// sweep ran (the embedded local relay is started on connect) must not be
+	// branded unstable for the rest of the session.
 	if result.HistorySamples >= 3 && result.Reachable {
-		unstableLoss := result.LossAvgPct >= 5.0
-		unstableSpread := result.RTTAvgMs > 0 && result.RTTStdMs >= result.RTTAvgMs*0.35
+		recent := stored
+		if len(recent) > 3 {
+			recent = recent[len(recent)-3:]
+		}
+		lossyRuns := 0
+		for _, e := range recent {
+			if !e.Reached || e.Loss >= 5 {
+				lossyRuns++
+			}
+		}
+		unstableLoss := lossyRuns >= 2
+		// Relative spread is only meaningful once RTT is above the
+		// sub-millisecond noise floor; a loopback/LAN relay with 0.2 ms
+		// samples would otherwise be flagged unstable by scheduler jitter.
+		unstableSpread := result.RTTAvgMs >= 2.0 && result.RTTStdMs >= result.RTTAvgMs*0.35
 		result.Unstable = unstableLoss || unstableSpread
 	}
 }

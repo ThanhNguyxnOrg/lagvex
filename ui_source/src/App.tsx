@@ -1041,6 +1041,9 @@ export default function App() {
   const [isBoosting, setIsBoosting] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [livePing, setLivePing] = useState(0);
+  // True once the tunnel engine has produced a real Pong sample. Without it,
+  // 0 ms would be ambiguous between a sub-millisecond RTT and "no sample".
+  const [pingSampled, setPingSampled] = useState(false);
   const [packetLoss, setPacketLoss] = useState<number | null>(null);
   const [jitter, setJitter] = useState(0);
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -1771,6 +1774,10 @@ export default function App() {
     return `${Math.round(bps / 1000)} KB/s`;
   };
 
+  // Measured RTT. Sub-millisecond values (loopback/LAN relays) are shown as
+  // "<1 ms" instead of rounding down to an ambiguous 0.
+  const formatRtt = (ms: number) => (ms < 1 ? "<1 ms" : `${Math.round(ms)} ms`);
+
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes <= 0) return "0 MB";
     const mb = bytes / (1024 * 1024);
@@ -1833,7 +1840,10 @@ export default function App() {
           const data = await res.json();
           if (data.active || data.state === "connected") {
             setIsBoosting(true);
-            if (data.pingMs && data.pingMs > 0) setLivePing(data.pingMs);
+            if (data.pingSampled) {
+              setPingSampled(true);
+              setLivePing(Number(data.pingMs) || 0);
+            }
             if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
           }
         }
@@ -2108,10 +2118,14 @@ export default function App() {
         if (data.state === "connected") {
           setIsBoosting(true);
           setConnectionError(null);
-          if (data.pingMs > 0) setLivePing(data.pingMs);
+          if (data.pingSampled) {
+            setPingSampled(true);
+            setLivePing(Number(data.pingMs) || 0);
+          }
           if (data.packetLossPct !== undefined) setPacketLoss(data.packetLossPct);
         } else if (data.state === "disconnected" || data.state === "error") {
           setIsBoosting(false);
+          setPingSampled(false);
           setPeerRoutes([]);
           setPeerRouteCount(0);
           setRateHistory([]);
@@ -2139,8 +2153,9 @@ export default function App() {
           if (res.ok) {
             const data = await res.json();
             if (data.active || data.state === "connected") {
-              if (data.pingMs > 0) {
-                const currentPing = Number(data.pingMs);
+              if (data.pingSampled) {
+                const currentPing = Number(data.pingMs) || 0;
+                setPingSampled(true);
                 setLivePing(Number(currentPing.toFixed(1)));
 
                 const chart = pingHistoryRef.current;
@@ -2184,6 +2199,7 @@ export default function App() {
       }, 1200);
     } else {
       setLivePing(0);
+      setPingSampled(false);
       setJitter(0);
       setPacketLoss(null);
       recentPingsRef.current = [];
@@ -2202,6 +2218,7 @@ export default function App() {
         await apiFetch("/api/disconnect", { method: "POST" });
         setIsBoosting(false);
         setLivePing(0);
+        setPingSampled(false);
         setConnectionError(null);
         notify("Acceleration stopped. Standby mode.");
       } catch {
@@ -2250,6 +2267,7 @@ export default function App() {
       setIsBoosting(true);
       // Only show RTT reported by the tunnel engine. A relay probe performed
       // before connecting is not live tunnel latency.
+      setPingSampled(false);
       const targetPing = data.pingMs > 0 ? Number(data.pingMs) : 0;
       setLivePing(Number(targetPing.toFixed(1)));
       const routeNote = data.routeCount > 0
@@ -2295,7 +2313,10 @@ export default function App() {
       }
       const idx = relays.findIndex((r) => r.id === relay.id);
       if (idx >= 0) setSelectedRelayIdx(idx);
-      if (data.pingMs > 0) setLivePing(Number(data.pingMs.toFixed(1)));
+      if (data.pingSampled) {
+        setPingSampled(true);
+        setLivePing(Number(data.pingMs) || 0);
+      }
       notify(`Now accelerating via ${relay.cleanName}.`);
     } catch {
       notify("Could not reach the local Lagvex service.");
@@ -3034,7 +3055,7 @@ export default function App() {
                               <>
                                 <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                   <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                  <span>{livePing > 0 ? `${Math.round(livePing)} ms` : "—"}</span>
+                                  <span>{pingSampled ? formatRtt(livePing) : "—"}</span>
                                 </div>
                                 <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                   TUNNEL LIVE
@@ -3139,8 +3160,10 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
-                            {isBoosting && livePing > 0
-                              ? Math.round(livePing)
+                            {isBoosting && pingSampled
+                              ? livePing < 1
+                                ? "<1"
+                                : Math.round(livePing)
                               : selectedRelay.pingMs > 0
                               ? Math.round(selectedRelay.pingMs)
                               : "—"}
@@ -3148,7 +3171,7 @@ export default function App() {
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-brand text-[#10b981] mt-1 flex items-center gap-1 font-semibold">
-                          <IconBolt className="w-4 h-4 text-[#00F0FF]" /> {isBoosting && livePing > 0
+                          <IconBolt className="w-4 h-4 text-[#00F0FF]" /> {isBoosting && pingSampled
                             ? "Live RTT measured by the tunnel engine"
                             : isBoosting
                             ? "Waiting for the first tunnel RTT sample"
@@ -3181,12 +3204,18 @@ export default function App() {
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-white tracking-tight">
-                            {isBoosting && jitter > 0 ? `±${jitter}` : "—"}
+                            {isBoosting && pingSampled ? (jitter > 0 ? `±${jitter}` : "0.0") : "—"}
                           </span>
                           <span className="font-mono text-sm text-white/50 font-bold">ms</span>
                         </div>
                         <span className="text-[10px] font-mono text-[#00F0FF] mt-1 font-semibold">
-                          {isBoosting && jitter > 0 ? "Mean RTT variation" : "Connect to measure"}
+                          {isBoosting && jitter > 0
+                            ? "Mean RTT variation"
+                            : isBoosting && pingSampled
+                            ? "Measured RTT samples vary by less than 1 ms"
+                            : isBoosting
+                            ? "Waiting for RTT samples"
+                            : "Connect to measure"}
                         </span>
                       </div>
                     </div>
@@ -3440,8 +3469,8 @@ export default function App() {
                         )}
                       </div>
                       <span className="text-[10px] font-mono text-[#00F0FF] font-bold mt-1">
-                        {isBoosting && livePing > 0
-                          ? `${Math.round(livePing)} ms`
+                        {isBoosting && pingSampled
+                          ? formatRtt(livePing)
                           : selectedRelay.pingMs > 0
                           ? `${selectedRelay.pingMs} ms`
                           : "—"}
@@ -3806,7 +3835,7 @@ export default function App() {
                           LIVE ENGINE RTT SAMPLES
                         </span>
                         <span className="text-[10px] font-mono text-white/45">
-                          Latest: {livePing > 0 ? `${Math.round(livePing)}ms` : "—"} &bull; Jitter: {isBoosting && jitter > 0 ? `±${jitter}ms` : "—"}
+                          Latest: {pingSampled ? formatRtt(livePing) : "—"} &bull; Jitter: {isBoosting && jitter > 0 ? `±${jitter}ms` : "—"}
                         </span>
                       </div>
                       <div className="h-[120px] w-full rounded-lg overflow-hidden bg-black/40">
@@ -4111,7 +4140,7 @@ export default function App() {
                             <>
                               <div className="flex items-center gap-2 font-mono text-[#10b981] font-bold text-xs">
                                 <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-                                <span>{livePing > 0 ? `${Math.round(livePing)} ms` : "—"}</span>
+                                <span>{pingSampled ? formatRtt(livePing) : "—"}</span>
                               </div>
                               <span className="text-[10px] font-brand font-bold text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 px-2 py-0.5 rounded-full">
                                 TUNNEL LIVE
@@ -4549,7 +4578,7 @@ export default function App() {
                         {relay.unstable && (
                           <span
                             className="shrink-0 text-[9px] font-brand font-bold px-1.5 py-0.5 rounded bg-[#f59e0b]/20 text-[#f59e0b]"
-                            title="Retained probe history shows high loss or a large RTT spread"
+                            title="Recent probe history shows repeated loss or a large RTT spread"
                           >
                             UNSTABLE
                           </span>

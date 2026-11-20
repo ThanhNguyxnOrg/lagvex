@@ -171,6 +171,7 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"clientIP":         stats.ClientIP,
 		"gatewayIP":        stats.GatewayIP,
 		"pingMs":           stats.PingMs,
+		"pingSampled":      stats.PingSampled,
 		"bytesUp":          stats.BytesUp,
 		"bytesDown":        stats.BytesDown,
 		"upRateBps":        stats.UpRateBps,
