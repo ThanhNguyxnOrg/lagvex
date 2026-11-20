@@ -234,6 +234,13 @@ region — see [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [docs/COST.md](COST.md).
 - **Continent-grouped region selector**: The dashboard groups the catalog's regional server clusters by their `continent` label (Asia-Pacific, Europe, North America, South America, Oceania, Middle East & Africa) and only offers regions that have verified CIDRs.
 - **Measured selection, not geography**: relay selection ranks the relays the user configured by **measured** path quality (RTT, jitter, loss and the relay→region-anchor segment), not by geographic proximity. A relay in the wrong city can rank below a nearby one, and the dashboard shows why.
 - **Relay hosting is Linux-only**: the relay needs `/dev/net/tun`; Windows and macOS can run the client but cannot host a relay.
+- **Squad signaling** runs on the relay's HTTP port (the data-plane port + 1):
+  the client proxies `/api/squad/*` to the connected relay, so a squad shares
+  one room even when the members are on different networks. The signaling
+  port is public and CORS-open, so the relay rate-limits room creation and
+  room lookups per source IP, caps the number of live rooms, and generates
+  cryptographically random room codes (a room code grants access to the
+  roster and must not be guessable).
 
 ---
 

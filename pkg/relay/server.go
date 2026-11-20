@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -64,6 +65,14 @@ type Server struct {
 	squadRoomsMu sync.RWMutex
 	squadRooms   map[string]*RelaySquadRoom
 
+	// squadRateLimit bounds how often one source IP may create or poll
+	// squad rooms. The signaling HTTP port is public and CORS-open, so
+	// without a limit any web page could spam rooms or enumerate the
+	// (short) room codes of a user's relay.
+	squadRateMu   sync.Mutex
+	squadRate     map[string]*squadRateEntry
+	squadRoomsCap int
+
 	bufPool sync.Pool
 
 	activeSessions atomic.Int64
@@ -81,12 +90,14 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 
 	return &Server{
-		cfg:          cfg,
-		pool:         pool,
-		sessionsByID: make(map[uint64]*Session),
-		sessionsByIP: make(map[netip.Addr]*Session),
-		dedup:        newDualDedupRegistry(),
-		squadRooms:   make(map[string]*RelaySquadRoom),
+		cfg:           cfg,
+		pool:          pool,
+		sessionsByID:  make(map[uint64]*Session),
+		sessionsByIP:  make(map[netip.Addr]*Session),
+		dedup:         newDualDedupRegistry(),
+		squadRooms:    make(map[string]*RelaySquadRoom),
+		squadRate:     make(map[string]*squadRateEntry),
+		squadRoomsCap: defaultSquadRoomsCap,
 		bufPool: sync.Pool{
 			New: func() any {
 				b := make([]byte, protocol.MaxPacketSize)
@@ -630,7 +641,7 @@ func (s *Server) startSignalingHTTP(ctx context.Context, wg *sync.WaitGroup) {
 
 	srv := &http.Server{
 		Addr:    httpAddr,
-		Handler: mux,
+		Handler: s.squadRateLimitMiddleware(mux),
 	}
 
 	go func() {
@@ -724,7 +735,7 @@ func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Code == "" {
-		req.Code = fmt.Sprintf("LGVX-%d", time.Now().UnixNano()%9000+1000)
+		req.Code = newRoomCode()
 	}
 
 	room := &RelaySquadRoom{
@@ -745,7 +756,7 @@ func (s *Server) handleSquadCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.squadRoomsMu.Lock()
-	s.squadRooms[req.Code] = room
+	s.insertRoomLocked(room)
 	s.squadRoomsMu.Unlock()
 
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -835,7 +846,17 @@ func (s *Server) handleSquadRoom(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		return
 	}
+	// The room code may arrive as a query parameter (what the dashboard uses)
+	// or inside a JSON body (what a script would naturally send).
 	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
+	if code == "" && r.Method == http.MethodPost {
+		var body struct {
+			Code string `json:"code"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err == nil {
+			code = strings.ToUpper(strings.TrimSpace(body.Code))
+		}
+	}
 	if code == "" {
 		http.Error(w, `{"error":"room code required"}`, http.StatusBadRequest)
 		return

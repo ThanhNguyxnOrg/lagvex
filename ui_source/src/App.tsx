@@ -2318,13 +2318,13 @@ export default function App() {
 
   // Create a new Squad Room (starts with ONLY YOU, real state!)
   const handleCreateSquadRoom = async () => {
-    const code = `LGVX-${Math.floor(1000 + Math.random() * 9000)}`;
     try {
+      // No client-side code: the relay generates a cryptographically random
+      // room code, because the code grants access to the room roster.
       const res = await apiFetch("/api/squad/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          code,
           host: gamerNickname,
           relayId: selectedRelay.id !== "none" ? selectedRelay.id : "",
           relayName: selectedRelay.id !== "none" ? selectedRelay.cleanName : "",
@@ -2336,6 +2336,18 @@ export default function App() {
       if (!res.ok) {
         const message = (await res.text().catch(() => "")) || res.statusText;
         notify(`Could not create squad room: ${message.trim()}`);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      // The relay answers with { code }, the local fallback with { room: { code } }.
+      const code: string =
+        typeof data.code === "string"
+          ? data.code
+          : typeof data.room?.code === "string"
+            ? data.room.code
+            : "";
+      if (!code) {
+        notify("The relay did not return a room code; no room was created.");
         return;
       }
       const selfMember: SquadMember = {
@@ -4199,7 +4211,7 @@ export default function App() {
                         type="text"
                         value={joinInputCode}
                         onChange={(e) => setJoinInputCode(e.target.value.toUpperCase())}
-                        placeholder="e.g. LGVX-9821"
+                        placeholder="e.g. LGVX-K7P2QD"
                         className="flex-1 h-[48px] px-4 rounded-xl bg-[#121b27] border border-[#233347] text-sm font-mono font-bold text-white outline-none focus:border-[#00F0FF] placeholder:text-white/30"
                       />
                       <button
