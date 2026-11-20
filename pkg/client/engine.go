@@ -874,7 +874,11 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		}
 	}
 
-	log.Printf("[Engine] Tunnel active and accelerating!")
+	if adapter == nil {
+		log.Printf("[Engine] Relay session active in userspace fallback: game traffic is not tunneled")
+	} else {
+		log.Printf("[Engine] Tunnel active and accelerating!")
+	}
 
 	// Dual path activates after the primary session is fully up, so the
 	// toggle's honest state reflects a real standby handshake.

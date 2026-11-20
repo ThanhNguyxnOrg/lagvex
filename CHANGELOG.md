@@ -54,7 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relay errors reach the dashboard instead of being swallowed: a 429 rate
   limit, a full room or a room that no longer exists keeps its real status and
   message, and an unreachable signaling port returns an explicit 502. The
-  client no longer creates a local-only room that teammates cannot join.
+  client no longer creates a local-only room when a connected relay rejects the
+  request; the deliberately offline fallback still exists, is labelled in the
+  squad panel, and only runs when no relay is connected at all.
 - The dashboard footer shows the running build version from `/api/system-info`
   instead of a hardcoded `v1.0.0`, and it no longer wraps when the version is
   long.
@@ -67,11 +69,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs), so the embedded relay's first sweep before it starts no longer brands
   it UNSTABLE for the session. Sub-millisecond timing noise is ignored when
   judging RTT spread.
+- The dashboard header names the game reported by the engine
+  (`activeGame`), not the game merely selected in the UI. With a connected
+  tunnel but no active game it says "TUNNEL CONNECTED", and the system-ready
+  badge shows the real adapter for the OS (WinTun NDIS, macOS utun, Linux
+  dev/net/tun) instead of a fixed "kernel accelerator" claim.
+- When the kernel adapter cannot be created (for example a non-root Linux
+  session), the dashboard now shows an amber **userspace fallback** banner and
+  badge: "game traffic is not routed". Ping labels switch from "live
+  accelerated ping" to "live relay RTT", CIDR rows read "Not routed", and the
+  pipeline shows "No TUN routes". The engine log no longer claims to be
+  accelerating in that state.
+- Route advice reports the relay's measured loss instead of a hardcoded "0%
+  packet loss"; a lossy but faster relay is described with its actual loss.
 - A new client↔relay end-to-end test performs a real UDP handshake, waits for
   an authenticated keepalive Pong, verifies the relay sees and then loses the
   session on disconnect, and covers the pre-flight refusal paths (bad PSK,
   game without a region, missing profiles). Client package coverage rose from
   49.6% to 57.8%.
+- Windows and macOS cross-compilation is green again. A console-window fix left
+  an unused `os/exec` import in both OS-specific route managers, which only the
+  cross-compile jobs caught; local verification now includes `GOOS=windows` and
+  `GOOS=darwin` builds and vet passes.
 
 ---
 

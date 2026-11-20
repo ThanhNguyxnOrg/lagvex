@@ -1044,6 +1044,12 @@ export default function App() {
   // True once the tunnel engine has produced a real Pong sample. Without it,
   // 0 ms would be ambiguous between a sub-millisecond RTT and "no sample".
   const [pingSampled, setPingSampled] = useState(false);
+  // Game ID reported by the tunnel engine, not by the dashboard selection.
+  // The UI must not claim to accelerate a game the engine has no routes for.
+  const [engineGameId, setEngineGameId] = useState("");
+  // Actual tunnel mode from the engine ("Kernel (...)" or "Userspace QoS").
+  // The nominal OS adapter name alone would overstate a userspace fallback.
+  const [driverMode, setDriverMode] = useState("");
   const [packetLoss, setPacketLoss] = useState<number | null>(null);
   const [jitter, setJitter] = useState(0);
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -1072,6 +1078,14 @@ export default function App() {
 
   // Current items
   const selectedGame = games[selectedGameIdx] || games[0] || OFFICIAL_GAMES[0];
+  const engineGameName = engineGameId
+    ? games.find((g) => g.id === engineGameId)?.name || engineGameId
+    : "";
+  // The engine only routes game traffic when the kernel adapter was created.
+  // In userspace fallback the relay session exists but no traffic is tunneled,
+  // so the UI must not present it as acceleration.
+  const userspaceFallback = isBoosting && driverMode === "Userspace QoS";
+  const kernelTunnelActive = isBoosting && driverMode.startsWith("Kernel");
   const selectedRelay = relays[selectedRelayIdx] || relays[0] || EMPTY_RELAY;
 
   // ExitLag-parity "Available route" hint. Only measured values participate,
@@ -1855,6 +1869,8 @@ export default function App() {
           const data = await res.json();
           if (data.active || data.state === "connected") {
             setIsBoosting(true);
+            setEngineGameId(typeof data.activeGame === "string" ? data.activeGame : "");
+            if (typeof data.driverMode === "string") setDriverMode(data.driverMode);
             if (data.pingSampled) {
               setPingSampled(true);
               setLivePing(Number(data.pingMs) || 0);
@@ -2133,6 +2149,8 @@ export default function App() {
         if (data.state === "connected") {
           setIsBoosting(true);
           setConnectionError(null);
+          setEngineGameId(typeof data.activeGame === "string" ? data.activeGame : "");
+          if (typeof data.driverMode === "string") setDriverMode(data.driverMode);
           if (data.pingSampled) {
             setPingSampled(true);
             setLivePing(Number(data.pingMs) || 0);
@@ -2141,6 +2159,8 @@ export default function App() {
         } else if (data.state === "disconnected" || data.state === "error") {
           setIsBoosting(false);
           setPingSampled(false);
+          setEngineGameId("");
+          setDriverMode("");
           setPeerRoutes([]);
           setPeerRouteCount(0);
           setRateHistory([]);
@@ -2215,6 +2235,8 @@ export default function App() {
     } else {
       setLivePing(0);
       setPingSampled(false);
+      setEngineGameId("");
+      setDriverMode("");
       setJitter(0);
       setPacketLoss(null);
       recentPingsRef.current = [];
@@ -2234,6 +2256,8 @@ export default function App() {
         setIsBoosting(false);
         setLivePing(0);
         setPingSampled(false);
+        setEngineGameId("");
+        setDriverMode("");
         setConnectionError(null);
         notify("Acceleration stopped. Standby mode.");
       } catch {
@@ -2283,12 +2307,18 @@ export default function App() {
       // Only show RTT reported by the tunnel engine. A relay probe performed
       // before connecting is not live tunnel latency.
       setPingSampled(false);
+      setEngineGameId(typeof data.gameId === "string" ? data.gameId : selectedGame.id);
+      if (typeof data.driverMode === "string") setDriverMode(data.driverMode);
       const targetPing = data.pingMs > 0 ? Number(data.pingMs) : 0;
       setLivePing(Number(targetPing.toFixed(1)));
       const routeNote = data.routeCount > 0
         ? `${data.routeCount} game routes installed`
         : "routes will activate when the game process starts";
-      notify(`Boost Active: ${selectedGame.name} via ${selectedRelay.cleanName} — ${routeNote}.`);
+      if (data.driverMode === "Userspace QoS") {
+        notify(`Relay session active via ${selectedRelay.cleanName} — userspace fallback, game traffic is not routed.`);
+      } else {
+        notify(`Boost Active: ${selectedGame.name} via ${selectedRelay.cleanName} — ${routeNote}.`);
+      }
     } catch {
       setConnectionError("Could not reach the local Lagvex service.");
       setIsBoosting(false);
@@ -2545,6 +2575,34 @@ export default function App() {
       notify("Could not reach the local Lagvex service; no tweaks were applied.");
     }
   };
+
+  // Prominent, explicit notice for the userspace fallback. Without it the
+  // dashboard could show a live relay session while no game traffic is routed.
+  const userspaceNotice = userspaceFallback ? (
+    <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#f59e0b]/10 border border-[#f59e0b]/30">
+      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[#f59e0b]/20 border border-[#f59e0b]/50 text-[#f59e0b] text-[11px] font-black flex items-center justify-center">
+        !
+      </span>
+      <div className="flex flex-col gap-1 min-w-0">
+        <span className="text-xs font-brand font-bold uppercase tracking-wider text-[#f59e0b]">
+          Userspace fallback • game traffic is not routed
+        </span>
+        <span className="text-[11px] leading-relaxed text-[#f59e0b]/80">
+          {isAdmin
+            ? "The kernel tunnel adapter could not be created on this system, so the relay session carries control traffic only. Check that a TUN/TAP device is available."
+            : "The kernel tunnel adapter could not be created, so the relay session carries control traffic only. Relaunch with administrator rights to create the adapter and install game routes."}
+        </span>
+      </div>
+      {!isAdmin && (
+        <button
+          onClick={handleRelaunchAdmin}
+          className="shrink-0 ml-auto h-[34px] px-3 rounded-xl bg-[#f59e0b]/15 hover:bg-[#f59e0b]/25 border border-[#f59e0b]/40 text-[10px] font-brand font-bold text-[#f59e0b] cursor-pointer transition-all"
+        >
+          ELEVATE NOW
+        </button>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-[var(--lx-bg)] text-[#E0E6ED] font-sans antialiased selection:bg-[#00F0FF]/30 selection:text-white flex relative overflow-x-hidden">
@@ -2868,9 +2926,20 @@ export default function App() {
               </span>
             </h1>
             {isBoosting && (
-              <span className="px-2.5 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] text-[10px] font-brand font-bold border border-[#10b981]/30 flex items-center gap-1.5 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
-                ACCELERATING {selectedGame.name.toUpperCase()}
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-brand font-bold border flex items-center gap-1.5 ${
+                  userspaceFallback
+                    ? "bg-[#f59e0b]/15 text-[#f59e0b] border-[#f59e0b]/30"
+                    : "bg-[#10b981]/15 text-[#10b981] border-[#10b981]/30 animate-pulse"
+                }`}
+                title={userspaceFallback ? "The kernel tunnel adapter could not be created; the relay session carries control traffic only." : undefined}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${userspaceFallback ? "bg-[#f59e0b]" : "bg-[#10b981]"}`} />
+                {userspaceFallback
+                  ? "USERSPACE FALLBACK • NO TUN"
+                  : engineGameName
+                  ? `ACCELERATING ${engineGameName.toUpperCase()}`
+                  : "TUNNEL CONNECTED"}
               </span>
             )}
           </div>
@@ -2948,7 +3017,7 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="px-3 py-1 rounded-full bg-[#00F0FF]/15 text-[#00F0FF] text-xs font-brand font-bold border border-[#00F0FF]/30 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
-                      SYSTEM READY &bull; KERNEL ACCELERATOR
+                      SYSTEM READY &bull; {(driverMode || (driverName && !driverName.startsWith("Detecting") ? driverName : "Tunnel Engine")).toUpperCase()}
                     </span>
                   </div>
                   <h2 className="font-brand font-extrabold text-3xl text-white tracking-wide leading-tight">
@@ -2970,7 +3039,7 @@ export default function App() {
                         className="h-[46px] px-5 rounded-2xl bg-[#10b981]/20 hover:bg-[#10b981]/30 border border-[#10b981]/40 text-[#10b981] font-brand font-bold text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all"
                       >
                         <IconBolt className="w-4 h-4 text-[#10b981] animate-pulse" />
-                        <span>VIEW ACTIVE ACCELERATION ({selectedGame.name})</span>
+                        <span>{userspaceFallback ? "VIEW TUNNEL STATUS" : engineGameName ? `VIEW ACTIVE ACCELERATION (${engineGameName})` : "VIEW ACTIVE TUNNEL"}</span>
                       </button>
                     )}
                   </div>
@@ -3013,6 +3082,8 @@ export default function App() {
                 </div>
               </div>
 
+              {userspaceNotice}
+
               {/* Popular Games (Quick Launch Cards) */}
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
@@ -3028,7 +3099,7 @@ export default function App() {
                 <div className="grid grid-cols-4 gap-5">
                   {games.slice(0, 4).map((game) => {
                     const originalIdx = games.findIndex((g) => g.id === game.id);
-                    const isCurrentActive = isBoosting && selectedGame.id === game.id;
+                    const isCurrentActive = kernelTunnelActive && engineGameId === game.id;
                     const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
                     return (
                       <div
@@ -3099,6 +3170,7 @@ export default function App() {
           {/* ========================================================= */}
           {activeTab === "boost" && (
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
+              {userspaceNotice}
               {/* GearUP Cinematic Banner */}
               <div className="relative rounded-[32px] overflow-hidden bg-[#0a0f16] border border-[#1c2738] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8">
                 {/* Backdrop Game Art */}
@@ -3169,7 +3241,7 @@ export default function App() {
                       {/* 1. ESTIMATED PING */}
                       <div className="p-4 rounded-2xl bg-[#0f1722]/80 border border-[#1f2d40] flex flex-col">
                         <span className="text-[10px] font-brand font-bold text-white/45 uppercase tracking-wider">
-                          {isBoosting ? "LIVE ACCELERATED PING" : "TARGET ROUTE LATENCY"}
+                          {isBoosting ? (userspaceFallback ? "LIVE RELAY RTT" : "LIVE ACCELERATED PING") : "TARGET ROUTE LATENCY"}
                         </span>
                         <div className="flex items-baseline gap-1.5 mt-1">
                           <span className="font-mono font-black text-5xl text-[#00F0FF] tracking-tight">
@@ -3355,7 +3427,9 @@ export default function App() {
                         <IconBolt className={`w-5 h-5 ${isConnecting ? "animate-spin" : isBoosting ? "animate-glow-pulse text-white" : ""}`} />
                         <span>
                           {isBoosting
-                            ? "STOP ACCELERATION"
+                            ? userspaceFallback
+                              ? "STOP RELAY SESSION"
+                              : "STOP ACCELERATION"
                             : isConnecting
                             ? "CONNECTING..."
                             : !selectedGame.profileAvailable || !selectedRegion
@@ -3471,7 +3545,7 @@ export default function App() {
                         <IconBolt className="w-5 h-5" />
                       </div>
                       <span className="text-[11px] font-brand font-bold text-white">Lagvex Core</span>
-                      <span className="text-[9px] font-mono text-[#10b981]">{driverName}</span>
+                      <span className="text-[9px] font-mono text-[#10b981]">{driverMode || driverName}</span>
                     </div>
 
                     {/* Connecting Hop 2 -> 3 */}
@@ -3503,11 +3577,11 @@ export default function App() {
                     <div className="flex-1 flex flex-col items-center px-3 relative">
                       <div className="w-full h-1 bg-[#182333] rounded relative overflow-hidden">
                         {isBoosting && (
-                          <div className="absolute inset-y-0 left-0 w-1/3 bg-[#10b981] rounded animate-[pulse_1s_infinite]" />
+                          <div className={`absolute inset-y-0 left-0 w-1/3 rounded animate-[pulse_1s_infinite] ${userspaceFallback ? "bg-[#f59e0b]" : "bg-[#10b981]"}`} />
                         )}
                       </div>
-                      <span className="text-[10px] font-mono text-[#10b981] font-bold mt-1">
-                        {isBoosting ? "Relay Active" : "Direct Peering"}
+                      <span className={`text-[10px] font-mono font-bold mt-1 ${userspaceFallback ? "text-[#f59e0b]" : "text-[#10b981]"}`}>
+                        {isBoosting ? (userspaceFallback ? "No TUN routes" : "Relay Active") : "Direct Peering"}
                       </span>
                     </div>
 
@@ -3545,7 +3619,7 @@ export default function App() {
 
                       <div className="p-4 rounded-xl bg-[#090e15] border border-[#16202e] flex flex-col gap-2">
                         <span className="text-[10px] font-brand font-bold text-[#00F0FF] uppercase tracking-wider">
-                          ACTIVE IP CIDR SUBNETS
+                          {kernelTunnelActive ? "ACTIVE IP CIDR SUBNETS" : "CONFIGURED IP CIDR SUBNETS"}
                         </span>
                         <div className="flex flex-col gap-1.5 font-mono text-xs text-white/80 max-h-[110px] overflow-y-auto">
                           {(selectedRegion?.cidrs || []).map((cidr) => (
@@ -3554,7 +3628,9 @@ export default function App() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF]" />
                                 <span>{cidr}</span>
                               </span>
-                              <span className="text-[10px] text-[#00F0FF]">Split-Tunnel</span>
+                              <span className={`text-[10px] ${kernelTunnelActive ? "text-[#00F0FF]" : "text-[#f59e0b]"}`}>
+                                {kernelTunnelActive ? "Split-Tunnel" : "Not routed"}
+                              </span>
                             </div>
                           ))}
                           {(selectedRegion?.cidrs || []).length === 0 && (
@@ -4108,7 +4184,7 @@ export default function App() {
                 {filteredGames.map((game) => {
                   const originalIdx = games.findIndex((g) => g.id === game.id);
                   const isCurrent = selectedGame.id === game.id;
-                  const isCurrentActive = isBoosting && isCurrent;
+                  const isCurrentActive = kernelTunnelActive && engineGameId === game.id;
                   const protocolRoute = game.platforms.replace(/^PC\s*\((.*)\)$/, "$1");
                   return (
                     <div

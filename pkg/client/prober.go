@@ -917,6 +917,10 @@ func CalculateRouteAdvice(directRTT, directLoss float64, bestRelay *ProbeResult)
 	// 4. Relay path is significantly better (at least 5ms faster or cuts packet loss)
 	if (relayRTT <= directRTT-5.0) || (directLoss > 2.0 && relayLoss <= 0.5) {
 		savings := directRTT - relayRTT
+		summary := fmt.Sprintf("The direct path shows %.1f%% loss; %s measures %.1f%% loss at %.1fms.", directLoss, bestRelay.Name, relayLoss, relayRTT)
+		if relayRTT <= directRTT-5.0 {
+			summary = fmt.Sprintf("%s is %.1fms faster than the direct path, with %.1fms jitter and %.1f%% measured loss.", bestRelay.Name, savings, relayJitter, relayLoss)
+		}
 		return RouteAdvice{
 			Verdict:          VerdictBoost,
 			DirectRTTMs:      roundTo(directRTT, 1),
@@ -928,7 +932,7 @@ func CalculateRouteAdvice(directRTT, directLoss float64, bestRelay *ProbeResult)
 			OptimalRelayName: bestRelay.Name,
 			SavingsMs:        roundTo(savings, 1),
 			Headline:         "BOOST RECOMMENDED",
-			Summary:          fmt.Sprintf("%s accelerates your connection: saving ~%.1fms with %.1fms jitter and 0%% packet loss.", bestRelay.Name, savings, relayJitter),
+			Summary:          summary,
 			Timestamp:        now,
 		}
 	}

@@ -16,6 +16,7 @@ Lagvex was built from the ground up to solve the latency challenges of online ga
    - **Windows**: Uses **WinTun**, WireGuard's signed, high-performance kernel TUN driver.
    - **macOS**: Uses native **`utun`** (built into the Darwin kernel; zero third-party drivers needed).
    - **Linux / Steam Deck**: Uses native **/dev/net/tun**.
+   - If the kernel adapter cannot be created (missing privileges or no TUN device), the engine keeps a control-only relay session instead of failing. The dashboard labels that state **userspace fallback** and states plainly that game traffic is not routed through the relay.
 3. ⚡ **Pure Go Monorepo**:
    - Both the VPS Relay daemon (`lagvex-relay`) and the Client engine (`lagvex-client`) are written in Go. Zero-allocation data pipelines and buffer recycling via `sync.Pool` minimize GC pause times to preserve microsecond-level packet throughput.
 4. 🐧 **High-Performance Kernel-Level NAT (Linux relay only)**:

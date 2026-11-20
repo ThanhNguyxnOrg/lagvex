@@ -5,6 +5,7 @@ import (
 	"math"
 	"net"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -413,6 +414,26 @@ func TestCalculateRouteAdvice(t *testing.T) {
 	advice = CalculateRouteAdvice(40.0, 0.0, unreachableRelay)
 	if advice.Verdict != VerdictDirect {
 		t.Errorf("expected VerdictDirect when relay is unreachable, got %s", advice.Verdict)
+	}
+
+	// 6. A faster relay with measured loss must not be described as lossless.
+	lossyRelay := &ProbeResult{
+		RelayID:     "relay-lossy",
+		Name:        "Lossy Relay",
+		RTTMedianMs: 20.0,
+		JitterMs:    2.0,
+		PacketLoss:  3.4,
+		Reachable:   true,
+	}
+	advice = CalculateRouteAdvice(60.0, 0.0, lossyRelay)
+	if advice.Verdict != VerdictBoost {
+		t.Fatalf("expected VerdictBoost for a 40ms faster relay, got %s", advice.Verdict)
+	}
+	if strings.Contains(advice.Summary, "0% packet loss") {
+		t.Fatalf("summary claims lossless when relay measured 3.4%% loss: %q", advice.Summary)
+	}
+	if !strings.Contains(advice.Summary, "3.4% measured loss") {
+		t.Fatalf("summary does not report the measured relay loss: %q", advice.Summary)
 	}
 }
 
