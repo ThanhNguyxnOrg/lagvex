@@ -696,8 +696,10 @@ func (p *Prober) ProbeAll(ctx context.Context, relays []profiles.RelayEndpoint, 
 // one allowlisted anchor and sorts by the measured client->relay->anchor total
 // when those per-segment values exist.
 func (p *Prober) ProbeAllWithAnchor(ctx context.Context, relays []profiles.RelayEndpoint, concurrency int, anchorID byte) []ProbeResult {
+	// An empty relay set is a valid, empty answer: return a non-nil slice so
+	// the API serializes [] instead of null for dashboards that expect a list.
 	if len(relays) == 0 {
-		return nil
+		return []ProbeResult{}
 	}
 	if concurrency <= 0 {
 		concurrency = p.cfg.DefaultConcurrency

@@ -448,6 +448,9 @@ export type RelayNode = {
   /** Measured locally by the prober; retained across probe sweeps. */
   rttAvgMs: number;
   rttStdMs: number;
+  /** Tail latency over the same retained runs (0 = not measured). */
+  rttP50Ms: number;
+  rttP95Ms: number;
   lossAvgPct: number;
   rttTrend: number[];
   historySamples: number;
@@ -677,6 +680,8 @@ const EMPTY_RELAY: RelayNode = {
   reachable: false,
   rttAvgMs: 0,
   rttStdMs: 0,
+  rttP50Ms: 0,
+  rttP95Ms: 0,
   lossAvgPct: 0,
   rttTrend: [],
   historySamples: 0,
@@ -720,6 +725,8 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         reachable: item.reachable === true,
         rttAvgMs: typeof item.rttAvgMs === "number" ? item.rttAvgMs : 0,
         rttStdMs: typeof item.rttStdMs === "number" ? item.rttStdMs : 0,
+        rttP50Ms: typeof item.rttP50Ms === "number" ? item.rttP50Ms : 0,
+        rttP95Ms: typeof item.rttP95Ms === "number" ? item.rttP95Ms : 0,
         lossAvgPct: typeof item.lossAvgPct === "number" ? item.lossAvgPct : 0,
         rttTrend: Array.isArray(item.rttTrend)
           ? item.rttTrend.filter((v: unknown): v is number => typeof v === "number")
@@ -4834,7 +4841,7 @@ export default function App() {
                           <RttSparkline samples={relay.rttTrend} width={96} />
                           <span className="text-[9px] font-mono text-white/40 whitespace-nowrap">
                             {relay.historySamples > 1 && relay.rttAvgMs > 0
-                              ? `avg ${relay.rttAvgMs} ±${relay.rttStdMs}`
+                              ? `avg ${relay.rttAvgMs} ±${relay.rttStdMs}${relay.rttP95Ms > 0 ? ` • p95 ${relay.rttP95Ms}` : ""}`
                               : relay.historySamples === 1
                                 ? "1 sample"
                                 : "—"}

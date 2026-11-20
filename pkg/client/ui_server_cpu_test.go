@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ThanhNguyxnOrg/lagvex/pkg/profiles"
@@ -48,5 +49,28 @@ func TestDetectedProcessesReportsCPUSupport(t *testing.T) {
 	// must be truthful.
 	if !body.CPUSupported && !processCPUSupported() {
 		t.Fatal("cpuSupported = false on a platform that exposes counters")
+	}
+}
+
+// TestProbeRelaysEmptyCatalogIsEmptyList guards the list contract: with no
+// relays configured the API answers [] rather than JSON null, because a
+// dashboard that expects a list reads a different shape.
+func TestProbeRelaysEmptyCatalogIsEmptyList(t *testing.T) {
+	t.Setenv("LAGVEX_CONFIG_DIR", t.TempDir())
+	pm, err := profiles.NewManager("")
+	if err != nil {
+		t.Fatalf("profile manager: %v", err)
+	}
+	u := &UIServer{profileMgr: pm, prober: NewProber()}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/probe-relays?force=1", nil)
+	rec := httptest.NewRecorder()
+	u.handleProbeRelays(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "[]" {
+		t.Fatalf("body = %q, want []", got)
 	}
 }
