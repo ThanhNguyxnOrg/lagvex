@@ -56,8 +56,53 @@ echo -e "    Relay UDP Port: ${BOLD}${PORT}${NC}"
 echo -e "    Tunnel Subnet: ${BOLD}${SUBNET}${NC}"
 echo ""
 
-# 1. Check TUN Device
-echo -e "${CYAN}==> [1/6] Checking Linux TUN driver...${NC}"
+# 1. Install the relay before changing the host configuration.
+echo -e "${CYAN}==> [1/6] Installing Lagvex Relay binary...${NC}"
+SCRIPT_DIR=""
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+(
+    tmp="$(mktemp -d "$INSTALL_DIR/.lagvex-install.XXXXXXXX")"
+    trap 'rm -rf -- "$tmp"' EXIT
+    candidate="$tmp/lagvex-relay"
+
+    if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../cmd/lagvex-relay/main.go" ]] && command -v go >/dev/null; then
+        echo "    Compiling lagvex-relay from local source..."
+        (cd "$SCRIPT_DIR/.." && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$candidate" ./cmd/lagvex-relay)
+    elif [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/lagvex-relay" ]]; then
+        cp "$SCRIPT_DIR/lagvex-relay" "$candidate"
+    else
+        if [[ "$(uname -m)" != x86_64 ]]; then
+            echo "[ERROR] No relay release for this architecture. Run the installer from a source checkout with Go installed." >&2
+            exit 1
+        fi
+        echo "    Downloading the Linux amd64 relay and checking its SHA-256..."
+        releases="https://github.com/ThanhNguyxnOrg/lagvex/releases"
+        cd "$tmp"
+        curl -fsSL "$releases/latest/download/checksums.txt" -o checksums.txt
+        awk 'NF == 2 && $2 ~ /^lagvex-relay-v[0-9][0-9A-Za-z.-]*-linux-amd64\.tar\.gz$/ {print $1 "  " $2}' checksums.txt > relay.sha256
+        if ! read -r _ archive < relay.sha256; then
+            echo "[ERROR] Release checksums do not list a Linux amd64 relay." >&2
+            exit 1
+        fi
+        tag="${archive#lagvex-relay-}"
+        curl -fsSL "$releases/download/${tag%-linux-amd64.tar.gz}/$archive" -o "$archive"
+        sha256sum --strict -c relay.sha256
+        tar -xzOf "$archive" ./lagvex-relay > "$candidate"
+    fi
+
+    if [[ ! -s "$candidate" ]]; then
+        echo "[ERROR] No relay binary to install." >&2
+        exit 1
+    fi
+    chmod 755 "$candidate"
+    "$candidate" -version
+    mv -fT "$candidate" "$INSTALL_DIR/lagvex-relay"
+)
+
+# 2. Check TUN Device
+echo -e "${CYAN}==> [2/6] Checking Linux TUN driver...${NC}"
 modprobe tun 2>/dev/null || true
 mkdir -p /etc/modules-load.d
 echo "tun" > /etc/modules-load.d/lagvex.conf
@@ -67,8 +112,8 @@ if [[ ! -c /dev/net/tun ]]; then
     exit 1
 fi
 
-# 2. Sysctl Tweaks
-echo -e "${CYAN}==> [2/6] Configuring sysctl (IP forwarding & UDP buffers)...${NC}"
+# 3. Sysctl Tweaks
+echo -e "${CYAN}==> [3/6] Configuring sysctl (IP forwarding & UDP buffers)...${NC}"
 cat > /etc/sysctl.d/99-lagvex.conf << 'EOF'
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.rp_filter = 2
@@ -82,8 +127,8 @@ net.ipv4.udp_wmem_min = 16384
 EOF
 sysctl -q --system 2>/dev/null || true
 
-# 3. Firewall & NAT Masquerade
-echo -e "${CYAN}==> [3/6] Setting up firewall & NAT MASQUERADE...${NC}"
+# 4. Firewall & NAT Masquerade
+echo -e "${CYAN}==> [4/6] Setting up firewall & NAT MASQUERADE...${NC}"
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
     ufw allow "${PORT}/udp" comment "Lagvex Relay" >/dev/null
 fi
@@ -116,8 +161,8 @@ if command -v iptables >/dev/null 2>&1; then
     fi
 fi
 
-# 4. Generate Pre-Shared Key (PSK)
-echo -e "${CYAN}==> [4/6] Setting up Pre-Shared Key (PSK)...${NC}"
+# 5. Generate Pre-Shared Key (PSK)
+echo -e "${CYAN}==> [5/6] Setting up Pre-Shared Key (PSK)...${NC}"
 mkdir -p "$CONF_DIR"
 if [[ -z "$PSK" ]]; then
     if [[ -f "$CONF_DIR/psk.key" ]]; then
@@ -133,31 +178,6 @@ else
     echo "$PSK" > "$CONF_DIR/psk.key"
     chmod 600 "$CONF_DIR/psk.key"
 fi
-
-# 5. Build or Install Binary
-echo -e "${CYAN}==> [5/6] Installing Lagvex Relay binary...${NC}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || true)"
-
-if [[ -f "$PROJECT_ROOT/cmd/lagvex-relay/main.go" ]] && command -v go >/dev/null 2>&1; then
-    echo "    Compiling lagvex-relay from local source..."
-    (cd "$PROJECT_ROOT" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$INSTALL_DIR/lagvex-relay" ./cmd/lagvex-relay)
-elif [[ -f "$SCRIPT_DIR/lagvex-relay" ]]; then
-    install -m 755 "$SCRIPT_DIR/lagvex-relay" "$INSTALL_DIR/lagvex-relay"
-else
-    # Compile or download release
-    if command -v go >/dev/null 2>&1; then
-        echo "    Building lagvex-relay via Go..."
-        TMP_BUILD="$(mktemp -d)"
-        git clone --depth 1 https://github.com/ThanhNguyxnOrg/lagvex.git "$TMP_BUILD" 2>/dev/null || true
-        if [[ -d "$TMP_BUILD/cmd/lagvex-relay" ]]; then
-            (cd "$TMP_BUILD" && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "$INSTALL_DIR/lagvex-relay" ./cmd/lagvex-relay)
-            rm -rf "$TMP_BUILD"
-        fi
-    fi
-fi
-
-chmod +x "$INSTALL_DIR/lagvex-relay" 2>/dev/null || true
 
 # 6. Install Systemd Service
 echo -e "${CYAN}==> [6/6] Configuring systemd service...${NC}"

@@ -43,17 +43,17 @@ curl -fsSL https://raw.githubusercontent.com/ThanhNguyxnOrg/lagvex/main/scripts/
 ```
 
 **Step-by-step what the Linux installer does automatically:**
-1. 🔌 **Checks TUN Support**: Ensures `/dev/net/tun` exists in your kernel.
-2. 🔧 **Tunes Kernel Network Parameters**:
+1. 📦 **Installs Binary**: On a clean x86_64 VPS, downloads the Linux amd64 relay archive, verifies its published SHA-256 checksum, and installs `/usr/local/bin/lagvex-relay` before changing network settings. A local release bundle uses its packaged binary; a source checkout with Go builds locally (also supported on other architectures).
+2. 🔌 **Checks TUN Support**: Ensures `/dev/net/tun` exists in your kernel.
+3. 🔧 **Tunes Kernel Network Parameters**:
    ```ini
    net.ipv4.ip_forward = 1
    net.ipv4.conf.all.rp_filter = 2
    net.core.rmem_max = 8388608
    net.core.wmem_max = 8388608
    ```
-3. 🛡️ **Sets Up Firewall & Masquerade**: Adds `iptables` NAT MASQUERADE for the `10.88.0.0/24` tunnel subnet and enables TCP MSS clamping so game packets never fragment.
-4. 🔑 **Generates Pre-Shared Key (PSK)**: Generates a cryptographically strong 32-character random key stored at `/etc/lagvex/psk.key`.
-5. 📦 **Installs Binary**: Downloads and installs `lagvex-relay` to `/usr/local/bin/lagvex-relay`.
+4. 🛡️ **Sets Up Firewall & Masquerade**: Adds `iptables` NAT MASQUERADE for the `10.88.0.0/24` tunnel subnet and enables TCP MSS clamping so game packets never fragment.
+5. 🔑 **Generates Pre-Shared Key (PSK)**: Generates a cryptographically strong 32-character random key stored at `/etc/lagvex/psk.key`.
 6. ⚙️ **Registers Systemd Service**: Creates `/etc/systemd/system/lagvex-relay.service` and activates it immediately.
 7. 📋 **Prints Connection Details**: Outputs the relay endpoint, UDP port and the generated PSK. Add these in the dashboard with **+ Add Node**; a relay cannot be probed or used without its PSK.
 
