@@ -265,21 +265,35 @@ func TypeString(mtype byte) string {
 	}
 }
 
-// FECPayload holds structured metadata and XOR parity data for packet recovery.
+// FECPayload holds structured metadata and XOR or Reed-Solomon parity data for
+// packet recovery. When ParityCount <= 1 the wire metadata byte stays 0 for
+// full backwards compatibility with legacy XOR peers.
 type FECPayload struct {
-	BaseSeq uint64
-	Count   uint8
-	Lengths []uint16
-	Parity  []byte
+	BaseSeq     uint64
+	Count       uint8
+	ParityCount uint8
+	ParityIndex uint8
+	Lengths     []uint16
+	Parity      []byte
 }
 
-// EncodeFECPayload serializes FEC parity metadata and XOR sum into a binary slice.
+// EncodeFECPayload serializes legacy single-parity XOR metadata and payload.
 func EncodeFECPayload(baseSeq uint64, count uint8, lengths []uint16, parity []byte) []byte {
+	return EncodeFECPayloadRS(baseSeq, count, 1, 0, lengths, parity)
+}
+
+// EncodeFECPayloadRS serializes XOR (parityCount <= 1) or Cauchy Reed-Solomon
+// (parityCount >= 2) parity metadata and payload into a binary slice.
+func EncodeFECPayloadRS(baseSeq uint64, count, parityCount, parityIndex uint8, lengths []uint16, parity []byte) []byte {
 	hdrLen := 10 + 2*int(count)
 	buf := make([]byte, hdrLen+len(parity))
 	binary.BigEndian.PutUint64(buf[0:8], baseSeq)
 	buf[8] = count
-	buf[9] = 0 // reserved
+	if parityCount <= 1 {
+		buf[9] = 0 // legacy XOR compatibility
+	} else {
+		buf[9] = ((parityCount & 0x0f) << 4) | (parityIndex & 0x0f)
+	}
 	for i := 0; i < int(count); i++ {
 		var l uint16
 		if i < len(lengths) {
@@ -301,6 +315,16 @@ func DecodeFECPayload(buf []byte) (FECPayload, error) {
 	if count == 0 {
 		return FECPayload{}, errors.New("fec count cannot be 0")
 	}
+	meta := buf[9]
+	parityCount := uint8(1)
+	parityIndex := uint8(0)
+	if meta != 0 {
+		parityCount = meta >> 4
+		parityIndex = meta & 0x0f
+		if parityCount == 0 || parityIndex >= parityCount {
+			return FECPayload{}, errors.New("invalid RS parity header")
+		}
+	}
 	hdrLen := 10 + 2*int(count)
 	if len(buf) < hdrLen {
 		return FECPayload{}, ErrPacketTooShort
@@ -311,9 +335,11 @@ func DecodeFECPayload(buf []byte) (FECPayload, error) {
 	}
 	parity := buf[hdrLen:]
 	return FECPayload{
-		BaseSeq: baseSeq,
-		Count:   count,
-		Lengths: lengths,
-		Parity:  parity,
+		BaseSeq:     baseSeq,
+		Count:       count,
+		ParityCount: parityCount,
+		ParityIndex: parityIndex,
+		Lengths:     lengths,
+		Parity:      parity,
 	}, nil
 }

@@ -54,6 +54,7 @@ type Server struct {
 
 	// dedup holds first-copy-wins state for dual-path connection groups.
 	dedup *dualDedupRegistry
+	obfs  *protocol.Obfuscator
 
 	// tunAtomic mirrors tunDev so tests and tooling can fetch the device
 	// without racing the assignment in Start.
@@ -107,6 +108,7 @@ func NewServer(cfg Config) (*Server, error) {
 		sessionsByID:  make(map[uint64]*Session),
 		sessionsByIP:  make(map[netip.Addr]*Session),
 		dedup:         newDualDedupRegistry(),
+		obfs:          protocol.NewObfuscator(cfg.PSK),
 		squadRooms:    make(map[string]*RelaySquadRoom),
 		squadRate:     make(map[string]*squadRateEntry),
 		squadRoomsCap: defaultSquadRoomsCap,
@@ -223,26 +225,54 @@ func (s *Server) loopUDP(ctx context.Context) {
 
 		remoteEndpoint := remoteAddr.AddrPort()
 		ver, mtype := protocol.ParseHeader(buf[0])
-		if ver != protocol.Version {
-			s.bufPool.Put(bufPtr)
-			continue
+		handled := false
+		if ver == protocol.Version {
+			switch mtype {
+			case protocol.TypeHandshakeReq:
+				handled = s.handleHandshake(buf[:n], remoteEndpoint, false)
+			case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC, protocol.TypeAnchorProbe:
+				handled = s.handleSessionPacket(buf[:n], remoteEndpoint)
+			}
 		}
 
-		switch mtype {
-		case protocol.TypeHandshakeReq:
-			s.handleHandshake(buf[:n], remoteEndpoint)
-		case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC, protocol.TypeAnchorProbe:
-			s.handleSessionPacket(buf[:n], remoteEndpoint)
+		// Transparent Anti-DPI fallback: if the packet was not valid plaintext,
+		// attempt PSK-keyed deobfuscation for obfuscated clients on the same port.
+		if !handled && s.obfs != nil {
+			if unmaskedHS, ok := s.obfs.DeobfuscateHandshake(buf[:n]); ok {
+				uVer, uType := protocol.ParseHeader(unmaskedHS[0])
+				if uVer == protocol.Version && uType == protocol.TypeHandshakeReq {
+					handled = s.handleHandshake(unmaskedHS, remoteEndpoint, true)
+				}
+			}
+			if !handled && n >= protocol.SecureHeaderLen+protocol.TagLen {
+				unmaskPtr := s.bufPool.Get().(*[]byte)
+				unmasked := s.obfs.DeobfuscateSession(*unmaskPtr, buf[:n])
+				uVer, uType := protocol.ParseHeader(unmasked[0])
+				if uVer == protocol.Version {
+					switch uType {
+					case protocol.TypeData, protocol.TypePing, protocol.TypeDisconnect, protocol.TypeFEC, protocol.TypeAnchorProbe:
+						s.handleSessionPacket(unmasked, remoteEndpoint)
+					}
+				}
+				s.bufPool.Put(unmaskPtr)
+			}
 		}
 
 		s.bufPool.Put(bufPtr)
 	}
 }
 
-func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
+func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort, obfuscated bool) bool {
 	req, groupID, err := protocol.DecodeHandshakeRequestExt(s.cfg.PSK, raw)
 	if err != nil {
-		return // Silent drop on auth / clock skew failure
+		return false // Silent drop on auth / clock skew failure
+	}
+
+	sendResp := func(respBuf []byte) {
+		if obfuscated && s.obfs != nil {
+			respBuf = s.obfs.ObfuscateHandshake(respBuf)
+		}
+		s.sendUDP(respBuf, remote)
 	}
 
 	// Check max clients
@@ -250,13 +280,13 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		respBuf := protocol.EncodeHandshakeResponse(s.cfg.PSK, protocol.HandshakeResponse{
 			Status: protocol.StatusServerBusy,
 		})
-		s.sendUDP(respBuf, remote)
-		return
+		sendResp(respBuf)
+		return true
 	}
 
 	sessionID, err := protocol.RandomUint64()
 	if err != nil {
-		return
+		return true
 	}
 
 	// Phase 0.1: Clean previous session if same client ID reconnected BEFORE allocating IP
@@ -278,18 +308,19 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		respBuf := protocol.EncodeHandshakeResponse(s.cfg.PSK, protocol.HandshakeResponse{
 			Status: protocol.StatusPoolFull,
 		})
-		s.sendUDP(respBuf, remote)
-		return
+		sendResp(respBuf)
+		return true
 	}
 
 	// Phase P0.1: Derive symmetric ChaCha20-Poly1305 session keys for relay
 	sessCrypto, err := protocol.NewRelayCrypto(s.cfg.PSK, req.Nonce, sessionID, req.ClientID)
 	if err != nil {
 		log.Printf("[Relay] Failed to init session crypto: %v", err)
-		return
+		return true
 	}
 
 	sess := NewSession(sessionID, req.ClientID, innerIP, remote, sessCrypto)
+	sess.Obfuscated = obfuscated
 
 	// Dual-path registration (Redundant-lite Phase 1). The group hash is
 	// derived from the PSK, so only authenticated clients can join a group.
@@ -330,13 +361,21 @@ func (s *Server) handleHandshake(raw []byte, remote netip.AddrPort) {
 		})
 	}
 
-	s.sendUDP(respBuf, remote)
+	sendResp(respBuf)
+	return true
 }
 
-func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
+func (s *Server) sendSessionUDP(sess *Session, data []byte, to netip.AddrPort) {
+	if sess != nil && sess.Obfuscated && s.obfs != nil {
+		data = s.obfs.ObfuscateSession(nil, data)
+	}
+	s.sendUDP(data, to)
+}
+
+func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) bool {
 	mtype, sessionID, err := protocol.ReadPacketHeader(raw)
 	if err != nil {
-		return
+		return false
 	}
 
 	s.mu.RLock()
@@ -344,7 +383,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 	s.mu.RUnlock()
 
 	if !exists || sess.Crypto == nil {
-		return
+		return false
 	}
 
 	bufPtr := s.bufPool.Get().(*[]byte)
@@ -352,7 +391,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 	plainBuf := *bufPtr
 	decType, payload, err := sess.Crypto.OpenPacket(plainBuf, raw)
 	if err != nil || decType != mtype {
-		return // Dropped: AEAD auth failure or anti-replay violation
+		return false // Dropped: AEAD auth failure or anti-replay violation
 	}
 
 	// Phase P0.3: Authenticated Roaming — update endpoint strictly AFTER Poly1305 authentication succeeds
@@ -362,18 +401,18 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 	switch decType {
 	case protocol.TypeData:
 		if len(payload) < 20 || (payload[0]>>4) != 4 {
-			return
+			return true
 		}
 		// Anti-spoofing: Verify inner source IPv4 matches assigned session IP
 		srcIP := netip.AddrFrom4([4]byte{payload[12], payload[13], payload[14], payload[15]})
 		if srcIP != sess.InnerIP {
-			return
+			return true
 		}
 
 		// Security: Prevent accessing private / bogon destinations
 		dstIP := netip.AddrFrom4([4]byte{payload[16], payload[17], payload[18], payload[19]})
 		if isForbiddenDestination(dstIP) {
-			return
+			return true
 		}
 
 		// Dual-path dedup (Redundant-lite): a dual session's frames carry a
@@ -386,7 +425,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 			inner, seq, frameGroup, ok = protocol.SplitDualTrailer(payload)
 			if !ok || frameGroup != sess.GroupHash {
 				sess.DualBadFrames.Add(1)
-				return
+				return true
 			}
 			if s.dedup.observe(sess.GroupHash, seq) {
 				sess.DualSuppressed.Add(1)
@@ -395,7 +434,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 				// contiguous ACK watermark (a retransmission can fill a
 				// hole that overflowed the tracking set).
 				sess.TrackDualForwarded(seq)
-				return
+				return true
 			}
 			sess.DualForwarded.Add(1)
 			sess.TrackDualForwarded(seq)
@@ -407,7 +446,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 			if ackSeq, ok := sess.TakeDualAck(time.Now()); ok {
 				ackBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 				ack := sess.Crypto.EncodeDualAck(ackBuf, sessionID, ackSeq)
-				s.sendUDP(ack, remote)
+				s.sendSessionUDP(sess, ack, remote)
 			}
 		}
 
@@ -422,36 +461,38 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 
 	case protocol.TypeFEC:
 		if sess.FECDecoder == nil {
-			return
+			return true
 		}
 		fecPayload, err := protocol.DecodeFECPayload(payload)
 		if err != nil {
-			return
+			return true
 		}
-		_, recovered, ok := sess.FECDecoder.ProcessParity(fecPayload)
-		if ok && len(recovered) >= 20 && (recovered[0]>>4) == 4 {
-			srcIP := netip.AddrFrom4([4]byte{recovered[12], recovered[13], recovered[14], recovered[15]})
-			dstIP := netip.AddrFrom4([4]byte{recovered[16], recovered[17], recovered[18], recovered[19]})
-			if srcIP == sess.InnerIP && !isForbiddenDestination(dstIP) {
-				sess.BytesUp.Add(uint64(len(recovered)))
-				sess.PacketsRecovered.Add(1)
-				_, _ = s.tunDev.Write(recovered)
+		for _, rec := range sess.FECDecoder.ProcessParityMulti(fecPayload) {
+			recovered := rec.Data
+			if len(recovered) >= 20 && (recovered[0]>>4) == 4 {
+				srcIP := netip.AddrFrom4([4]byte{recovered[12], recovered[13], recovered[14], recovered[15]})
+				dstIP := netip.AddrFrom4([4]byte{recovered[16], recovered[17], recovered[18], recovered[19]})
+				if srcIP == sess.InnerIP && !isForbiddenDestination(dstIP) {
+					sess.BytesUp.Add(uint64(len(recovered)))
+					sess.PacketsRecovered.Add(1)
+					_, _ = s.tunDev.Write(recovered)
+				}
 			}
 		}
 
 	case protocol.TypePing:
 		ts, err := protocol.DecodeControlPayload(payload)
 		if err != nil {
-			return
+			return true
 		}
 		pongBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 		pong := sess.Crypto.EncodePong(pongBuf, sessionID, ts)
-		s.sendUDP(pong, remote)
+		s.sendSessionUDP(sess, pong, remote)
 
 	case protocol.TypeAnchorProbe:
 		packed, err := protocol.DecodeControlPayload(payload)
 		if err != nil {
-			return
+			return true
 		}
 		seq, anchorID := protocol.DecodeAnchorProbeRequest(packed)
 		target, ok := protocol.AnchorProbeTargets[anchorID]
@@ -459,16 +500,16 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 			// Unknown ids are never probed; the allowlist is the only source of
 			// targets so the relay cannot be pointed at arbitrary hosts.
 			log.Printf("[Relay] Rejected anchor probe for unknown id %d from session %016x", anchorID, sessionID)
-			return
+			return true
 		}
 		if !sess.AllowAnchorProbe(time.Now()) {
-			return // Rate limited; silently drop to avoid amplification.
+			return true // Rate limited; silently drop to avoid amplification.
 		}
 		rttUs, lossPct := probeAnchorTarget(target)
 		replyBuf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 		reply := sess.Crypto.EncodeAnchorProbeReply(replyBuf, sessionID,
 			protocol.EncodeAnchorProbeReply(seq, rttUs, lossPct))
-		s.sendUDP(reply, remote)
+		s.sendSessionUDP(sess, reply, remote)
 
 	case protocol.TypeDisconnect:
 		s.mu.Lock()
@@ -481,6 +522,7 @@ func (s *Server) handleSessionPacket(raw []byte, remote netip.AddrPort) {
 		}
 		s.mu.Unlock()
 	}
+	return true
 }
 
 // loopTUN reads return packets from the Linux TUN device and sends them to clients.
@@ -526,14 +568,13 @@ func (s *Server) loopTUN(ctx context.Context) {
 				sess.BytesDown.Add(uint64(n))
 
 				packet := sess.Crypto.EncodeData(outBuf, sess.ID, buf[:n])
-				s.sendUDP(packet, *remote)
+				s.sendSessionUDP(sess, packet, *remote)
 
 				if sess.FECEncoder != nil {
 					seq := binary.BigEndian.Uint64(packet[9:17])
-					fecPayloadBytes, hasParity := sess.FECEncoder.AddPacket(seq, buf[:n])
-					if hasParity {
+					for _, fecPayloadBytes := range sess.FECEncoder.AddPacketMulti(seq, buf[:n]) {
 						fecPacket := sess.Crypto.EncodeFEC(fecBuf, sess.ID, fecPayloadBytes)
-						s.sendUDP(fecPacket, *remote)
+						s.sendSessionUDP(sess, fecPacket, *remote)
 					}
 				}
 			}

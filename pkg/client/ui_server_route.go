@@ -1,10 +1,13 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,14 +164,40 @@ func (u *UIServer) handleRouteDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	hops = append(hops, tunnelHop)
 
-	// Hop: game server. The relay can measure its own RTT to an allowlisted
-	// anchor (see "anchor" below), but it never probes the actual game server,
-	// so this segment is not guessed.
+	// Hop: game server. When connected to a native Lagvex relay and a measured
+	// game-server IP is provided (via query param or persisted game history),
+	// ask the relay itself to measure the relay->server segment via /probe/gameserver.
 	gameServerHop := routeHop{
 		ID:     "game-server",
 		Label:  "Game server",
 		Target: regionName,
 		Reason: "no server-side probe target; only the region anchor below is measured",
+	}
+	gsHost := strings.TrimSpace(r.URL.Query().Get("gameServerHost"))
+	gsPort, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("gameServerPort")))
+	if gsHost == "" && gameID != "" && u.configStore != nil {
+		if hist := u.configStore.GameServersFor(gameID); len(hist) > 0 {
+			gsHost = hist[0].Host
+			gsPort = hist[0].Port
+		}
+	}
+	if gsPort <= 0 || gsPort > 65535 {
+		gsPort = 443
+	}
+	if connected && stats.Transport != "wireguard" && gsHost != "" {
+		if ip, err := validateTCPPingTarget(gsHost); err == nil {
+			if relayURL := u.getRelaySignalingURL(); relayURL != "" {
+				if rttMs, lossPct, samples, ok := probeGameServerViaRelay(relayURL, ip.String(), gsPort); ok {
+					gameServerHop.Target = fmt.Sprintf("%s:%d", ip.String(), gsPort)
+					gameServerHop.RTTMs = rttMs
+					gameServerHop.LossPct = lossPct
+					gameServerHop.Samples = samples
+					gameServerHop.Measured = true
+					gameServerHop.Reason = ""
+					gameServerHop.Note = "measured from connected relay (relay -> game server)"
+				}
+			}
+		}
 	}
 	hops = append(hops, gameServerHop)
 
@@ -255,4 +284,36 @@ func (u *UIServer) handleRouteDetail(w http.ResponseWriter, r *http.Request) {
 		"anchor":     anchor,
 		"notes":      notes,
 	})
+}
+
+func probeGameServerViaRelay(relayURL, host string, port int) (rttMs, lossPct float64, samples int, ok bool) {
+	body, err := json.Marshal(map[string]any{"host": host, "port": port})
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3500*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, relayURL+"/probe/gameserver", bytes.NewReader(body))
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 3500 * time.Millisecond}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return 0, 0, 0, false
+	}
+	var out struct {
+		RTTMs   float64 `json:"rttMs"`
+		LossPct float64 `json:"lossPct"`
+		Samples int     `json:"samples"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || out.RTTMs <= 0 {
+		return 0, 0, 0, false
+	}
+	return out.RTTMs, out.LossPct, out.Samples, true
 }

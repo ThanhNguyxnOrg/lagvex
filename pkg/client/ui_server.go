@@ -114,19 +114,30 @@ func (u *UIServer) setupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/ping-relay", u.handleTestRelay)
 	mux.HandleFunc("/api/add-game", u.handleAddGame)
 	mux.HandleFunc("/api/add-relay", u.handleAddRelay)
+	mux.HandleFunc("/api/relay/import-uri", u.handleRelayImportURI)
+	mux.HandleFunc("/api/relay/export-uri", u.handleRelayExportURI)
+	mux.HandleFunc("/api/relay/import-wireguard", u.handleRelayImportWireGuard)
+	mux.HandleFunc("/api/relay/register-warp", u.handleRelayRegisterWARP)
+	mux.HandleFunc("/api/relay/import-subscription", u.handleRelayImportSubscription)
+	mux.HandleFunc("/api/relay/delete", u.handleRelayDelete)
 	mux.HandleFunc("/api/tweak", u.handleTweak)
 	mux.HandleFunc("/api/advisor", u.handleAdvisor)
 	mux.HandleFunc("/api/failover/toggle", u.handleFailoverToggle)
 	mux.HandleFunc("/api/failover/history", u.handleFailoverHistory)
 	mux.HandleFunc("/api/fec/toggle", u.handleFECToggle)
 	mux.HandleFunc("/api/dual-path/toggle", u.handleDualPathToggle)
+	mux.HandleFunc("/api/obfuscation/toggle", u.handleObfuscationToggle)
 	mux.HandleFunc("/api/optimize-profile", u.handleOptimizeProfile)
 	mux.HandleFunc("/api/system-info", u.handleSystemInfo)
 	mux.HandleFunc("/api/relaunch-admin", u.handleRelaunchAdmin)
 	mux.HandleFunc("/api/shutdown", u.handleShutdown)
 	mux.HandleFunc("/api/diagnose-network", u.handleNetworkDiagnostics)
+	mux.HandleFunc("/api/diagnose-mtu", u.handleDiagnoseMTU)
+	mux.HandleFunc("/api/traceroute", u.handleTraceroute)
+	mux.HandleFunc("/api/dns-benchmark", u.handleDNSBenchmark)
 	mux.HandleFunc("/api/tcping", u.handleTCPPing)
 	mux.HandleFunc("/api/relay-tcping", u.handleRelayGameServerProbe)
+	mux.HandleFunc("/api/relay-tcpping", u.handleRelayGameServerProbe)
 	mux.HandleFunc("/api/game-server-history", u.handleGameServerHistory)
 	mux.HandleFunc("/api/diagnose-bufferbloat", u.handleDiagnoseBufferbloat)
 	mux.HandleFunc("/api/diagnostics/export", u.handleDiagnosticsExport)
@@ -193,9 +204,12 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"fecActive":        stats.FECActive,
 		"fecRatio":         stats.FECRatio,
 		"packetsRecovered": stats.PacketsRecovered,
+		"packetsHedged":    stats.PacketsHedged,
 		"fecParitySent":    stats.FECParitySent,
 		"fecParityRecv":    stats.FECParityRecv,
 		"driverMode":       stats.DriverMode,
+		"transport":        stats.Transport,
+		"obfuscated":       stats.Obfuscated,
 		"lastError":        stats.LastError,
 		"smartL4Filter":    stats.SmartL4Filter,
 		"packetLoss":       stats.PacketLoss,
@@ -210,6 +224,15 @@ func (u *UIServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"standbyRttMs":     stats.StandbyRttMs,
 		"standbyTotalMs":   stats.StandbyTotalMs,
 		"standbyAgeSec":    stats.StandbyAgeSec,
+	}
+	if stats.DualPath != nil {
+		resp["dualPath"] = stats.DualPath
+	}
+	if u.configStore != nil {
+		period, mUp, mDown := u.configStore.MonthlyTransfer()
+		resp["monthlyPeriod"] = period
+		resp["monthlyBytesUp"] = mUp + stats.BytesUp
+		resp["monthlyBytesDown"] = mDown + stats.BytesDown
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -291,12 +314,11 @@ func (u *UIServer) handleDetectedProcesses(w http.ResponseWriter, r *http.Reques
 func (u *UIServer) handleRelays(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	catalog := u.profileMgr.Catalog()
-	// Never expose relay pre-shared keys to the browser. The engine resolves
-	// them from the local catalog when a connection is requested.
+	// Never expose relay pre-shared keys or WireGuard private keys to the
+	// browser. The engine resolves them from the local catalog on connect.
 	relays := make([]profiles.RelayEndpoint, len(catalog.Relays))
-	copy(relays, catalog.Relays)
-	for i := range relays {
-		relays[i].PSK = ""
+	for i, rel := range catalog.Relays {
+		relays[i] = rel.Redacted()
 	}
 	_ = json.NewEncoder(w).Encode(relays)
 }
@@ -507,10 +529,53 @@ func (u *UIServer) handleConnect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var matchedRelay *profiles.RelayEndpoint
+	for _, rel := range catalog.Relays {
+		if strings.EqualFold(rel.Endpoint, req.RelayEndpoint) || strings.EqualFold(rel.ID, req.RelayEndpoint) {
+			c := rel
+			matchedRelay = &c
+			req.RelayEndpoint = rel.Endpoint
+			break
+		}
+	}
+
 	if req.RelayEndpoint == "" {
 		writeJSONError(w, http.StatusBadRequest, "relayEndpoint is required")
 		return
 	}
+
+	// WireGuard / Cloudflare WARP Free Backbone transport path
+	if matchedRelay != nil && matchedRelay.IsWireGuard() {
+		if u.engine == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "engine not initialized")
+			return
+		}
+		u.engine.SetFullTunnel(req.FullTunnel)
+		if err := u.engine.ConnectWireGuard(*matchedRelay, req.GameID, req.RegionID, req.ForceNow); err != nil {
+			log.Printf("[Dashboard] WireGuard connect error: %v", err)
+			writeJSONError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		if u.configStore != nil {
+			u.configStore.AddRecentRelay(req.RelayEndpoint)
+		}
+		stats := u.engine.Stats()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success":     true,
+			"status":      "connected",
+			"state":       stats.State,
+			"transport":   stats.Transport,
+			"endpoint":    req.RelayEndpoint,
+			"gameId":      stats.ActiveGame,
+			"regionId":    stats.ActiveRegion,
+			"routeCount":  stats.RouteCount,
+			"gameRunning": stats.GameRunning,
+			"driverMode":  stats.DriverMode,
+		})
+		return
+	}
+
 	if req.PSK == "" {
 		writeJSONError(w, http.StatusBadRequest, "relay PSK is required; add the relay with its PSK before connecting")
 		return
@@ -580,6 +645,10 @@ func (u *UIServer) handleDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if u.engine != nil {
+		preStats := u.engine.Stats()
+		if u.configStore != nil && (preStats.BytesUp > 0 || preStats.BytesDown > 0) {
+			u.configStore.AddMonthlyTransfer(preStats.BytesUp, preStats.BytesDown)
+		}
 		go func() {
 			_ = u.engine.Disconnect()
 		}()

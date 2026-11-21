@@ -90,13 +90,28 @@ anti-cheat checks the way socket-hooking boosters can.
   own measured session rate, split the VPS price across a squad, and compare with a
   typical paid plan. Every price and traffic figure is labelled as an estimate;
   see [`docs/COST.md`](docs/COST.md).
-- 🛡️ **Adaptive FEC, failover and DSCP marking** — loss recovery and relay failover
-  with honest status reporting. While connected, one alternative relay is kept
-  pre-measured as a standby, so a degradation promotes it without waiting for a sweep.
-- ♻️ **Dual-path redundancy (experimental, opt-in)** — frames go to the primary relay
+- 🛡️ **Adaptive Reed-Solomon FEC, Packet Hedging, failover and DSCP marking** — pure-Go
+  GF(2⁸) Cauchy Reed-Solomon FEC automatically scales from `10:1` XOR to `RS 6:2`,
+  `RS 4:2` and `RS 4:3` to recover multi-packet burst losses (5–15% loss) without
+  waiting for retransmission RTT, backed by selective UDP packet hedging (≤256 B) and
+  pre-measured standby failover.
+- ♻️ **Dual-path redundancy (independent PSK)** — frames go to the primary relay
   only; the relay acknowledges progress, and frames it may have missed are
-  retransmitted via the standby relay. Overhead is the measured retransmission
-  counter, not a fixed multiplier. Requires both relays to share one PSK.
+  retransmitted via the standby relay. Primary and standby relays may now use
+  **independent PSKs** across different VPS providers.
+- 🆓 **Free Mode (Zero-VPS) — Cloudflare WARP / WireGuard split-tunnel** — register a
+  free Cloudflare WARP WireGuard profile in one click or import any `.conf` file
+  (WARP, Mullvad, AmneziaWG, personal VPS) to run over Lagvex's route-based game
+  split-tunneling on Windows, macOS and Linux.
+- 🔗 **Relay Share URIs (`lagvex://`) & Community Subscriptions** — share a self-hosted
+  VPS relay with a squad via one copyable URI or import an `https://` relay list.
+- 🕶️ **Anti-DPI UDP Obfuscation (zero overhead)** — optional PSK-keyed header
+  scrambling (salted by the random Poly1305 tag) plus variable-length handshake padding
+  to resist ISP UDP fingerprinting and peak-hour throttling; relays auto-detect both
+  plain and obfuscated clients on the same UDP port.
+- 🧭 **Free Local Diagnostics Suite** — PingPlotter-style hop-by-hop Route Tracer,
+  UDP DNS Resolver Benchmark (Cloudflare, Google, Quad9, OpenDNS, AdGuard), Auto
+  Path-MTU Discovery (PMTUD) and Bufferbloat analysis — all usable at \$0 without a VPS.
 - 🖥️ **Windows, macOS and Linux client** — WinTun, native `utun` and `/dev/net/tun`
   respectively; one Go codebase, one React dashboard.
 

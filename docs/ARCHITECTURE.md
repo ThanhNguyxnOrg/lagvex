@@ -178,6 +178,14 @@ Every route below is served by the loopback HTTP server (`pkg/client/ui_server*.
 | POST | `/api/connect` | Connects to a relay (`relayEndpoint` + `psk`) |
 | POST | `/api/disconnect` | Tears the session down |
 | POST | `/api/add-game` / `/api/add-relay` | Adds a custom game or relay |
+| POST | `/api/relay/register-warp` | Registers a free Cloudflare WARP WireGuard split-tunnel profile |
+| POST | `/api/relay/import-wireguard` | Imports a standard WireGuard `.conf` profile (WARP/Mullvad/VPS) |
+| POST | `/api/relay/import-uri` / `/export-uri` | Imports or exports a `lagvex://` squad share URI |
+| POST | `/api/relay/import-subscription` / `/delete` | Imports an HTTPS relay list or removes a relay node |
+| POST | `/api/obfuscation/toggle` | Toggles zero-overhead Anti-DPI UDP obfuscation |
+| POST | `/api/traceroute` | PingPlotter-style hop-by-hop route tracer (public IPv4 only) |
+| POST | `/api/dns-benchmark` | Benchmarks real UDP latency across public DNS resolvers |
+| POST | `/api/diagnose-mtu` | Binary-search Path-MTU Discovery (PMTUD) for Lagvex & WireGuard |
 | POST | `/api/tcping` | TCP handshake RTT to a public IP |
 | POST | `/api/ping-relay` / `/api/test-relay` | Relay reachability checks |
 | POST | `/api/dual-path/toggle` | Opt-in redundant-lite ARQ mode |

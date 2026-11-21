@@ -171,6 +171,21 @@ func (m *Manager) AddRelay(relay RelayEndpoint) error {
 	return m.saveLocked()
 }
 
+// RemoveRelay deletes a relay server from the catalog by ID.
+func (m *Manager) RemoveRelay(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for i, existing := range m.catalog.Relays {
+		if strings.EqualFold(existing.ID, id) {
+			m.catalog.Relays = append(m.catalog.Relays[:i], m.catalog.Relays[i+1:]...)
+			_ = m.saveLocked()
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) saveLocked() error {
 	if m.path == "" {
 		return nil

@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import FloatingHUD from "./FloatingHUD";
+import FreeBackbonePanel from "./components/FreeBackbonePanel";
+import RouteTracerPanel from "./components/RouteTracerPanel";
+import { apiFetch } from "./lib/api";
 import {
   countEndpointsInCIDRs,
   hostFromEndpoint,
@@ -8,16 +11,6 @@ import {
 import { formatAgeShort, probeMethodShort, routeHintMsLabel } from "./lib/format.ts";
 import { isRttFresh, cpuPercentLabel } from "./lib/telemetry.ts";
 import { MIN_MEASURED_SAMPLES, TYPICAL_BOOSTER_PRICE_PER_MONTH, projectMonthlyCost } from "./lib/cost.ts";
-
-// The dashboard API requires this header on state-changing requests so a
-// cross-site page cannot drive the loopback API (custom headers force a CORS
-// preflight, which the local server never allows).
-const nativeFetch = window.fetch.bind(window);
-function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers);
-  headers.set("X-Lagvex-Request", "1");
-  return nativeFetch(input, { ...init, headers });
-}
 
 // ==================== BRAND ASSETS ====================
 const imgLagvexLogo = "/assets/logo.jpg";
@@ -442,6 +435,7 @@ export type RelayNode = {
   location: string;
   country: string;
   flag: string;
+  tier?: string;
   pingMs: number;
   packetLoss: number;
   reachable: boolean;
@@ -499,13 +493,15 @@ export type TCPPingSample = {
   error?: string;
 };
 
-/** Measured FEC counters for the latency-stabilization readout. */
+/** Measured FEC & hedging counters for the latency-stabilization readout. */
 export type StabilizationReadout = {
   fecActive: boolean;
-  fecRatio: number;
+  fecRatio: string;
   packetsRecovered: number;
+  packetsHedged: number;
   paritySent: number;
   parityRecv: number;
+  transport: string;
 };
 
 /** Automatic TCP probe of an observed game-server endpoint. */
@@ -719,6 +715,7 @@ function mapProbeRelays(data: unknown): RelayNode[] {
         location: typeof item.location === "string" ? item.location : "",
         country: item.continent || item.country || "GLOBAL",
         flag,
+        tier: typeof item.tier === "string" ? item.tier : "",
         pingMs: measuredRtt > 0 ? Math.round(measuredRtt * 10) / 10 : 0,
         packetLoss:
           typeof item.packetLoss === "number" ? Math.round(item.packetLoss * 10) / 10 : 0,
@@ -1034,6 +1031,8 @@ export default function App() {
   const [peerRoutes, setPeerRoutes] = useState<string[]>([]);
   const [fullTunnel, setFullTunnel] = useState(false);
   const [dualPath, setDualPathState] = useState<DualPathStatus | null>(null);
+  const [obfuscated, setObfuscated] = useState(false);
+  const [monthlyTransfer, setMonthlyTransfer] = useState<{ period: string; bytes: number } | null>(null);
   const [standby, setStandby] = useState<{ id: string; name: string; rttMs: number; totalMs: number; ageSec: number } | null>(null);
   const [rateHistory, setRateHistory] = useState<{ t: number; up: number; down: number }[]>([]);
   const [sessionBytes, setSessionBytes] = useState<{ up: number; down: number }>({ up: 0, down: 0 });
@@ -1046,10 +1045,12 @@ export default function App() {
   // Measured FEC counters for the latency-stabilization readout.
   const [stabilization, setStabilization] = useState<StabilizationReadout>({
     fecActive: false,
-    fecRatio: 0,
+    fecRatio: "Off",
     packetsRecovered: 0,
+    packetsHedged: 0,
     paritySent: 0,
-    parityRecv: 0
+    parityRecv: 0,
+    transport: ""
   });
   // Automatic game-server TCP probe (GearUP DoPingGame parity).
   const [serverProbe, setServerProbe] = useState<ServerProbe | null>(null);
@@ -2211,14 +2212,22 @@ export default function App() {
 
         setPeerRouting(data.peerRouting === true);
         setFullTunnel(data.fullTunnel === true);
+        setObfuscated(data.obfuscated === true);
+        if (typeof data.monthlyPeriod === "string") {
+          const up = typeof data.monthlyBytesUp === "number" ? data.monthlyBytesUp : 0;
+          const down = typeof data.monthlyBytesDown === "number" ? data.monthlyBytesDown : 0;
+          setMonthlyTransfer({ period: data.monthlyPeriod, bytes: up + down });
+        }
         setDualPathState(data.dualPath ?? null);
         if (typeof data.activeRelayId === "string") setActiveRelayId(data.activeRelayId);
         setStabilization({
           fecActive: data.fecActive === true,
-          fecRatio: typeof data.fecRatio === "number" ? data.fecRatio : 0,
+          fecRatio: typeof data.fecRatio === "string" ? data.fecRatio : "Off",
           packetsRecovered: typeof data.packetsRecovered === "number" ? data.packetsRecovered : 0,
+          packetsHedged: typeof data.packetsHedged === "number" ? data.packetsHedged : 0,
           paritySent: typeof data.fecParitySent === "number" ? data.fecParitySent : 0,
-          parityRecv: typeof data.fecParityRecv === "number" ? data.fecParityRecv : 0
+          parityRecv: typeof data.fecParityRecv === "number" ? data.fecParityRecv : 0,
+          transport: typeof data.transport === "string" ? data.transport : ""
         });
         if (data.standbyRelayName) {
           setStandby({
@@ -3018,9 +3027,9 @@ export default function App() {
       </aside>
 
       {/* ── 2. MAIN WORKSPACE CONTENT ── */}
-      <main className="ml-[84px] flex-1 min-h-screen flex flex-col">
+      <main className="ml-[84px] flex-1 min-w-0 min-h-screen flex flex-col overflow-x-hidden">
         {/* Top Header Bar */}
-        <header className="flex items-center justify-between pt-5 pb-3 px-8 z-20 border-b border-[#141b26]/50">
+        <header className="flex flex-wrap items-center justify-between gap-3 pt-5 pb-3 px-6 lg:px-8 z-20 border-b border-[#141b26]/50">
           <div className="flex items-center gap-3">
             <h1 className="font-brand font-extrabold text-lg text-white tracking-wide flex items-center gap-2">
               <span className="text-[#00F0FF]">LAGVEX</span>
@@ -3070,7 +3079,11 @@ export default function App() {
                 title={`Administrator rights may be required to create the ${driverName} adapter. Click to request elevation.`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#f59e0b] shadow-[0_0_8px_#f59e0b] animate-pulse" />
-                <span>Standard user &bull; Elevate &#x2197;</span>
+                <span>Standard user &middot; Elevate</span>
+                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="7" y1="17" x2="17" y2="7" />
+                  <polyline points="7 7 17 7 17 17" />
+                </svg>
               </button>
             )}
 
@@ -3163,9 +3176,9 @@ export default function App() {
                     </span>
                   </span>
                   <div className="flex flex-col gap-2 font-mono text-xs">
-                    <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
-                      <span className="text-white/50">Hostname:</span>
-                      <span className="font-bold text-white">{pcHostname}</span>
+                    <div className="flex items-center justify-between gap-3 p-2 rounded bg-white/[0.02]">
+                      <span className="text-white/60 shrink-0">Hostname:</span>
+                      <span className="font-bold text-white truncate text-right" title={pcHostname}>{pcHostname}</span>
                     </div>
                     <div className="flex items-center justify-between p-2 rounded bg-white/[0.02]">
                       <span className="text-white/50">Gateway LAN:</span>
@@ -3299,6 +3312,23 @@ export default function App() {
             <div className="flex flex-col gap-6 max-w-[1240px] mx-auto w-full tab-enter">
               {userspaceNotice}
               {gameMismatchNotice}
+              {relays.length === 0 && (
+                <FreeBackbonePanel
+                  relays={[]}
+                  notify={notify}
+                  onRelaysChanged={async () => {
+                    try {
+                      const pRes = await apiFetch("/api/probe-relays?force=1");
+                      if (pRes.ok) {
+                        const data = await pRes.json();
+                        setRelays(mapProbeRelays(data));
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                />
+              )}
               {/* GearUP Cinematic Banner */}
               <div className="relative rounded-[32px] overflow-hidden bg-[#0a0f16] border border-[#1c2738] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8">
                 {/* Backdrop Game Art */}
@@ -3312,9 +3342,9 @@ export default function App() {
                 <div className="absolute inset-0 bg-gradient-to-r from-[#0a0f16] via-[#0a0f16]/85 to-transparent pointer-events-none" />
 
                 {/* Main Hero Content */}
-                <div className="relative z-10 flex items-start justify-between">
+                <div className="relative z-10 flex items-start justify-between gap-6">
                   {/* Left Info & Big Metrics */}
-                  <div className="flex flex-col gap-5 max-w-[680px]">
+                  <div className="flex flex-col gap-5 min-w-0 flex-1 max-w-[680px]">
                     <div className="flex items-center gap-3">
                       <img
                         src={selectedGame.coverImg}
@@ -3343,7 +3373,7 @@ export default function App() {
                                 value={selectedRegion?.id || ""}
                                 onChange={(e) => setSelectedRegionId(e.target.value)}
                                 disabled={isBoosting}
-                                className="h-7 max-w-[260px] px-2 rounded-lg bg-[#111b28] border border-[#24364b] text-[11px] font-mono text-[#00F0FF] outline-none focus:border-[#00F0FF] disabled:opacity-60"
+                                className="appearance-none max-w-full sm:max-w-[320px] py-1.5 pl-3 pr-8 rounded-lg bg-[#111b28] border border-[#24364b] text-[11px] font-mono text-[#00F0FF] outline-none focus:border-[#00F0FF] disabled:opacity-60 cursor-pointer"
                               >
                                 {(selectedGame.regions || []).map((region) => (
                                   <option key={region.id} value={region.id}>
@@ -3477,28 +3507,34 @@ export default function App() {
                             </span>
                           </>
                         ) : (
-                          <span className="text-white/25">
+                          <span className="text-white/55">
                             no endpoint observed yet — appears when the game process runs
                           </span>
                         )}
                       </div>
-                      {(stabilization.fecActive || stabilization.packetsRecovered > 0) && (
+                      {((isBoosting && (stabilization.fecActive || stabilization.transport === "wireguard")) || stabilization.packetsRecovered > 0) && (
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
                           <span className="text-white/45 font-brand font-bold uppercase tracking-wider">
                             LATENCY STABILIZATION (MEASURED)
                           </span>
-                          <span className={stabilization.fecActive ? "text-[#00F0FF]" : "text-white/30"}>
-                            {stabilization.fecActive ? "FEC active" : "FEC idle"}
-                          </span>
-                          {stabilization.fecRatio > 0 && (
-                            <span className="text-white/40">overhead {stabilization.fecRatio.toFixed(1)}%</span>
+                          {stabilization.transport === "wireguard" ? (
+                            <span className="text-[#34d399]">WireGuard / WARP Split-Tunnel</span>
+                          ) : (
+                            <>
+                              <span className={stabilization.fecActive ? "text-[#00F0FF]" : "text-white/30"}>
+                                {stabilization.fecActive ? `FEC ${stabilization.fecRatio}` : "FEC idle"}
+                              </span>
+                              {stabilization.packetsRecovered > 0 && (
+                                <span className="text-[#10b981]">{stabilization.packetsRecovered} packets repaired</span>
+                              )}
+                              {stabilization.packetsHedged > 0 && (
+                                <span className="text-[#A366FF]">{stabilization.packetsHedged} hedged</span>
+                              )}
+                              <span className="text-white/30">
+                                {stabilization.paritySent} parity sent · {stabilization.parityRecv} received
+                              </span>
+                            </>
                           )}
-                          {stabilization.packetsRecovered > 0 && (
-                            <span className="text-[#10b981]">{stabilization.packetsRecovered} packets repaired</span>
-                          )}
-                          <span className="text-white/30">
-                            {stabilization.paritySent} parity sent · {stabilization.parityRecv} received
-                          </span>
                         </div>
                       )}
                       {serverHistory.length > 0 && (
@@ -4689,13 +4725,13 @@ export default function App() {
                 <div>
                   <h2 className="font-brand font-extrabold text-2xl text-white">Relay Nodes</h2>
                   <p className="text-xs text-white/50">
-                    Relays configured in this client. RTT and loss come from the local prober; no public nodes are bundled. Add your own relay endpoint and PSK to begin.
+                    Connect free via Cloudflare WARP / WireGuard .conf, import a teammate&apos;s lagvex:// link, or deploy your own Linux VPS relay for Reed-Solomon FEC and Dual-Path redundancy.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <button
                     onClick={() => setIsAddingNode(true)}
-                    className="px-4 py-2 rounded-xl bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 text-xs font-brand font-bold text-[#00F0FF] flex items-center gap-1.5 cursor-pointer transition-all"
+                    className="h-9 px-4 rounded-xl bg-[#00F0FF]/15 hover:bg-[#00F0FF]/25 border border-[#00F0FF]/30 text-xs font-brand font-bold text-[#00F0FF] flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all"
                   >
                     <span>+ Add Custom Node</span>
                   </button>
@@ -4728,13 +4764,35 @@ export default function App() {
                         notify("Node probe sweep completed.");
                       }
                     }}
-                    className="px-4 py-2 rounded-xl bg-[#101722] hover:bg-[#162130] border border-[#223042] text-xs font-brand font-bold text-white flex items-center gap-2 cursor-pointer transition-all"
+                    className="h-9 px-4 rounded-xl bg-[#101722] hover:bg-[#162130] border border-[#223042] text-xs font-brand font-bold text-white flex items-center gap-2 whitespace-nowrap cursor-pointer transition-all"
                   >
                     <IconRefresh className="w-4 h-4 text-[#00F0FF]" />
                     <span>Refresh All Latencies</span>
                   </button>
                 </div>
               </div>
+
+              {/* Free Mode (WARP / WireGuard) & Relay Share Import Hub */}
+              <FreeBackbonePanel
+                relays={relays.map((r) => ({
+                  id: r.id,
+                  cleanName: r.cleanName,
+                  endpoint: r.address,
+                  tier: r.tier
+                }))}
+                notify={notify}
+                onRelaysChanged={async () => {
+                  try {
+                    const pRes = await apiFetch("/api/probe-relays?force=1");
+                    if (pRes.ok) {
+                      const data = await pRes.json();
+                      setRelays(mapProbeRelays(data));
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }}
+              />
 
               {/* Node Search and Continent Filter Bar */}
               <div className="flex items-center justify-between gap-4">
@@ -4757,7 +4815,7 @@ export default function App() {
                   <select
                     value={nodeSort}
                     onChange={(e) => setNodeSort(e.target.value as typeof nodeSort)}
-                    className="h-[36px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
+                    className="appearance-none py-2 pl-3 pr-8 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
                   >
                     <option value="best">Best measured route</option>
                     <option value="loss">Lowest loss</option>
@@ -4978,7 +5036,7 @@ export default function App() {
                     <select
                       value={tcpPingAttempts}
                       onChange={(e) => setTCPPingAttempts(e.target.value)}
-                      className="h-[42px] w-[110px] px-3 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
+                      className="appearance-none h-[42px] w-[110px] pl-3 pr-8 rounded-xl bg-[#0f1722] border border-[#1c293a] text-xs font-mono text-white outline-none focus:border-[#00F0FF]/60 cursor-pointer"
                     >
                       {[1, 2, 3, 4, 6, 8].map((count) => (
                         <option key={count} value={count}>{count}</option>
@@ -5197,7 +5255,43 @@ export default function App() {
           {/* TAB 5: SYSTEM TWEAKER                                     */}
           {/* ========================================================= */}
           {activeTab === "tweaker" && (
-            <div className="flex flex-col gap-6 max-w-[960px] mx-auto w-full tab-enter">
+            <div className="flex flex-col gap-6 max-w-[1100px] mx-auto w-full tab-enter">
+              {monthlyTransfer && monthlyTransfer.bytes > 0 && (
+                <div className="px-4 py-2.5 rounded-2xl bg-[#0d1624] border border-[#1d2b3d] flex items-center justify-between text-xs font-mono">
+                  <span className="text-white/55">
+                    Measured Monthly Relay Transfer ({monthlyTransfer.period})
+                  </span>
+                  <span className="text-[#00F0FF] font-bold">
+                    {(monthlyTransfer.bytes / (1024 * 1024)).toFixed(1)} MB
+                  </span>
+                </div>
+              )}
+              {/* PingPlotter-Style Hop-by-Hop Route Tracer, Free DNS Benchmark, PMTUD & Anti-DPI */}
+              <RouteTracerPanel
+                notify={notify}
+                obfuscated={obfuscated}
+                onToggleObfuscation={async (next) => {
+                  try {
+                    const res = await apiFetch("/api/obfuscation/toggle", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ enabled: next })
+                    });
+                    if (res.ok) {
+                      const d = await res.json();
+                      setObfuscated(d.obfuscated === true);
+                      notify(
+                        d.obfuscated
+                          ? "Anti-DPI UDP Obfuscation enabled (applies on next Lagvex relay connect)."
+                          : "Anti-DPI UDP Obfuscation disabled."
+                      );
+                    }
+                  } catch {
+                    notify("Could not update obfuscation setting.");
+                  }
+                }}
+              />
+
               {/* Bufferbloat Diagnostic Test Card */}
               <div className="p-6 rounded-3xl bg-gradient-to-r from-[#0d1624] via-[#101a29] to-[#0a121e] border border-[#1d2b3d] shadow-xl flex flex-col gap-4">
                 <div className="flex items-center justify-between">

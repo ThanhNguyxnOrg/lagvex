@@ -301,3 +301,42 @@ func TestEngineConnectRefusals(t *testing.T) {
 		}
 	})
 }
+
+// TestEngineConnectObfuscatedE2E verifies Anti-DPI UDP obfuscation end-to-end
+// against a real relay on the same standard UDP port: obfuscated handshake,
+// obfuscated Ping/Pong keepalive, and obfuscated Disconnect teardown.
+func TestEngineConnectObfuscatedE2E(t *testing.T) {
+	psk := []byte("obfs-e2e-psk-0123456789abcdef")
+	srv := startE2ERelay(t, psk)
+	udpAddr := srv.UDPAddr()
+	httpAddr := srv.HTTPAddr()
+
+	eng, err := NewEngine(nil)
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+	eng.SetObfuscation(true)
+	if err := eng.Connect(udpAddr.String(), psk, "", "", false); err != nil {
+		t.Fatalf("obfuscated connect failed: %v", err)
+	}
+	t.Cleanup(func() { _ = eng.Disconnect() })
+
+	if !eng.Stats().Obfuscated {
+		t.Fatal("expected Obfuscated=true in stats")
+	}
+	waitActiveUsers(t, httpAddr, 1)
+
+	initialPong := eng.lastPong.Load()
+	deadline := time.Now().Add(6 * time.Second)
+	for time.Now().Before(deadline) && eng.lastPong.Load() == initialPong {
+		time.Sleep(25 * time.Millisecond)
+	}
+	if eng.lastPong.Load() == initialPong {
+		t.Fatal("no authenticated obfuscated pong received from relay")
+	}
+
+	if err := eng.Disconnect(); err != nil {
+		t.Fatalf("disconnect: %v", err)
+	}
+	waitActiveUsers(t, httpAddr, 0)
+}

@@ -21,6 +21,9 @@ type UserConfig struct {
 	Tweaks            map[string]bool               `json:"tweaks"`
 	RecentRelays      []string                      `json:"recentRelays,omitempty"`
 	GameServers       map[string][]GameServerRecord `json:"gameServers,omitempty"`
+	MonthlyPeriod     string                        `json:"monthlyPeriod,omitempty"`
+	MonthlyBytesUp    uint64                        `json:"monthlyBytesUp,omitempty"`
+	MonthlyBytesDown  uint64                        `json:"monthlyBytesDown,omitempty"`
 }
 
 // GameServerRecord remembers one measured game-server endpoint (GearUP keeps a
@@ -161,6 +164,24 @@ func (cs *ConfigStore) AddCustomRelay(relay profiles.RelayEndpoint) {
 	_ = cs.Save()
 }
 
+// RemoveCustomRelay deletes a custom relay node by ID and persists to disk.
+func (cs *ConfigStore) RemoveCustomRelay(id string) bool {
+	cs.mu.Lock()
+	removed := false
+	for i, r := range cs.config.CustomRelays {
+		if strings.EqualFold(r.ID, id) {
+			cs.config.CustomRelays = append(cs.config.CustomRelays[:i], cs.config.CustomRelays[i+1:]...)
+			removed = true
+			break
+		}
+	}
+	cs.mu.Unlock()
+	if removed {
+		_ = cs.Save()
+	}
+	return removed
+}
+
 // AddRecentRelay remembers the last few relays the user connected through,
 // most recent first (max 3), for quick re-selection like the node-history
 // lists in GearUP and Mudfish.
@@ -262,4 +283,34 @@ func (cs *ConfigStore) GameServersFor(gameID string) []GameServerRecord {
 	out := make([]GameServerRecord, len(list))
 	copy(out, list)
 	return out
+}
+
+// AddMonthlyTransfer accumulates measured session transfer bytes into the
+// current YYYY-MM bucket (Mudfish-style metered traffic visibility).
+func (cs *ConfigStore) AddMonthlyTransfer(upBytes, downBytes uint64) {
+	if upBytes == 0 && downBytes == 0 {
+		return
+	}
+	period := time.Now().UTC().Format("2006-01")
+	cs.mu.Lock()
+	if cs.config.MonthlyPeriod != period {
+		cs.config.MonthlyPeriod = period
+		cs.config.MonthlyBytesUp = 0
+		cs.config.MonthlyBytesDown = 0
+	}
+	cs.config.MonthlyBytesUp += upBytes
+	cs.config.MonthlyBytesDown += downBytes
+	cs.mu.Unlock()
+	_ = cs.Save()
+}
+
+// MonthlyTransfer returns the persisted transfer totals for the active month.
+func (cs *ConfigStore) MonthlyTransfer() (period string, up, down uint64) {
+	nowPeriod := time.Now().UTC().Format("2006-01")
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	if cs.config.MonthlyPeriod != nowPeriod {
+		return nowPeriod, 0, 0
+	}
+	return cs.config.MonthlyPeriod, cs.config.MonthlyBytesUp, cs.config.MonthlyBytesDown
 }

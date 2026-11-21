@@ -291,12 +291,45 @@ copy, since dedup state is per relay and relays do not share state.
 - The standby session receives keepalive Pings; 30 s without a pong, a
   standby Disconnect, or a relay handover tears the dual session down and
   the client records the reason in `/api/status` (`dualPath.reason`).
-- Both relays must share one PSK: the dedup scope is
-  `SHA-256(PSK ‖ group ID)`, so different PSKs would give each relay a
-  different group identity and the single trailer could not satisfy both.
+- Both relays may now use **independent PSKs**: the client derives each relay's
+  dedup scope (`SHA-256(primaryPSK ‖ group ID)` and `SHA-256(standbyPSK ‖ group ID)`)
+  separately and stamps the matching group hash when sending to each relay.
 - `/api/status` reports the measured counters (`framed`, `retransmits`,
   `ackPurged`, `expired`, `ringOverflow`, `inFlight`, `ackedSeq`,
   `thresholdMs`) — overhead is what was counted, never a fixed multiplier.
+
+---
+
+## 10. 🛡️ Multi-Parity Reed-Solomon FEC (`TypeFEC` Header Extension)
+
+`TypeFEC` (`0x7`) preserves wire compatibility with legacy single-parity XOR peers
+through reserved byte `buf[9]`:
+
+- `buf[9] == 0x00`: Legacy XOR parity (`ParityCount = 1`, `ParityIndex = 0`).
+- `buf[9] != 0x00`: High nibble = `ParityCount` (`M`, `2..6`), low nibble = `ParityIndex` (`0..M-1`).
+
+When `M >= 2`, both client and relay encode parity shards using a systematic
+Cauchy matrix over `GF(2^8)` (primitive polynomial `0x11d`) and recover up to
+`M` simultaneous burst-lost packets per block via Gauss-Jordan inversion. The
+adaptive controller automatically scales across `Standby (0%)`, `Light XOR (10:1)`,
+`Medium RS (6:2)`, `High RS (4:2)` and `Extreme RS (4:3)`.
+
+---
+
+## 11. 🕶️ Anti-DPI UDP Obfuscation (Optional, Auto-Detected)
+
+Clients may enable PSK-keyed UDP obfuscation (`POST /api/obfuscation/toggle`):
+
+- **Session packets (0-byte overhead)**: The 17-byte plaintext header (`bytes[0..17)`)
+  is XOR-masked with `SHA-256(obfsKey || tag[0:8])`, where `tag` is the trailing
+  16-byte Poly1305 authentication tag. Every byte on the wire is statistically
+  indistinguishable from uniform random noise.
+- **Handshake packets**: Encrypted with a keyed stream mask and padded with
+  4–35 random bytes plus a 4-byte random salt and 1-byte masked pad length so
+  handshake sizes vary per attempt.
+- **Transparent relay detection**: Relays attempt plaintext validation first and
+  transparently deobfuscate packets on the same UDP port when plaintext parsing
+  does not match, tracking `Session.Obfuscated` per client.
 
 ---
 

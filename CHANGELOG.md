@@ -13,6 +13,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.10.0] - 2026-11-21
+
+### ✨ Free Mode, Burst-Loss RS-FEC, Anti-DPI & Diagnostics
+
+- **Free Mode (Zero-VPS) — WireGuard & Cloudflare WARP Split-Tunnel**: Integrated
+  pure-Go `wireguard-go` bridged directly onto Lagvex's cross-platform virtual
+  adapter (WinTun / `utun` / `/dev/net/tun`) and `RouteManager`. Users can now
+  activate a free Cloudflare WARP profile in one click (`POST /api/relay/register-warp`)
+  or import any standard WireGuard `.conf` (`POST /api/relay/import-wireguard`)
+  while keeping CIDR split-tunneling and process watching intact. WireGuard
+  private keys and preshared keys are redacted from `/api/relays` and exports.
+- **Relay Share URIs & Community Lists**: Added `lagvex://` share URI import/export
+  (`POST /api/relay/import-uri`, `POST /api/relay/export-uri`), HTTPS subscription
+  import (`POST /api/relay/import-subscription`, SSRF-guarded), and relay deletion
+  (`POST /api/relay/delete`).
+- **Cauchy Reed-Solomon FEC (`GF(2^8)`)**: Upgraded FEC beyond single-packet XOR
+  to multi-parity Reed-Solomon (`RS 6:2`, `RS 4:2`, `RS 4:3`) using a backwards-
+  compatible `buf[9]` metadata byte, recovering multi-packet burst losses (5–15%)
+  on both client and relay without CGO.
+- **Packet Hedging & Independent-PSK Dual-Path**: Small UDP game packets (`≤256B`)
+  are hedged during active loss (`≥2%`) or recent FEC recovery with a measured
+  `packetsHedged` counter. Dual-Path ARQ now supports independent PSKs per relay.
+- **Anti-DPI UDP Obfuscation**: Added opt-in zero-overhead header scrambling
+  (salted by the random Poly1305 tag) plus variable-length handshake padding
+  (`POST /api/obfuscation/toggle`), transparently auto-detected by relays on the
+  same UDP port.
+- **Free Local Diagnostics Suite**: Added PingPlotter-style hop-by-hop Route
+  Tracer (`POST /api/traceroute`), UDP DNS Resolver Benchmark (`POST /api/dns-benchmark`),
+  Auto Path-MTU Discovery (`POST /api/diagnose-mtu`), live `relay→game-server`
+  hop population inside `/api/route-detail`, monthly transfer quota tracking, and
+  stale-aware RTT + FEC/WireGuard mode tags in the Floating HUD.
+
+---
+
 ## [1.9.1] - 2026-11-21
 
 ### 🛡️ Security

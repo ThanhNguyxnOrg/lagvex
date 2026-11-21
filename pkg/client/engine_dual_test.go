@@ -90,16 +90,45 @@ func seedDualFixture(t *testing.T, standbyPSK, activePSK string) *Engine {
 	return engine
 }
 
-func TestSetDualPathRefusesDifferentPSK(t *testing.T) {
-	engine := seedDualFixture(t, "standby-psk", "primary-psk")
+func TestSetDualPathSupportsIndependentPSK(t *testing.T) {
+	now := time.Unix(1000, 0)
+	clock := func() time.Time { return now }
 
-	engine.SetDualPath(true)
-	stats := engine.Stats()
-	if stats.DualPath == nil || stats.DualPath.Active {
-		t.Fatalf("dual path must stay inactive: %+v", stats.DualPath)
+	primaryHash := protocol.GroupHash([]byte("primary-psk"), []byte("0123456789abcdef"))
+	standbyHash := protocol.GroupHash([]byte("standby-psk"), []byte("0123456789abcdef"))
+	if primaryHash == standbyHash {
+		t.Fatal("expected distinct group hashes for distinct PSKs")
 	}
-	if !strings.Contains(stats.DualPath.Reason, "same PSK") {
-		t.Fatalf("reason = %q, want a same-PSK explanation", stats.DualPath.Reason)
+
+	sender := newDualSenderPair(primaryHash, standbyHash, clock, 40*time.Millisecond)
+	inner := make([]byte, 32)
+	inner[0] = 0x45
+	framedPrimary, seq := sender.frame(inner)
+	_, gotSeq, gotHash, ok := protocol.SplitDualTrailer(framedPrimary)
+	if !ok || gotSeq != seq || gotHash != primaryHash {
+		t.Fatalf("primary frame hash=%08x want %08x", gotHash, primaryHash)
+	}
+
+	// Attempt 1 → primary relay hash
+	now = now.Add(50 * time.Millisecond)
+	due1 := sender.pendingRetransmits()
+	if len(due1) != 1 || due1[0].Attempt != 1 {
+		t.Fatalf("attempt 1 = %+v", due1)
+	}
+	_, _, h1, _ := protocol.SplitDualTrailer(due1[0].Frame)
+	if h1 != primaryHash {
+		t.Fatalf("attempt 1 hash=%08x want primary %08x", h1, primaryHash)
+	}
+
+	// Attempt 2 → standby relay hash
+	now = now.Add(200 * time.Millisecond)
+	due2 := sender.pendingRetransmits()
+	if len(due2) != 1 || due2[0].Attempt != 2 {
+		t.Fatalf("attempt 2 = %+v", due2)
+	}
+	_, _, h2, _ := protocol.SplitDualTrailer(due2[0].Frame)
+	if h2 != standbyHash {
+		t.Fatalf("attempt 2 hash=%08x want standby %08x", h2, standbyHash)
 	}
 }
 

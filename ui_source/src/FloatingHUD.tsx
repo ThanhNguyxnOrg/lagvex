@@ -10,8 +10,10 @@ type StatusSnapshot = {
   active: boolean;
   state: string;
   pingMs: number | null;
+  stale: boolean;
   lossPct: number | null;
   node: string;
+  modeTag: string;
 };
 
 type Position = { left: number; top: number };
@@ -20,8 +22,10 @@ const EMPTY_STATUS: StatusSnapshot = {
   active: false,
   state: "unavailable",
   pingMs: null,
+  stale: false,
   lossPct: null,
   node: "Unavailable",
+  modeTag: "",
 };
 
 function readVisible(): boolean {
@@ -112,15 +116,28 @@ export default function FloatingHUD() {
           active?: boolean;
           state?: string;
           pingMs?: number;
+          pingSampled?: boolean;
+          pingAgeMs?: number;
           packetLossPct?: number;
           activeRelayName?: string;
           activeRelayId?: string;
+          transport?: string;
+          fecRatio?: string;
+          fecActive?: boolean;
         };
         if (cancelled) return;
 
         const connected = data.active === true || data.state === "connected";
+        const stale =
+          connected &&
+          data.pingSampled === true &&
+          typeof data.pingAgeMs === "number" &&
+          data.pingAgeMs > 6000;
         const pingMs =
-          connected && typeof data.pingMs === "number" && data.pingMs > 0
+          connected &&
+          !stale &&
+          (data.pingSampled === true || (typeof data.pingMs === "number" && data.pingMs > 0)) &&
+          typeof data.pingMs === "number"
             ? data.pingMs
             : null;
         const lossPct =
@@ -129,8 +146,14 @@ export default function FloatingHUD() {
             : null;
 
         let node = "Disconnected";
+        let modeTag = "";
         if (connected) {
           node = data.activeRelayName || data.activeRelayId || "Relay";
+          if (data.transport === "wireguard") {
+            modeTag = "WG";
+          } else if (data.fecActive && typeof data.fecRatio === "string" && data.fecRatio !== "Off" && data.fecRatio !== "Standby") {
+            modeTag = data.fecRatio;
+          }
         } else if (data.state === "error") {
           node = "Relay error";
         }
@@ -139,8 +162,10 @@ export default function FloatingHUD() {
           active: connected,
           state: typeof data.state === "string" ? data.state : "unknown",
           pingMs,
+          stale,
           lossPct,
           node,
+          modeTag,
         });
       } catch {
         if (!cancelled) setStatus(EMPTY_STATUS);
@@ -234,7 +259,14 @@ export default function FloatingHUD() {
             onPointerCancel={endDrag}
           >
             <span className="lvx-hud-drag" title="Drag to reposition" aria-hidden="true">
-              ⠿
+              <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                <circle cx="2.5" cy="2.5" r="1.2" />
+                <circle cx="7.5" cy="2.5" r="1.2" />
+                <circle cx="2.5" cy="7" r="1.2" />
+                <circle cx="7.5" cy="7" r="1.2" />
+                <circle cx="2.5" cy="11.5" r="1.2" />
+                <circle cx="7.5" cy="11.5" r="1.2" />
+              </svg>
             </span>
             <span
               className={`lvx-hud-dot${
@@ -246,9 +278,13 @@ export default function FloatingHUD() {
               <span className="lvx-hud-label">PING</span>
               <span
                 className={`lvx-hud-value ${pingClass}`}
-                title="Round-trip time measured by the relay keepalive"
+                title={
+                  status.stale
+                    ? "Last keepalive sample is stale (>6s old)"
+                    : "Round-trip time measured by the relay keepalive"
+                }
               >
-                {status.pingMs === null ? "—" : `${status.pingMs.toFixed(0)} ms`}
+                {status.pingMs === null ? "—" : status.pingMs < 1 ? "<1 ms" : `${status.pingMs.toFixed(0)} ms`}
               </span>
             </div>
             {!minimized && (
@@ -267,7 +303,7 @@ export default function FloatingHUD() {
                 <div className="lvx-hud-metric">
                   <span className="lvx-hud-label">NODE</span>
                   <span className="lvx-hud-value lvx-hud-node" title={status.node}>
-                    {status.node}
+                    {status.modeTag ? `${status.node} · ${status.modeTag}` : status.node}
                   </span>
                 </div>
               </>
@@ -280,7 +316,16 @@ export default function FloatingHUD() {
                 title={minimized ? "Expand HUD" : "Minimize HUD"}
                 aria-label={minimized ? "Expand HUD" : "Minimize HUD"}
               >
-                {minimized ? "+" : "−"}
+                {minimized ? (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                ) : (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"
@@ -289,7 +334,10 @@ export default function FloatingHUD() {
                 title="Close HUD"
                 aria-label="Close HUD"
               >
-                ×
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </div>
           </div>

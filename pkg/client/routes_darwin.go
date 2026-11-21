@@ -39,7 +39,11 @@ func (r *RouteManager) ConfigureAdapter(tunIfIndex uint32, innerIP netip.Addr, p
 	r.tunName = iface.Name
 
 	b := innerIP.As4()
-	gwIP := netip.AddrFrom4([4]byte{b[0], b[1], b[2], 1})
+	peerLast := byte(1)
+	if b[3] == 1 {
+		peerLast = 2
+	}
+	gwIP := netip.AddrFrom4([4]byte{b[0], b[1], b[2], peerLast})
 	// ifconfig utunX <innerIP> <gwIP> mtu <mtu> up
 	cmd := execHidden("ifconfig", r.tunName, innerIP.String(), gwIP.String(), "mtu", fmt.Sprintf("%d", mtu), "up")
 	if out, err := cmd.CombinedOutput(); err != nil {

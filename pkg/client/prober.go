@@ -250,6 +250,13 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 		return result
 	}
 
+	// WireGuard / Cloudflare WARP endpoints do not speak the Lagvex PSK
+	// handshake. Measure honest reachability via ICMP echo (when OS permits) or
+	// TCP connect timing to port 443 on the endpoint host.
+	if relay.IsWireGuard() {
+		return p.probeWireGuardEndpoint(ctx, relay, udpAddr, samples, result)
+	}
+
 	// Pin the probe socket to the routed local address (see
 	// routedLocalUDPAddr) and fall back to an OS-chosen source if that address
 	// disappears between the route lookup and the bind.
@@ -460,6 +467,44 @@ func (p *Prober) ProbeEndpointWithAnchor(ctx context.Context, relay profiles.Rel
 		}
 	}
 
+	return result
+}
+
+func (p *Prober) probeWireGuardEndpoint(ctx context.Context, relay profiles.RelayEndpoint, udpAddr *net.UDPAddr, samples int, result ProbeResult) ProbeResult {
+	if p.cfg.ICMPProbe {
+		if icmpRes, err := probeICMP(ctx, udpAddr.IP, samples, p.cfg.ICMPTimeout); err == nil && icmpRes.Samples > 0 && icmpRes.RTTMs > 0 {
+			result.Reachable = true
+			result.ProbeMethod = ProbeMethodICMPEcho
+			result.RTTMedianMs = roundTo(icmpRes.RTTMs, 2)
+			result.ICMPRTTMs = roundTo(icmpRes.RTTMs, 1)
+			result.ICMPLossPct = roundTo(icmpRes.LossPct, 0)
+			result.PacketLoss = roundTo(icmpRes.LossPct, 1)
+			result.Score = roundTo(result.RTTMedianMs+(result.PacketLoss*50.0), 2)
+			return result
+		}
+	}
+
+	// Fallback: measure TCP handshake timing to port 443 on the WireGuard host.
+	tcpCtx, cancel := context.WithTimeout(ctx, time.Duration(samples)*p.cfg.SampleTimeout)
+	rtts, _ := probeTCPGateway(tcpCtx, net.JoinHostPort(udpAddr.IP.String(), "443"), samples)
+	cancel()
+	if len(rtts) > 0 {
+		lost := samples - len(rtts)
+		if lost < 0 {
+			lost = 0
+		}
+		lossPct := (float64(lost) / float64(samples)) * 100.0
+		result.Reachable = true
+		result.ProbeMethod = ProbeMethodTCPConnect
+		result.RTTMedianMs = roundTo(calculateMedian(rtts), 2)
+		result.JitterMs = roundTo(calculateJitter(rtts), 2)
+		result.PacketLoss = roundTo(lossPct, 1)
+		result.Score = roundTo(result.RTTMedianMs+(2.0*result.JitterMs)+(result.PacketLoss*50.0), 2)
+		return result
+	}
+
+	result.Error = "wireguard endpoint did not answer ICMP or TCP/443 probe (UDP may still connect)"
+	result.PacketLoss = 100.0
 	return result
 }
 

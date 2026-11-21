@@ -68,6 +68,7 @@ func (e *Engine) SetDualPath(enabled bool) {
 	e.dualEnabled.Store(true)
 	e.mu.Lock()
 	connected := e.state == StateConnected
+	transport := e.transport
 	primaryPSK := append([]byte(nil), e.psk...)
 	primaryEndpoint := e.relayAddr.String()
 	pingMs := e.pingMs.Load()
@@ -75,6 +76,10 @@ func (e *Engine) SetDualPath(enabled bool) {
 
 	if !connected {
 		e.setDualReason("not connected; activates when the tunnel connects")
+		return
+	}
+	if transport == "wireguard" {
+		e.setDualReason("dual path is only available on native Lagvex relays")
 		return
 	}
 
@@ -93,12 +98,8 @@ func (e *Engine) SetDualPath(enabled bool) {
 		e.setDualReason("standby relay has no PSK in the catalog")
 		return
 	}
-	if primaryPSK == nil || string(psk) != string(primaryPSK) {
-		e.setDualReason("dual path requires both relays to use the same PSK")
-		return
-	}
 
-	e.activateDual(standby.Endpoint, psk, dualThresholdFor(pingMs), standby.RelayID, standby.Name)
+	e.activateDualWithPSKs(standby.Endpoint, primaryPSK, psk, dualThresholdFor(pingMs), standby.RelayID, standby.Name)
 }
 
 // IsDualPathEnabled reports the user's dual-path intent.
@@ -154,9 +155,14 @@ func (e *Engine) ensureGroupID() ([16]byte, error) {
 	return e.groupID, nil
 }
 
-// activateDual opens the standby dual session and starts its loops. It is
-// synchronous: the caller learns the real result from dualActive/dualReason.
+// activateDual opens the standby dual session using one shared PSK.
 func (e *Engine) activateDual(endpoint string, psk []byte, threshold time.Duration, relayID, relayName string) {
+	e.activateDualWithPSKs(endpoint, psk, psk, threshold, relayID, relayName)
+}
+
+// activateDualWithPSKs opens the standby dual session and supports independent
+// primary and standby PSKs by deriving each relay's dedup group hash separately.
+func (e *Engine) activateDualWithPSKs(endpoint string, primaryPSK, psk []byte, threshold time.Duration, relayID, relayName string) {
 	groupID, err := e.ensureGroupID()
 	if err != nil {
 		e.setDualReason(err.Error())
@@ -231,8 +237,13 @@ func (e *Engine) activateDual(endpoint string, psk []byte, threshold time.Durati
 	}
 	ctx, cancel := context.WithCancel(tunnelCtx)
 
-	groupHash := protocol.GroupHash(psk, groupID[:])
-	sender := newDualSender(groupHash, nil, threshold)
+	standbyGroupHash := protocol.GroupHash(psk, groupID[:])
+	primaryGroupHash := standbyGroupHash
+	if len(primaryPSK) > 0 {
+		primaryGroupHash = protocol.GroupHash(primaryPSK, groupID[:])
+	}
+	groupHash := primaryGroupHash
+	sender := newDualSenderPair(primaryGroupHash, standbyGroupHash, nil, threshold)
 
 	// Replace any previous standby session.
 	e.dualMu.Lock()

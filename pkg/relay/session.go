@@ -47,6 +47,7 @@ type Session struct {
 	// sessions; non-zero means data frames carry the dual trailer and are
 	// deduplicated against the shared connection group.
 	GroupHash      uint32
+	Obfuscated     bool
 	DualForwarded  atomic.Uint64
 	DualSuppressed atomic.Uint64
 	DualBadFrames  atomic.Uint64

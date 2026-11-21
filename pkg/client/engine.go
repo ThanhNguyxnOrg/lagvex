@@ -63,12 +63,15 @@ type TunnelStats struct {
 	FECActive        bool           `json:"fecActive"`
 	FECRatio         string         `json:"fecRatio"`
 	PacketsRecovered uint64         `json:"packetsRecovered"`
+	PacketsHedged    uint64         `json:"packetsHedged"`
 	FECParitySent    uint64         `json:"fecParitySent"`
 	FECParityRecv    uint64         `json:"fecParityRecv"`
 	SmartL4Filter    bool           `json:"smartL4Filter"`
 	PacketLoss       float64        `json:"packetLoss"`
 	PacketLossPct    float64        `json:"packetLossPct"`
 	DriverMode       string         `json:"driverMode,omitempty"`
+	Transport        string         `json:"transport,omitempty"`
+	Obfuscated       bool           `json:"obfuscated"`
 	LastError        string         `json:"lastError,omitempty"`
 
 	// Peer routing: opt-in /32 routes for the public IPs the detected game
@@ -110,11 +113,14 @@ type Engine struct {
 	psk             []byte
 	udpConn         *net.UDPConn
 	wintun          *WintunAdapter
+	wgTunnel        *wireguardTunnel
+	transport       string
 	driverMode      string
 	routeManager    *RouteManager
 	profileMgr      *profiles.Manager
 	watcher         *ProcessWatcher
 	crypto          *protocol.SessionCrypto
+	obfs            *protocol.Obfuscator
 	failoverCtrl    *FailoverController
 	activeRelayID   string
 	activeRelayName string
@@ -142,16 +148,18 @@ type Engine struct {
 	lastFailover        atomic.Pointer[FailoverEvent]
 	failoverCount       atomic.Int64
 
-	fecEncoder       *protocol.FECEncoder
-	fecDecoder       *protocol.FECDecoder
-	fecController    *protocol.AdaptiveFECController
-	fecEnabled       atomic.Bool
-	packetsRecovered atomic.Uint64
-	lastRecoveryAt   atomic.Int64 // Unix nanoseconds of the last FEC recovery
-	fecParitySent    atomic.Uint64
-	fecParityRecv    atomic.Uint64
-	l4FilterEnabled  atomic.Bool
-	lossPctBits      atomic.Uint64
+	fecEncoder         *protocol.FECEncoder
+	fecDecoder         *protocol.FECDecoder
+	fecController      *protocol.AdaptiveFECController
+	fecEnabled         atomic.Bool
+	obfuscationEnabled atomic.Bool
+	packetsRecovered   atomic.Uint64
+	packetsHedged      atomic.Uint64
+	lastRecoveryAt     atomic.Int64 // Unix nanoseconds of the last FEC recovery
+	fecParitySent      atomic.Uint64
+	fecParityRecv      atomic.Uint64
+	l4FilterEnabled    atomic.Bool
+	lossPctBits        atomic.Uint64
 
 	peerRoutingEnabled atomic.Bool
 	fullTunnelEnabled  atomic.Bool
@@ -242,7 +250,12 @@ func (e *Engine) Stats() TunnelStats {
 	fecRatio := "Off"
 	if e.fecEnabled.Load() && e.fecEncoder != nil {
 		if bs := e.fecEncoder.BlockSize(); bs > 0 {
-			fecRatio = fmt.Sprintf("%d:1", bs)
+			pc := e.fecEncoder.ParityCount()
+			if pc > 1 {
+				fecRatio = fmt.Sprintf("RS %d:%d", bs, pc)
+			} else {
+				fecRatio = fmt.Sprintf("%d:1", bs)
+			}
 		} else {
 			fecRatio = "Standby"
 		}
@@ -288,12 +301,15 @@ func (e *Engine) Stats() TunnelStats {
 		FECActive:        e.fecEnabled.Load(),
 		FECRatio:         fecRatio,
 		PacketsRecovered: e.packetsRecovered.Load(),
+		PacketsHedged:    e.packetsHedged.Load(),
 		FECParitySent:    e.fecParitySent.Load(),
 		FECParityRecv:    e.fecParityRecv.Load(),
 		SmartL4Filter:    e.l4FilterEnabled.Load(),
 		PacketLoss:       loss,
 		PacketLossPct:    loss,
 		DriverMode:       e.driverMode,
+		Transport:        e.transport,
+		Obfuscated:       e.obfuscationEnabled.Load(),
 		LastError:        lastErrStr,
 		PeerRouting:      e.peerRoutingEnabled.Load(),
 		PeerRouteCount:   len(peerIPs),
@@ -602,6 +618,7 @@ func (e *Engine) ProbeAnchorViaRelay(ctx context.Context, anchorID byte) (float6
 	e.mu.Lock()
 	connected := e.state == StateConnected
 	crypto := e.crypto
+	obfs := e.obfs
 	conn := e.udpConn
 	relay := e.relayAddr
 	sessionID := e.sessionID
@@ -625,6 +642,9 @@ func (e *Engine) ProbeAnchorViaRelay(ctx context.Context, anchorID byte) (float6
 
 	buf := make([]byte, protocol.SecureHeaderLen+8+protocol.TagLen)
 	packet := crypto.EncodeAnchorProbe(buf, sessionID, protocol.EncodeAnchorProbeRequest(seq, anchorID))
+	if obfs != nil {
+		packet = obfs.ObfuscateSession(nil, packet)
+	}
 	if _, err := conn.WriteToUDPAddrPort(packet, relay); err != nil {
 		return 0, 0, err
 	}
@@ -706,7 +726,11 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	_ = conn.SetWriteBuffer(8 * 1024 * 1024)
 	_ = ApplySocketQoS(conn)
 
-	// 3. Handshake
+	// 3. Handshake (optionally wrapped in Anti-DPI UDP Obfuscation)
+	var obfs *protocol.Obfuscator
+	if e.obfuscationEnabled.Load() {
+		obfs = protocol.NewObfuscator(psk)
+	}
 	nonce, _ := protocol.RandomUint64()
 	req := protocol.HandshakeRequest{
 		Nonce:     nonce,
@@ -714,6 +738,9 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		ClientID:  e.clientID,
 	}
 	reqBuf := protocol.EncodeHandshakeRequest(psk, req)
+	if obfs != nil {
+		reqBuf = obfs.ObfuscateHandshake(reqBuf)
+	}
 
 	// Retry handshake up to 3 times
 	var resp *protocol.HandshakeResponse
@@ -725,8 +752,14 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 
 		n, _, readErr := conn.ReadFromUDP(recvBuf)
 		if readErr == nil {
+			rawResp := recvBuf[:n]
+			if obfs != nil {
+				if unmasked, ok := obfs.DeobfuscateHandshake(rawResp); ok {
+					rawResp = unmasked
+				}
+			}
 			var decErr error
-			resp, decErr = protocol.DecodeHandshakeResponse(psk, recvBuf[:n], nonce)
+			resp, decErr = protocol.DecodeHandshakeResponse(psk, rawResp, nonce)
 			if decErr == nil && resp.Status == protocol.StatusOK {
 				break
 			}
@@ -822,8 +855,11 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	e.psk = psk
 	e.udpConn = conn
 	e.wintun = adapter
+	e.wgTunnel = nil
+	e.transport = "lagvex"
 	e.driverMode = driverMode
 	e.crypto = clientCrypto
+	e.obfs = obfs
 	e.activeGame = gameID
 	e.activeRegion = regionID
 	e.activeRelayID = relayID
@@ -843,6 +879,7 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 		e.fecDecoder.Reset()
 	}
 	e.packetsRecovered.Store(0)
+	e.packetsHedged.Store(0)
 	e.lastRecoveryAt.Store(0)
 	e.fecParitySent.Store(0)
 	e.fecParityRecv.Store(0)
@@ -911,6 +948,205 @@ func (e *Engine) Connect(relayEndpoint string, psk []byte, gameID, regionID stri
 	return nil
 }
 
+// ConnectWireGuard starts a split-tunnel session over a standard WireGuard or
+// free Cloudflare WARP endpoint, using the exact same OS TUN adapter, CIDR
+// split-tunneling, process watcher and peer routing as native Lagvex relays.
+func (e *Engine) ConnectWireGuard(relay profiles.RelayEndpoint, gameID, regionID string, forceRoutesNow bool) error {
+	recordErr := func(err error) error {
+		if err != nil {
+			errStr := err.Error()
+			e.lastErr.Store(&errStr)
+		}
+		return err
+	}
+
+	if err := profiles.ValidateWireGuardConfig(relay.WireGuard, relay.Endpoint); err != nil {
+		return recordErr(err)
+	}
+
+	e.mu.Lock()
+	if e.state != StateDisconnected && e.state != StateError {
+		e.mu.Unlock()
+		return recordErr(fmt.Errorf("cannot connect in state %s", e.state))
+	}
+	e.state = StateConnecting
+	e.mu.Unlock()
+
+	var cidrs []string
+	if gameID != "" {
+		if regionID == "" {
+			e.resetState()
+			return recordErr(fmt.Errorf("game %q requires a server region", gameID))
+		}
+		if e.profileMgr == nil {
+			e.resetState()
+			return recordErr(fmt.Errorf("game profiles are unavailable"))
+		}
+		resolved, err := e.profileMgr.GetRegionCIDRs(gameID, regionID)
+		if err != nil {
+			e.resetState()
+			return recordErr(err)
+		}
+		if len(resolved) == 0 {
+			e.resetState()
+			return recordErr(fmt.Errorf("region %q for game %q has no verified CIDRs", regionID, gameID))
+		}
+		cidrs = resolved
+	}
+
+	udpAddr, err := net.ResolveUDPAddr("udp4", relay.Endpoint)
+	if err != nil {
+		e.resetState()
+		return recordErr(fmt.Errorf("resolve WireGuard endpoint %s: %w", relay.Endpoint, err))
+	}
+	endpointAP := udpAddr.AddrPort()
+	endpointIP := endpointAP.Addr()
+
+	clientPrefix, err := profiles.ParseWireGuardIPv4(relay.WireGuard.Address)
+	if err != nil {
+		e.resetState()
+		return recordErr(err)
+	}
+	mtu := relay.WireGuard.MTU
+	if mtu < 1200 || mtu > 1500 {
+		mtu = 1280
+	}
+
+	kernelName := "WinTun NDIS"
+	switch runtime.GOOS {
+	case "darwin":
+		kernelName = "macOS utun"
+	case "linux":
+		kernelName = "Linux dev/net/tun"
+	}
+	driverMode := fmt.Sprintf("Kernel (%s · WireGuard)", kernelName)
+	adapter, err := OpenOrCreateWintunAdapter("Lagvex", "LagvexTunnel", "")
+	if err != nil {
+		log.Printf("[Engine] %s kernel adapter unavailable (%v). Starting WireGuard in userspace fallback...", kernelName, err)
+		driverMode = "Userspace Fallback (WireGuard)"
+		adapter = nil
+	} else {
+		prefixLen := clientPrefix.Bits()
+		if prefixLen == 32 {
+			prefixLen = 24
+		}
+		if err := e.routeManager.ConfigureAdapter(adapter.InterfaceIndex(), clientPrefix.Addr(), prefixLen, mtu); err != nil {
+			log.Printf("[Engine] Warning: adapter configuration: %v", err)
+		}
+		if err := e.routeManager.PinRelayRoute(endpointIP); err != nil {
+			log.Printf("[Engine] Warning: pin WireGuard endpoint route: %v", err)
+		}
+	}
+
+	wgTun, err := startWireGuardTunnel(adapter, relay.WireGuard, endpointAP, &e.bytesUp, &e.bytesDown)
+	if err != nil {
+		if adapter != nil {
+			_ = adapter.Close()
+		}
+		e.routeManager.RemoveAll()
+		e.resetState()
+		return recordErr(err)
+	}
+
+	relayName := relay.Name
+	if relayName == "" {
+		relayName = relay.Endpoint
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	e.mu.Lock()
+	if e.state != StateConnecting {
+		e.mu.Unlock()
+		cancel()
+		wgTun.Close()
+		if adapter != nil {
+			_ = adapter.Close()
+		}
+		e.routeManager.RemoveAll()
+		return recordErr(fmt.Errorf("connection aborted: client disconnected"))
+	}
+	e.state = StateConnected
+	e.sessionID = 0
+	e.clientIP = clientPrefix.Addr()
+	e.gatewayIP = netip.Addr{}
+	e.mtu = mtu
+	e.relayAddr = endpointAP
+	e.relayIP = endpointIP
+	e.psk = nil
+	e.udpConn = nil
+	e.wintun = adapter
+	e.wgTunnel = wgTun
+	e.transport = "wireguard"
+	e.driverMode = driverMode
+	e.crypto = nil
+	e.activeGame = gameID
+	e.activeRegion = regionID
+	e.activeRelayID = relay.ID
+	e.activeRelayName = relayName
+	e.baselinePingMs = 0
+	e.gameCIDRs = cidrs
+	e.cancelCtx = ctx
+	e.cancelFunc = cancel
+	e.lastPong.Store(time.Now().UnixNano())
+	e.pingSampled.Store(false)
+	e.pongTotal.Store(0)
+	e.lastErr.Store(nil)
+	e.packetsRecovered.Store(0)
+	e.packetsHedged.Store(0)
+	e.fecParitySent.Store(0)
+	e.fecParityRecv.Store(0)
+	e.bytesUp.Store(0)
+	e.bytesDown.Store(0)
+	e.upRate.Store(0)
+	e.downRate.Store(0)
+	e.lossPctBits.Store(0)
+	e.failoverCount.Store(0)
+	e.mu.Unlock()
+
+	if forceRoutesNow && len(cidrs) > 0 {
+		e.routeManager.InstallGameRoutes(cidrs)
+	}
+	if e.fullTunnelEnabled.Load() {
+		e.routeManager.InstallFullTunnel()
+	}
+
+	e.wg.Add(2)
+	go e.loopBitrateMeter(ctx)
+	go e.loopWireGuardMonitor(ctx, wgTun, udpAddr.IP)
+
+	if gameID != "" {
+		if game, ok := e.profileMgr.FindGameByID(gameID); ok && len(game.ProcessNames) > 0 {
+			e.watcher = NewProcessWatcher(game.ProcessNames)
+			e.watcher.OnGameStarted = func(proc string) {
+				log.Printf("[Engine] Game process %q started! Activating WireGuard game routes...", proc)
+				e.mu.Lock()
+				e.isGameActive = true
+				cList := e.gameCIDRs
+				e.mu.Unlock()
+				e.routeManager.InstallGameRoutes(cList)
+				e.startPeerRouting()
+			}
+			e.watcher.OnGameStopped = func(proc string) {
+				log.Printf("[Engine] Game process %q exited. Removing WireGuard game routes...", proc)
+				e.mu.Lock()
+				e.isGameActive = false
+				e.mu.Unlock()
+				e.routeManager.RemoveGameRoutes()
+				e.stopPeerRouting()
+			}
+			go e.watcher.Start(ctx, 2*time.Second)
+		}
+	}
+
+	if adapter == nil {
+		log.Printf("[Engine] WireGuard session active in userspace fallback: game traffic is not tunneled")
+	} else {
+		log.Printf("[Engine] WireGuard split-tunnel active via %s (%s)!", relayName, relay.Endpoint)
+	}
+	return nil
+}
+
 // Disconnect stops the tunnel and cleans up all routes.
 func (e *Engine) Disconnect() error {
 	e.mu.Lock()
@@ -924,7 +1160,9 @@ func (e *Engine) Disconnect() error {
 	conn := e.udpConn
 	rAddr := e.relayAddr
 	adapter := e.wintun
+	wgTun := e.wgTunnel
 	crypto := e.crypto
+	e.wgTunnel = nil
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Disconnecting tunnel...")
@@ -936,6 +1174,9 @@ func (e *Engine) Disconnect() error {
 	if conn != nil && crypto != nil {
 		discBuf := make([]byte, protocol.SecureHeaderLen+protocol.TagLen)
 		sealedDisc := crypto.EncodeDisconnect(discBuf, sessID)
+		if e.obfs != nil {
+			sealedDisc = e.obfs.ObfuscateSession(nil, sealedDisc)
+		}
 		udpTarget := net.UDPAddrFromAddrPort(rAddr)
 		_, _ = conn.WriteToUDP(sealedDisc, udpTarget)
 	}
@@ -948,6 +1189,9 @@ func (e *Engine) Disconnect() error {
 	e.stopPeerRouting()
 	e.routeManager.RemoveAll()
 
+	if wgTun != nil {
+		wgTun.Close()
+	}
 	if adapter != nil {
 		_ = adapter.Close()
 	}
@@ -967,6 +1211,7 @@ func (e *Engine) Disconnect() error {
 	e.activeRelayID = ""
 	e.activeRelayName = ""
 	e.driverMode = ""
+	e.transport = ""
 	e.pingMs.Store(0)
 	e.pingSampled.Store(false)
 	e.pongTotal.Store(0)
@@ -976,6 +1221,7 @@ func (e *Engine) Disconnect() error {
 	e.downRate.Store(0)
 	e.lossPctBits.Store(0)
 	e.failoverCount.Store(0)
+	e.packetsHedged.Store(0)
 	e.mu.Unlock()
 
 	log.Printf("[Engine] Tunnel disconnected and routes cleaned.")
@@ -1017,6 +1263,7 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 
 		e.mu.Lock()
 		crypto := e.crypto
+		obfs := e.obfs
 		sessID := e.sessionID
 		conn := e.udpConn
 		rAddr := e.relayAddr
@@ -1039,25 +1286,32 @@ func (e *Engine) pumpWinTunToUDP(ctx context.Context) {
 		} else {
 			pkt = crypto.EncodeData(outBuf, sessID, inBuf[:n])
 		}
+		seq := binary.BigEndian.Uint64(pkt[9:17])
+		wirePkt := pkt
+		if obfs != nil {
+			wirePkt = obfs.ObfuscateSession(nil, pkt)
+		}
 
 		// Immediate systematic delivery (0 RTT latency overhead on game packets)
-		_, err = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
+		_, err = conn.WriteToUDP(wirePkt, net.UDPAddrFromAddrPort(rAddr))
 		if err == nil {
 			e.bytesUp.Add(uint64(n))
-			// Packet hedging is bounded to a short window after the last FEC
-			// recovery, so a single historical loss cannot duplicate every
-			// game tick for the rest of the session.
+			// Packet hedging duplicates small critical UDP game ticks (<=256B)
+			// only while active loss or recent FEC recovery is measured.
 			if isGameTick && e.fecEnabled.Load() && n <= 256 && e.shouldHedge() {
-				_, _ = conn.WriteToUDP(pkt, net.UDPAddrFromAddrPort(rAddr))
+				if _, hErr := conn.WriteToUDP(wirePkt, net.UDPAddrFromAddrPort(rAddr)); hErr == nil {
+					e.packetsHedged.Add(1)
+				}
 			}
 		}
 
-		// Systematic FEC: Feed packet and emit XOR parity frame when block boundary reached (prioritize UDP game ticks)
+		// Systematic FEC: emit XOR (M=1) or Reed-Solomon (M>=2) parity frames when block boundary reached
 		if isGameTick && e.fecEnabled.Load() && e.fecEncoder != nil {
-			seq := binary.BigEndian.Uint64(pkt[9:17])
-			fecPayloadBytes, hasParity := e.fecEncoder.AddPacket(seq, inBuf[:n])
-			if hasParity {
+			for _, fecPayloadBytes := range e.fecEncoder.AddPacketMulti(seq, inBuf[:n]) {
 				fecPkt := crypto.EncodeFEC(fecOutBuf, sessID, fecPayloadBytes)
+				if obfs != nil {
+					fecPkt = obfs.ObfuscateSession(nil, fecPkt)
+				}
 				if _, err := conn.WriteToUDP(fecPkt, net.UDPAddrFromAddrPort(rAddr)); err == nil {
 					e.fecParitySent.Add(1)
 				}
@@ -1094,6 +1348,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 		e.mu.Lock()
 		activeRelay := e.relayAddr
 		activeCrypto := e.crypto
+		activeObfs := e.obfs
 		wt := e.wintun
 		e.mu.Unlock()
 
@@ -1103,7 +1358,11 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			continue
 		}
 
-		mtype, payload, err := activeCrypto.OpenPacket(outBuf, inBuf[:n])
+		rawPkt := inBuf[:n]
+		if activeObfs != nil {
+			rawPkt = activeObfs.DeobfuscateSession(nil, rawPkt)
+		}
+		mtype, payload, err := activeCrypto.OpenPacket(outBuf, rawPkt)
 		if err != nil {
 			continue // Tag mismatch or replay drop
 		}
@@ -1114,7 +1373,7 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 				_ = wt.WritePacket(payload)
 				e.bytesDown.Add(uint64(len(payload)))
 				if e.fecEnabled.Load() && e.fecDecoder != nil {
-					seq := binary.BigEndian.Uint64(inBuf[9:17])
+					seq := binary.BigEndian.Uint64(rawPkt[9:17])
 					e.fecDecoder.RecordPacket(seq, payload)
 				}
 			}
@@ -1124,12 +1383,14 @@ func (e *Engine) pumpUDPToWinTun(ctx context.Context, conn *net.UDPConn) {
 			if e.fecEnabled.Load() && e.fecDecoder != nil {
 				fecPayload, err := protocol.DecodeFECPayload(payload)
 				if err == nil {
-					_, recovered, ok := e.fecDecoder.ProcessParity(fecPayload)
-					if ok && len(recovered) >= 20 && (recovered[0]>>4) == 4 && wt != nil {
-						_ = wt.WritePacket(recovered)
-						e.bytesDown.Add(uint64(len(recovered)))
-						e.packetsRecovered.Add(1)
-						e.lastRecoveryAt.Store(time.Now().UnixNano())
+					for _, rec := range e.fecDecoder.ProcessParityMulti(fecPayload) {
+						recovered := rec.Data
+						if len(recovered) >= 20 && (recovered[0]>>4) == 4 && wt != nil {
+							_ = wt.WritePacket(recovered)
+							e.bytesDown.Add(uint64(len(recovered)))
+							e.packetsRecovered.Add(1)
+							e.lastRecoveryAt.Store(time.Now().UnixNano())
+						}
 					}
 				}
 			}
@@ -1186,13 +1447,14 @@ func (e *Engine) loopFECFlush(ctx context.Context) {
 			if !e.fecEnabled.Load() || e.fecEncoder == nil {
 				continue
 			}
-			payload, ok := e.fecEncoder.CheckFlush(now)
-			if !ok {
+			payloads := e.fecEncoder.CheckFlushMulti(now)
+			if len(payloads) == 0 {
 				continue
 			}
 
 			e.mu.Lock()
 			crypto := e.crypto
+			obfs := e.obfs
 			sessID := e.sessionID
 			conn := e.udpConn
 			rAddr := e.relayAddr
@@ -1201,22 +1463,30 @@ func (e *Engine) loopFECFlush(ctx context.Context) {
 			if crypto == nil || conn == nil {
 				continue
 			}
-			fecPkt := crypto.EncodeFEC(fecPktBuf, sessID, payload)
-			if _, err := conn.WriteToUDP(fecPkt, net.UDPAddrFromAddrPort(rAddr)); err == nil {
-				e.fecParitySent.Add(1)
+			for _, payload := range payloads {
+				fecPkt := crypto.EncodeFEC(fecPktBuf, sessID, payload)
+				if obfs != nil {
+					fecPkt = obfs.ObfuscateSession(nil, fecPkt)
+				}
+				if _, err := conn.WriteToUDP(fecPkt, net.UDPAddrFromAddrPort(rAddr)); err == nil {
+					e.fecParitySent.Add(1)
+				}
 			}
 		}
 	}
 }
 
 // shouldHedge reports whether packet duplication is currently warranted. It
-// stays active only for a short window after the most recent FEC recovery.
+// activates briefly after an FEC recovery or while measured loss is >= 2%.
 func (e *Engine) shouldHedge() bool {
+	if math.Float64frombits(e.lossPctBits.Load()) >= 2.0 {
+		return true
+	}
 	last := e.lastRecoveryAt.Load()
 	if last == 0 {
 		return false
 	}
-	return time.Since(time.Unix(0, last)) < 2*time.Second
+	return time.Since(time.Unix(0, last)) < 3*time.Second
 }
 
 func (e *Engine) loopKeepalive(ctx context.Context) {
@@ -1249,6 +1519,7 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 
 			e.mu.Lock()
 			crypto := e.crypto
+			obfs := e.obfs
 			sessID := e.sessionID
 			conn := e.udpConn
 			rAddr := e.relayAddr
@@ -1256,6 +1527,9 @@ func (e *Engine) loopKeepalive(ctx context.Context) {
 
 			if crypto != nil && conn != nil {
 				sealedPing := crypto.EncodePing(pingBuf, sessID, uint64(time.Now().UnixNano()))
+				if obfs != nil {
+					sealedPing = obfs.ObfuscateSession(nil, sealedPing)
+				}
 				_, _ = conn.WriteToUDP(sealedPing, net.UDPAddrFromAddrPort(rAddr))
 			}
 		}
@@ -1354,12 +1628,12 @@ func (e *Engine) loopFailoverMonitor(ctx context.Context) {
 			lossPct := lossRate * 100.0
 			e.lossPctBits.Store(math.Float64bits(lossPct))
 
-			// Adaptively adjust FEC block size based on loss telemetry
+			// Adaptively adjust FEC block size and Reed-Solomon parity depth based on loss telemetry
 			if e.fecEnabled.Load() && e.fecController != nil && e.fecEncoder != nil {
-				newBlockSize, changed := e.fecController.UpdateLoss(lossPct)
+				newK, newM, changed := e.fecController.UpdateLossProfile(lossPct)
 				if changed {
-					e.fecEncoder.SetBlockSize(newBlockSize)
-					log.Printf("[FEC] Adaptive loss controller scaled FEC block size to %d (loss: %.2f%%)", newBlockSize, lossPct)
+					e.fecEncoder.SetProfile(newK, newM)
+					log.Printf("[FEC] Adaptive controller scaled FEC profile to %d:%d (loss: %.2f%%)", newK, newM, lossPct)
 				}
 			}
 
@@ -1669,6 +1943,18 @@ func (e *Engine) SetL4FilterEnabled(enabled bool) {
 // IsL4FilterEnabled reports whether L4 smart game tick filtering is currently enabled.
 func (e *Engine) IsL4FilterEnabled() bool {
 	return e.l4FilterEnabled.Load()
+}
+
+// SetObfuscation toggles Anti-DPI UDP packet header/handshake obfuscation.
+// Takes effect on the next native Lagvex relay connection.
+func (e *Engine) SetObfuscation(enabled bool) {
+	e.obfuscationEnabled.Store(enabled)
+	log.Printf("[Engine] Anti-DPI UDP obfuscation set to: %v", enabled)
+}
+
+// IsObfuscationEnabled reports whether Anti-DPI UDP obfuscation is enabled.
+func (e *Engine) IsObfuscationEnabled() bool {
+	return e.obfuscationEnabled.Load()
 }
 
 // FailoverHistory returns recent failover events.

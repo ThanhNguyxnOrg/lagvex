@@ -60,19 +60,20 @@ type DualSenderStats struct {
 
 type dualFrame struct {
 	seq      uint32
-	framed   []byte
+	inner    []byte
 	sentAt   time.Time
 	attempts int
 	nextTry  time.Time
 }
 
 type dualSender struct {
-	mu        sync.Mutex
-	groupHash uint32
-	nextSeq   uint32
-	ackedSeq  uint32
-	ring      map[uint32]*dualFrame
-	ringQ     []uint32
+	mu               sync.Mutex
+	groupHash        uint32 // primary relay's PSK-derived group hash
+	standbyGroupHash uint32 // standby relay's PSK-derived group hash (may differ when PSKs differ)
+	nextSeq          uint32
+	ackedSeq         uint32
+	ring             map[uint32]*dualFrame
+	ringQ            []uint32
 
 	now       func() time.Time
 	threshold time.Duration
@@ -85,6 +86,15 @@ type dualSender struct {
 }
 
 func newDualSender(groupHash uint32, now func() time.Time, threshold time.Duration) *dualSender {
+	return newDualSenderPair(groupHash, groupHash, now, threshold)
+}
+
+// newDualSenderPair supports independent primary and standby PSKs by stamping
+// each relay's own PSK-derived group hash on frames routed to that relay.
+func newDualSenderPair(primaryHash, standbyHash uint32, now func() time.Time, threshold time.Duration) *dualSender {
+	if standbyHash == 0 {
+		standbyHash = primaryHash
+	}
 	if now == nil {
 		now = time.Now
 	}
@@ -95,16 +105,16 @@ func newDualSender(groupHash uint32, now func() time.Time, threshold time.Durati
 		threshold = DualMaxRetransmitThreshold
 	}
 	return &dualSender{
-		groupHash: groupHash,
-		ring:      make(map[uint32]*dualFrame),
-		now:       now,
-		threshold: threshold,
+		groupHash:        primaryHash,
+		standbyGroupHash: standbyHash,
+		ring:             make(map[uint32]*dualFrame),
+		now:              now,
+		threshold:        threshold,
 	}
 }
 
-// frame assigns the next dual sequence, appends the trailer and stores the
-// frame for potential retransmission. The returned slice is a fresh copy the
-// caller may seal toward any relay.
+// frame assigns the next dual sequence, appends the primary trailer and stores
+// the raw inner packet for potential retransmission toward either relay.
 func (d *dualSender) frame(inner []byte) ([]byte, uint32) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -116,7 +126,7 @@ func (d *dualSender) frame(inner []byte) ([]byte, uint32) {
 
 	d.ring[seq] = &dualFrame{
 		seq:     seq,
-		framed:  append([]byte(nil), framed...),
+		inner:   append([]byte(nil), inner...),
 		sentAt:  now,
 		nextTry: now.Add(d.threshold),
 	}
@@ -190,9 +200,13 @@ func (d *dualSender) pendingRetransmits() []DualRetransmit {
 			backoff = dualFrameTTL / 2
 		}
 		entry.nextTry = now.Add(backoff)
+		targetHash := d.groupHash
+		if entry.attempts >= 2 {
+			targetHash = d.standbyGroupHash
+		}
 		due = append(due, DualRetransmit{
 			Seq:     entry.seq,
-			Frame:   append([]byte(nil), entry.framed...),
+			Frame:   protocol.AppendDualTrailer(entry.inner, entry.seq, targetHash),
 			Attempt: entry.attempts,
 		})
 		if len(due) >= dualRingCap {
