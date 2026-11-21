@@ -72,10 +72,17 @@ jobs:
           fi
 
           if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?)$ ]]; then
-            CHECKED_OUT_TAG="$(git describe --tags --exact-match HEAD)"
-            if [[ "$CHECKED_OUT_TAG" != "$TAG" ]]; then
-              echo "::error::The selected ref is not the exact requested tag: $TAG"
-              exit 1
+            if [[ "$EVENT_NAME" == "push" ]]; then
+              git merge-base --is-ancestor "${TAG}^{commit}" HEAD || {
+                echo "::error::The selected release tag is not reachable from main: $TAG"
+                exit 1
+              }
+            else
+              CHECKED_OUT_TAG="$(git describe --tags --exact-match HEAD)"
+              if [[ "$CHECKED_OUT_TAG" != "$TAG" ]]; then
+                echo "::error::The selected ref is not the exact requested tag: $TAG"
+                exit 1
+              fi
             fi
             VERSION="${TAG#v}"
             SHOULD_RELEASE="true"
