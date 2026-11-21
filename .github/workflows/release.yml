@@ -215,11 +215,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: 🔐 Mint repository-scoped ThanhNguyxnAgent token
+      - name: 🔐 Mint release-scoped ThanhNguyxnAgent token
         id: agent
         uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
         with:
-          profile: content
+          profile: release
           app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_PRIVATE_KEY }}
 
