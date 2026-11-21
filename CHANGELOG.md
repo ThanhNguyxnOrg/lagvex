@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+- Docker Compose now requires an explicit relay PSK. Relays using the old public default must rotate their key and update clients.
+
 ## [1.10.0] - 2026-11-21
 
 ### ✨ Free Mode, Burst-Loss RS-FEC, Anti-DPI & Diagnostics
@@ -590,4 +594,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - dual-path dedup readiness (Redundant-lite Phase 1) ([3b54e8e](https://github.com/ThanhNguyxnOrg/lagvex/commit/3b54e8ecde73fa8841e95638b4cb17e4699aede0))
-

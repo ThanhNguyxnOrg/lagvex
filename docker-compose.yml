@@ -10,7 +10,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - LAGVEX_PSK=${LAGVEX_PSK:-change_this_to_your_secure_psk}
+      - LAGVEX_PSK=${LAGVEX_PSK:?Set LAGVEX_PSK to a private relay key}
       - LAGVEX_PORT=51820
       - LAGVEX_SUBNET=10.88.0.0/24
     volumes:
