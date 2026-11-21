@@ -2,12 +2,6 @@ name: 🚀 Build & Publish Release 📦
 
 on:
   create:
-  # Reconcile a tagged release whose tag exists but whose draft was never created.
-  # This path is intentionally limited to edits of this workflow on main.
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/release.yml'
   workflow_dispatch:
     inputs:
       tag:
@@ -53,36 +47,13 @@ jobs:
             TAG="$INPUT_TAG"
           elif [[ "$REF_TYPE" == "tag" ]]; then
             TAG="$REF_NAME"
-          elif [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
-            # A release tag can be created without going through the central
-            # commit-intent controller. Pick the newest reachable semver tag
-            # that has a changelog section but no Release record yet.
-            RELEASES="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")"
-            while IFS= read -r CANDIDATE; do
-              [[ "$CANDIDATE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$ ]] || continue
-              CANDIDATE_VERSION="${CANDIDATE#v}"
-              git merge-base --is-ancestor "${CANDIDATE}^{commit}" HEAD || continue
-              grep -Eq "^## \\[${CANDIDATE_VERSION}\\]([[:space:]]|$)" CHANGELOG.md || continue
-              if jq -e --arg tag "$CANDIDATE" '[.[] | select(.tag_name == $tag)] | length > 0' <<< "$RELEASES" >/dev/null; then
-                continue
-              fi
-              TAG="$CANDIDATE"
-              break
-            done < <(git tag --list 'v[0-9]*' --sort=-version:refname)
           fi
 
           if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?)$ ]]; then
-            if [[ "$EVENT_NAME" == "push" ]]; then
-              git merge-base --is-ancestor "${TAG}^{commit}" HEAD || {
-                echo "::error::The selected release tag is not reachable from main: $TAG"
-                exit 1
-              }
-            else
-              CHECKED_OUT_TAG="$(git describe --tags --exact-match HEAD)"
-              if [[ "$CHECKED_OUT_TAG" != "$TAG" ]]; then
-                echo "::error::The selected ref is not the exact requested tag: $TAG"
-                exit 1
-              fi
+            CHECKED_OUT_TAG="$(git describe --tags --exact-match HEAD)"
+            if [[ "$CHECKED_OUT_TAG" != "$TAG" ]]; then
+              echo "::error::The selected ref is not the exact requested tag: $TAG"
+              exit 1
             fi
             VERSION="${TAG#v}"
             SHOULD_RELEASE="true"
@@ -200,94 +171,8 @@ jobs:
           path: release-artifacts/*
           if-no-files-found: error
 
-  prepare-release-draft:
-    name: 📝 Ensure release draft exists
-    needs: [detect, build-and-release]
-    if: needs.detect.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: 📥 Checkout tagged release
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.detect.outputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: 🔐 Mint release-scoped ThanhNguyxnAgent token
-        id: agent
-        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
-        with:
-          profile: release
-          app-id: ${{ vars.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
-
-      - name: 🧾 Create or recover the tagged draft release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.agent.outputs.token }}
-          TAG: ${{ needs.detect.outputs.tag }}
-          VERSION: ${{ needs.detect.outputs.version }}
-        run: |
-          set -euo pipefail
-          API="repos/${GITHUB_REPOSITORY}"
-          TAG_SHA="$(git rev-parse "${TAG}^{commit}")"
-          RELEASES="$(gh api "${API}/releases?per_page=100")"
-
-          MATCH="$(jq -c --arg tag "$TAG" '[.[] | select(.tag_name == $tag)] | sort_by(.created_at) | last // empty' <<< "$RELEASES")"
-          if [[ -n "$MATCH" && "$MATCH" != "null" ]]; then
-            IS_DRAFT="$(jq -r '.draft' <<< "$MATCH")"
-            if [[ "$IS_DRAFT" != "true" ]]; then
-              echo "::error::Release $TAG is already published; refusing to mutate it."
-              exit 1
-            fi
-            echo "Reusing existing draft $TAG (release id $(jq -r '.id' <<< "$MATCH"))."
-            exit 0
-          fi
-
-          # Recover an older untagged draft only when both its target SHA and
-          # release name identify this exact version. Never attach an unrelated draft.
-          ORPHAN_ID="$(jq -r --arg tag "$TAG" --arg sha "$TAG_SHA" '
-            [.[] | select(
-              .draft == true
-              and (.tag_name | startswith("untagged-"))
-              and .target_commitish == $sha
-              and ((.name // "") | endswith($tag))
-            )] | sort_by(.created_at) | last | .id // empty
-          ' <<< "$RELEASES")"
-          if [[ -n "$ORPHAN_ID" ]]; then
-            RELEASE="$(gh api --method PATCH "${API}/releases/${ORPHAN_ID}" \
-              -f tag_name="$TAG" -f target_commitish="$TAG_SHA" -F draft=true)"
-            jq -e --arg tag "$TAG" '.tag_name == $tag and .draft == true' <<< "$RELEASE" >/dev/null
-            echo "Recovered orphan draft $ORPHAN_ID for $TAG."
-            exit 0
-          fi
-
-          NOTES_FILE="$(mktemp)"
-          PAYLOAD_FILE="$(mktemp)"
-          trap 'rm -f "$NOTES_FILE" "$PAYLOAD_FILE"' EXIT
-          awk -v version="$VERSION" '
-            !found && $0 ~ ("^## \\[" version "\\]([[:space:]]|$)") { found=1 }
-            found && /^## / && $0 !~ ("^## \\[" version "\\]([[:space:]]|$)") { exit }
-            found { print }
-            END { if (!found) exit 1 }
-          ' CHANGELOG.md > "$NOTES_FILE"
-
-          jq -n \
-            --arg tag "$TAG" \
-            --arg target "$TAG_SHA" \
-            --arg name "Lagvex $TAG" \
-            --rawfile body "$NOTES_FILE" \
-            '{tag_name:$tag,target_commitish:$target,name:$name,body:$body,draft:true,prerelease:false}' \
-            > "$PAYLOAD_FILE"
-
-          RELEASE="$(gh api --method POST "${API}/releases" --input "$PAYLOAD_FILE")"
-          jq -e --arg tag "$TAG" '.tag_name == $tag and .draft == true' <<< "$RELEASE" >/dev/null
-          echo "Created draft $TAG (release id $(jq -r '.id' <<< "$RELEASE"))."
-
   publish:
-    needs: [detect, build-and-release, prepare-release-draft]
+    needs: [detect, build-and-release]
     permissions:
       actions: read
       contents: read
