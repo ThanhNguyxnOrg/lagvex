@@ -594,3 +594,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Features
 
 - dual-path dedup readiness (Redundant-lite Phase 1) ([3b54e8e](https://github.com/ThanhNguyxnOrg/lagvex/commit/3b54e8ecde73fa8841e95638b4cb17e4699aede0))
+
+## [1.10.1] - 2026-11-21
+
+### Bug Fixes and Performance
+
+- require a private Compose key ([8d697ed](https://github.com/ThanhNguyxnOrg/lagvex/commit/8d697edfc61180bb425fbfb72594be8e7e6b0274))
+
