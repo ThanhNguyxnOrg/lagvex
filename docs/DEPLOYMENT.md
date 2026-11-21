@@ -195,7 +195,7 @@ The relay serves two open HTTP endpoints on **UDP port + 1** (default
 
 | Risk | What an attacker gets | Mitigation |
 |---|---|---|
-| **Port-scan oracle** — the RTT/loss pair distinguishes open, refused and filtered ports on any public host | a slow, rate-limited probe of third-party hosts | 1 request / 2 s / IP; private, loopback, link-local and bogon hosts are refused **before** dialing; a limiter of its own that squad traffic cannot consume |
+| **Port-scan oracle** — the RTT/loss pair distinguishes open, refused and filtered ports on any public host | a slow, rate-limited probe of third-party hosts | 1 request / 2 s / IP **and** a sustained 600/hour/IP cap (a legitimate dashboard needs ~60/hour); private, loopback, link-local and bogon hosts are refused **before** dialing; a limiter of its own that squad traffic cannot consume |
 | **Reflected load** — asking the relay to dial a victim 3× per request | ≤3 TCP handshakes per 2 s per source IP | same limiter; no UDP, no amplification |
 | **Resource pinning** | nothing persisted per request | per-IP bookkeeping capped at 4096 entries |
 

@@ -248,9 +248,9 @@ region — see [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [docs/COST.md](COST.md).
   explicit public game-server IP so the dashboard can show the relay→server
   segment (ExitLag's `PingToDS` equivalent). It takes no PSK (the
   measurement is exactly what the client's own TCP ping tool performs
-  locally), rate-limits one request per source IP per two seconds on a
-  limiter of its own so it cannot starve squad polling, and refuses private,
-  loopback and bogon hosts before dialing.
+  locally), rate-limits one request per source IP per two seconds plus a
+  sustained 600/hour per-IP cap on limiters of its own so it cannot starve
+  squad polling, and refuses private, loopback and bogon hosts before dialing.
   The remaining abuse surface (a slow, rate-limited port-scan oracle) and its
   firewall escape hatch are documented in [DEPLOYMENT.md §7](DEPLOYMENT.md).
 

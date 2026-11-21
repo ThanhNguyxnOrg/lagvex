@@ -80,8 +80,10 @@ type Server struct {
 
 	// gameServerProbeLimiter bounds how often one source IP may ask the relay
 	// to dial a game server. It is separate from squadRate so the two
-	// endpoints cannot starve each other.
-	gameServerProbeLimiter probeRateLimiter
+	// endpoints cannot starve each other. The hourly limiter bounds sustained
+	// scanning that the burst window alone would still allow.
+	gameServerProbeLimiter  probeRateLimiter
+	gameServerHourlyLimiter probeRateLimiter
 
 	bufPool sync.Pool
 

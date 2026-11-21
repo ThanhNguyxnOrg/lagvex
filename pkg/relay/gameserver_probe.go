@@ -35,6 +35,13 @@ const (
 
 	// probeRateEntriesCap bounds the probe limiter's own bookkeeping.
 	probeRateEntriesCap = 4096
+
+	// probeHourlyWindow / probeHourlyLimit bound sustained abuse. The 2 s
+	// window already stops bursts; this one bounds a scanner to a fraction of
+	// its reach per hour. A legitimate dashboard needs about one probe per
+	// minute per game while boosting, so 600/hour is 10x headroom.
+	probeHourlyWindow = time.Hour
+	probeHourlyLimit  = 600
 )
 
 // probeDial dials one TCP target. It is a variable so tests can replace it
@@ -147,6 +154,10 @@ func (s *Server) handleProbeGameServer(w http.ResponseWriter, r *http.Request) {
 	// correct request wait out the window.
 	if !s.gameServerProbeLimiter.allow(clientIP(r), probeGameServerWindow, probeGameServerLimit) {
 		http.Error(w, `{"error":"too many relay probe requests, wait 2 seconds"}`, http.StatusTooManyRequests)
+		return
+	}
+	if !s.gameServerHourlyLimiter.allow(clientIP(r), probeHourlyWindow, probeHourlyLimit) {
+		http.Error(w, `{"error":"relay probe hourly limit reached for this address"}`, http.StatusTooManyRequests)
 		return
 	}
 

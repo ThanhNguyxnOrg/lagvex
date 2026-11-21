@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   objects, so an unbounded body was pure attack surface: an anonymous caller
   could stream JSON that never closes and make each request allocate the whole
   stream. Oversized bodies now fail to decode and are answered with 400.
+- The relay probe's rate limit now runs on two limiters of its own: the 2 s
+  burst window plus a sustained 600/hour per-IP cap. The burst window alone
+  still allowed 1,800 probes/hour, which is enough to turn the endpoint into a
+  slow port scanner; the hourly cap bounds it to a fraction of that while
+  staying ten times what a real dashboard uses (~60/hour).
 
 ---
 

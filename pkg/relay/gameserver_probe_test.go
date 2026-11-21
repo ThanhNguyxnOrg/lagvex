@@ -156,6 +156,31 @@ func TestProbeGameServerCORSAndOptions(t *testing.T) {
 	}
 }
 
+// TestProbeGameServerHourlyLimit: the burst window alone still allows a
+// scanner up to 1,800 probes/hour, so a second, sustained limiter bounds it.
+// The handler path cannot reach 600 requests without waiting out the burst
+// window 600 times, so this drives the limiter directly.
+func TestProbeGameServerHourlyLimit(t *testing.T) {
+	l := probeRateLimiter{}
+	for i := 0; i < probeHourlyLimit; i++ {
+		if !l.allow("1.2.3.4", probeHourlyWindow, probeHourlyLimit) {
+			t.Fatalf("hourly limiter refused request #%d of %d", i+1, probeHourlyLimit)
+		}
+	}
+	if l.allow("1.2.3.4", probeHourlyWindow, probeHourlyLimit) {
+		t.Fatalf("hourly limiter allowed request #%d", probeHourlyLimit+1)
+	}
+	// Another address is unaffected: the cap is per source IP.
+	if !l.allow("5.6.7.8", probeHourlyWindow, probeHourlyLimit) {
+		t.Fatal("another IP was refused by the first IP's hourly window")
+	}
+	// The sustained cap is a documented, generous margin: the dashboard probes
+	// about once a minute while boosting, i.e. 60/hour.
+	if ratio := probeHourlyLimit / 60; ratio < 5 {
+		t.Fatalf("hourly limit %d is only %dx the legitimate need", probeHourlyLimit, ratio)
+	}
+}
+
 // TestProbeRateLimiterIsPerEndpoint verifies the probe limiter is separate
 // from the squad limiter: a squad-poll window must not consume probe slots.
 func TestProbeRateLimiterIsPerEndpoint(t *testing.T) {
