@@ -298,7 +298,8 @@ func validateSubscriptionURL(raw string) (*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
-	if u.Scheme != "https" && !(allowLocalSubscriptionForTests && u.Scheme == "http") {
+	allowedHTTP := allowLocalSubscriptionForTests && u.Scheme == "http"
+	if u.Scheme != "https" && !allowedHTTP {
 		return nil, fmt.Errorf("subscription URL must use https://")
 	}
 	host := strings.TrimSpace(u.Hostname())

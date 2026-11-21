@@ -111,7 +111,7 @@ func RegisterFreeWARP(ctx context.Context) (profiles.RelayEndpoint, error) {
 		return profiles.RelayEndpoint{}, fmt.Errorf("read WARP registration response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return profiles.RelayEndpoint{}, fmt.Errorf("Cloudflare WARP registration returned HTTP %d", resp.StatusCode)
+		return profiles.RelayEndpoint{}, fmt.Errorf("cloudflare WARP registration returned HTTP %d", resp.StatusCode)
 	}
 
 	var parsed warpRegResponse
