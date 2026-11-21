@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   verify:
-    uses: ThanhNguyxnOrg/.github/.github/workflows/ci-go.yml@dde345c28f4fc33bb49ac46e46b8adc174c24f7e
+    uses: ThanhNguyxnOrg/.github/.github/workflows/ci-go.yml@ci-v1
     with:
       job_name: Verify (Lagvex Go)
       go_version: stable
