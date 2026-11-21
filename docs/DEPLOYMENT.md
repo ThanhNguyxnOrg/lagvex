@@ -179,6 +179,34 @@ ip addr show dev lagvex0
 
 ---
 
+## 7. 🌐 The Public HTTP Port (squad signalling + relay probe)
+
+The relay serves two open HTTP endpoints on **UDP port + 1** (default
+`51821`), because squad rooms must be joinable across networks:
+
+- `/squad/*` — squad room signalling (CORS-open, rate limited per IP, capped
+  room count, CSPRNG codes).
+- `/probe/gameserver` — the game-server TCP probe the dashboard uses for the
+  relay→server route segment. It takes **no PSK**: the measurement is exactly
+  what the client's own TCP ping tool performs locally and reveals nothing
+  about the relay's configuration.
+
+### Abuse surface, and its limits
+
+| Risk | What an attacker gets | Mitigation |
+|---|---|---|
+| **Port-scan oracle** — the RTT/loss pair distinguishes open, refused and filtered ports on any public host | a slow, rate-limited probe of third-party hosts | 1 request / 2 s / IP; private, loopback, link-local and bogon hosts are refused **before** dialing; a limiter of its own that squad traffic cannot consume |
+| **Reflected load** — asking the relay to dial a victim 3× per request | ≤3 TCP handshakes per 2 s per source IP | same limiter; no UDP, no amplification |
+| **Resource pinning** | nothing persisted per request | per-IP bookkeeping capped at 4096 entries |
+
+If you do not need squad rooms or the route segment, close the port:
+`iptables -A INPUT -p tcp --dport 51821 -j DROP`. The UDP data-plane port is
+the only one the tunnel itself requires. The probe endpoint is what makes the
+"relay→server" segment measurable, so closing it only removes that display —
+never fabricates a value in its place (`—` with a reason instead).
+
+---
+
 🔗 **Navigation**:
 - 🏠 [**Project README**](../README.md)
 - 🤝 [**Contributor Guide**](../CONTRIBUTING.md)

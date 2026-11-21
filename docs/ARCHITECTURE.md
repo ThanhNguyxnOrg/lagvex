@@ -251,6 +251,8 @@ region — see [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [docs/COST.md](COST.md).
   locally), rate-limits one request per source IP per two seconds on a
   limiter of its own so it cannot starve squad polling, and refuses private,
   loopback and bogon hosts before dialing.
+  The remaining abuse surface (a slow, rate-limited port-scan oracle) and its
+  firewall escape hatch are documented in [DEPLOYMENT.md §7](DEPLOYMENT.md).
 
 ---
 
