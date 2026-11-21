@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still allowed 1,800 probes/hour, which is enough to turn the endpoint into a
   slow port scanner; the hourly cap bounds it to a fraction of that while
   staying ten times what a real dashboard uses (~60/hour).
+- `POST /squad/leave` no longer answers success for a body that does not
+  decode: nothing changed, and the caller deserves a 400 instead.
 
 ---
 

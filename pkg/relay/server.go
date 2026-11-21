@@ -983,7 +983,12 @@ func (s *Server) handleSquadLeave(w http.ResponseWriter, r *http.Request) {
 		Code string `json:"code"`
 		Name string `json:"name"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	// A body that does not decode must not be reported as a successful
+	// leave: nothing changed, and the caller deserves to know why.
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
 
 	req.Code = strings.ToUpper(strings.TrimSpace(req.Code))
 	s.squadRoomsMu.Lock()

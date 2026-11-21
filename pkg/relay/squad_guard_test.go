@@ -163,3 +163,20 @@ func TestSquadRoomAcceptsCodeFromBody(t *testing.T) {
 		t.Fatalf("room code = %q, want %q", got.Code, created.Code)
 	}
 }
+
+// TestSquadLeaveRejectsUndecodableBody: a leave request whose body does not
+// decode changed nothing, so it must not answer success. The public port's
+// 8 KiB cap routes oversized bodies here too.
+func TestSquadLeaveRejectsUndecodableBody(t *testing.T) {
+	_, handler := newSquadTestServer(t)
+
+	for _, body := range []string{"not-json", "", "{\"code\":}"} {
+		req := httptest.NewRequest(http.MethodPost, "/squad/leave", strings.NewReader(body))
+		req.RemoteAddr = "203.0.113.10:5555"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("leave body %q: status = %d, want 400", body, rec.Code)
+		}
+	}
+}
