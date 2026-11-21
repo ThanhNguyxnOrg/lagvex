@@ -151,12 +151,17 @@ Deploying with Docker Compose:
 git clone https://github.com/ThanhNguyxnOrg/lagvex.git
 cd lagvex
 
-# Set custom Pre-Shared Key
-export LAGVEX_PSK="your_custom_psk"
+# Generate a key once for this relay
+LAGVEX_PSK=$(openssl rand -hex 32)
+export LAGVEX_PSK
 
 # Launch container in background
 docker compose up -d
 ```
+
+Save the key in your password manager and supply the same `LAGVEX_PSK` for
+future Compose commands. Share it privately with clients. If your relay used
+the old Compose default, recreate it with a new key and update its clients.
 
 ---
 

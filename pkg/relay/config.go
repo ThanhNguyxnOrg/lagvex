@@ -32,6 +32,9 @@ func (c *Config) Validate() error {
 	if len(c.PSK) == 0 {
 		return errors.New("pre-shared key (PSK) cannot be empty")
 	}
+	if string(c.PSK) == "change_this_to_your_secure_psk" {
+		return errors.New("replace the public Compose default with a private pre-shared key (PSK)")
+	}
 	if c.MTU <= 0 {
 		c.MTU = 1400
 	}
