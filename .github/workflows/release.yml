@@ -206,7 +206,7 @@ jobs:
     if: needs.detect.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: 📥 Checkout tagged release
         uses: actions/checkout@v7
@@ -215,10 +215,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: 🔐 Mint repository-scoped ThanhNguyxnAgent token
+        id: agent
+        uses: ThanhNguyxnOrg/.github/.github/actions/agent-token@2b5c5cad571ee93fd091e16e1734ebd819191e68
+        with:
+          profile: content
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+
       - name: 🧾 Create or recover the tagged draft release
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.agent.outputs.token }}
           TAG: ${{ needs.detect.outputs.tag }}
           VERSION: ${{ needs.detect.outputs.version }}
         run: |
