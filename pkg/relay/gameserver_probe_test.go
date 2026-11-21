@@ -119,6 +119,43 @@ func TestProbeGameServerResponseShape(t *testing.T) {
 	}
 }
 
+// TestProbeGameServerBodyLimit: a public endpoint must not buffer an
+// unbounded request body. Anything past the middleware cap fails to decode,
+// so the answer is a 400 rather than memory pressure.
+func TestProbeGameServerBodyLimit(t *testing.T) {
+	srv := &Server{}
+	handler := srv.squadRateLimitMiddleware(http.HandlerFunc(srv.handleProbeGameServer))
+
+	big := `{"host":"203.0.113.7","port":443,"pad":"` + strings.Repeat("a", 64<<10) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/probe/gameserver", strings.NewReader(big))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 for an oversized body", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "invalid JSON body") {
+		t.Fatalf("body = %q, want the decode error", rec.Body.String())
+	}
+}
+
+// TestProbeGameServerCORSAndOptions keeps the open-port contract intact: the
+// body cap applies to requests with bodies, not to CORS preflights.
+func TestProbeGameServerCORSAndOptions(t *testing.T) {
+	srv := &Server{}
+	handler := srv.squadRateLimitMiddleware(http.HandlerFunc(srv.handleProbeGameServer))
+
+	req := httptest.NewRequest(http.MethodOptions, "/probe/gameserver", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("OPTIONS status = %d, want 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, want *", got)
+	}
+}
+
 // TestProbeRateLimiterIsPerEndpoint verifies the probe limiter is separate
 // from the squad limiter: a squad-poll window must not consume probe slots.
 func TestProbeRateLimiterIsPerEndpoint(t *testing.T) {

@@ -148,12 +148,20 @@ func (s *Server) insertRoomLocked(room *RelaySquadRoom) {
 }
 
 // squadRateLimitMiddleware applies the per-IP limits to the signaling routes.
+// relayMaxBodyBytes bounds any request body on the public signaling port. The
+// handlers decode small JSON objects, so an unbounded body is pure attack
+// surface: an anonymous caller could stream JSON that never closes and make
+// each request allocate the whole stream. Bytes beyond the limit surface as an
+// "unexpected EOF"/"http: request body too large" decode error.
+const relayMaxBodyBytes = 8 << 10
+
 func (s *Server) squadRateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
 			next.ServeHTTP(w, r)
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, relayMaxBodyBytes)
 		ip := clientIP(r)
 		switch r.URL.Path {
 		case "/squad/create":

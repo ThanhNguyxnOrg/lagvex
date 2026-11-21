@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.1] - Unreleased
+
+### 🛡️ Security
+
+- Every request body on the relay's public signaling port is capped at 8 KiB
+  by the rate-limit middleware. The squad and probe handlers decode small JSON
+  objects, so an unbounded body was pure attack surface: an anonymous caller
+  could stream JSON that never closes and make each request allocate the whole
+  stream. Oversized bodies now fail to decode and are answered with 400.
+
+---
+
 ## [1.9.0] - 2026-11-20
 
 ### 🧪 Test, correctness and docs sync
